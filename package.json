@@ -1,6 +1,6 @@
 {
   "name": "beautiful-mermaid",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "license": "MIT",
   "description": "Render Mermaid diagrams as beautiful SVGs or ASCII art. Ultra-fast, fully themeable, zero DOM dependencies.",
   "type": "module",

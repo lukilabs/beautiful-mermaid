@@ -11,7 +11,7 @@ Ultra-fast, fully themeable, zero DOM dependencies. Built for the AI era.
 [![npm version](https://img.shields.io/npm/v/beautiful-mermaid.svg)](https://www.npmjs.com/package/beautiful-mermaid)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-[**Live Demo & Samples**](https://agents.craft.do/mermaid) · [Themes](#themes) · [API](#api) · [GitHub](https://github.com/lukilabs/beautiful-mermaid)
+[**Live Demo & Samples**](https://agents.craft.do/mermaid)
 
 **[→ Use it live in Craft Agents](https://agents.craft.do)**
 
@@ -33,7 +33,7 @@ Diagrams are essential for AI-assisted programming. When you're working with an 
 We built `beautiful-mermaid` at [Craft](https://craft.do) to power diagrams in [Craft Agents](https://agents.craft.do). It's fast, beautiful, and works everywhere—from rich UIs to plain terminals.
 
 
-The ASCII rendering engine is based on [mermaid-ascii](https://github.com/AlexanderGrooff/mermaid-ascii) by Alexander Grooff. We ported it from Python to TypeScript and extended it Thank you Alexander for the excellent foundation! (And inspiration that this was possible.)
+The ASCII rendering engine is based on [mermaid-ascii](https://github.com/AlexanderGrooff/mermaid-ascii) by Alexander Grooff. We ported it from Go to TypeScript and extended it Thank you Alexander for the excellent foundation! (And inspiration that this was possible.)
 
 ## Features
 
@@ -388,7 +388,7 @@ Default colors (`#FFFFFF` / `#27272A`).
 
 ## Attribution
 
-The ASCII rendering engine is based on [mermaid-ascii](https://github.com/AlexanderGrooff/mermaid-ascii) by Alexander Grooff. We ported it from Python to TypeScript and extended it with:
+The ASCII rendering engine is based on [mermaid-ascii](https://github.com/AlexanderGrooff/mermaid-ascii) by Alexander Grooff. We ported it from Go to TypeScript and extended it with:
 
 - Sequence diagram support
 - Class diagram support
