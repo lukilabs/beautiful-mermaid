@@ -1,5 +1,7 @@
 # Dependencies
 node_modules/
+skills/**/node_modules/
+skill-dist/
 
 # Build output
 dist/
