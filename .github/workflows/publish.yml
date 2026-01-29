@@ -32,3 +32,40 @@ jobs:
         run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  release-binaries:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - target: bun-linux-x64
+            name: bmmdc-linux-x64
+          - target: bun-linux-arm64
+            name: bmmdc-linux-arm64
+          - target: bun-darwin-x64
+            name: bmmdc-darwin-x64
+          - target: bun-darwin-arm64
+            name: bmmdc-darwin-arm64
+          - target: bun-windows-x64
+            name: bmmdc-windows-x64.exe
+          - target: bun-windows-arm64
+            name: bmmdc-windows-arm64.exe
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build binary
+        run: bun build ./src/cli.ts --compile --minify --target=${{ matrix.target }} --outfile ${{ matrix.name }}
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.name }}
