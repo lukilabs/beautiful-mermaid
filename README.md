@@ -39,6 +39,7 @@ The ASCII rendering engine is based on [mermaid-ascii](https://github.com/Alexan
 
 - **5 diagram types** — Flowcharts, State, Sequence, Class, and ER diagrams
 - **Dual output** — SVG for rich UIs, ASCII/Unicode for terminals
+- **Standalone CLI** — Single binary, no runtime required
 - **15 built-in themes** — And dead simple to add your own
 - **Full Shiki compatibility** — Use any VS Code theme directly
 - **Live theme switching** — CSS custom properties, no re-render needed
@@ -48,12 +49,52 @@ The ASCII rendering engine is based on [mermaid-ascii](https://github.com/Alexan
 
 ## Installation
 
+### As a library
+
 ```bash
 npm install beautiful-mermaid
 # or
 bun add beautiful-mermaid
 # or
 pnpm add beautiful-mermaid
+```
+
+### As a CLI
+
+Download the standalone binary for your platform from [GitHub Releases](https://github.com/lukilabs/beautiful-mermaid/releases):
+
+| Platform | Binary |
+|----------|--------|
+| Linux x64 | `bmmdc-linux-x64` |
+| Linux ARM64 | `bmmdc-linux-arm64` |
+| macOS Intel | `bmmdc-darwin-x64` |
+| macOS Apple Silicon | `bmmdc-darwin-arm64` |
+| Windows x64 | `bmmdc-windows-x64.exe` |
+| Windows ARM64 | `bmmdc-windows-arm64.exe` |
+
+```bash
+# Example: macOS Apple Silicon
+curl -L -o bmmdc https://github.com/lukilabs/beautiful-mermaid/releases/latest/download/bmmdc-darwin-arm64
+chmod +x bmmdc
+./bmmdc --help
+```
+
+## CLI Usage
+
+```bash
+# Render to ASCII (default)
+bmmdc diagram.mmd
+echo -e "graph LR\nA --> B" | bmmdc
+
+# Render to SVG
+bmmdc --svg diagram.mmd
+bmmdc --svg --theme tokyo-night -o output.svg diagram.mmd
+
+# List available themes
+bmmdc --themes
+
+# Options
+bmmdc --help
 ```
 
 ## Quick Start
