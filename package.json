@@ -12,8 +12,14 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./browser": {
+      "types": "./dist/beautiful-mermaid.browser.d.ts",
+      "default": "./dist/beautiful-mermaid.browser.global.js"
     }
   },
+  "unpkg": "./dist/beautiful-mermaid.browser.global.js",
+  "jsdelivr": "./dist/beautiful-mermaid.browser.global.js",
   "files": [
     "dist",
     "README.md",
