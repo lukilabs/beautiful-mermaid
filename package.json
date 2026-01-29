@@ -4,6 +4,9 @@
   "license": "MIT",
   "description": "Render Mermaid diagrams as beautiful SVGs or ASCII art. Ultra-fast, fully themeable, zero DOM dependencies.",
   "type": "module",
+  "bin": {
+    "bmmdc": "./dist/cli.js"
+  },
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -54,6 +57,7 @@
     "@dagrejs/dagre": "^1.1.8"
   },
   "devDependencies": {
+    "bun-types": "^1.3.8",
     "shiki": "^3.19.0",
     "tsup": "^8.0.0",
     "typescript": "^5.0.0"
