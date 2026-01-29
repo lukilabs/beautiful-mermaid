@@ -87,6 +87,20 @@ const ascii = renderMermaidAscii(`graph LR; A --> B --> C`)
 └───┘     └───┘     └───┘
 ```
 
+### Browser (Script Tag)
+
+For non-bundled environments, include via CDN:
+
+```html
+<script src="https://unpkg.com/beautiful-mermaid/dist/beautiful-mermaid.browser.global.js"></script>
+<script>
+  const { renderMermaid, THEMES } = beautifulMermaid;
+  renderMermaid('graph TD; A-->B').then(svg => { ... });
+</script>
+```
+
+Also available via [jsDelivr](https://cdn.jsdelivr.net/npm/beautiful-mermaid/dist/beautiful-mermaid.browser.global.js). The bundle exposes `renderMermaid`, `renderMermaidAscii`, `THEMES`, `DEFAULTS`, and `fromShikiTheme` on the global `beautifulMermaid` object.
+
 ---
 
 ## Theming
