@@ -227,9 +227,9 @@ function renderNodeShape(node: PositionedNode): string {
   // Resolve fill and stroke — inline styles (from mermaid `style` directives)
   // override the CSS variable defaults. When no inline style is present, the
   // CSS variable handles theming automatically via color-mix() derivation.
-  const fill = inlineStyle?.fill ?? 'var(--_node-fill)'
-  const stroke = inlineStyle?.stroke ?? 'var(--_node-stroke)'
-  const sw = inlineStyle?.['stroke-width'] ?? String(STROKE_WIDTHS.innerBox)
+  const fill = escapeXml(inlineStyle?.fill ?? 'var(--_node-fill)')
+  const stroke = escapeXml(inlineStyle?.stroke ?? 'var(--_node-stroke)')
+  const sw = escapeXml(inlineStyle?.['stroke-width'] ?? String(STROKE_WIDTHS.innerBox))
 
   switch (shape) {
     case 'diamond':
@@ -461,7 +461,7 @@ function renderNodeLabel(node: PositionedNode, font: string): string {
   const cy = node.y + node.height / 2
 
   // Resolve text color — inline styles can override the CSS variable default
-  const textColor = node.inlineStyle?.color ?? 'var(--_text)'
+  const textColor = escapeXml(node.inlineStyle?.color ?? 'var(--_text)')
 
   return (
     `<text x="${cx}" y="${cy}" text-anchor="middle" dy="${TEXT_BASELINE_SHIFT}" ` +
