@@ -1,0 +1,8 @@
+{
+  "name": "beautiful-mermaid-skill",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "beautiful-mermaid": "^0.1.2"
+  }
+}

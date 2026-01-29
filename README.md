@@ -87,6 +87,10 @@ const ascii = renderMermaidAscii(`graph LR; A --> B --> C`)
 └───┘     └───┘     └───┘
 ```
 
+## Skill Usage (Codex/Claude)
+
+If you want your agents to render diagrams on demand, add `skills/beautiful-mermaid/` to your global skills and run `bun install` in that folder once. Then invoke it with `bun run scripts/render-mermaid.ts --format svg --theme tokyo-night --out /tmp/diagram.svg < diagram.mmd` (or `--format ascii` for terminal output).
+
 ---
 
 ## Theming
