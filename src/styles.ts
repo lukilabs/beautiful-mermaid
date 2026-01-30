@@ -7,12 +7,13 @@
 // contains font metrics, spacing constants, and stroke widths.
 // ============================================================================
 
+import { measureTextWidth } from './text-metrics'
+
 /** Average character width in px at the given font size and weight (proportional font) */
 export function estimateTextWidth(text: string, fontSize: number, fontWeight: number): number {
-  // Inter average character widths as fraction of fontSize, per weight.
-  // Heavier weights are slightly wider.
-  const widthRatio = fontWeight >= 600 ? 0.58 : fontWeight >= 500 ? 0.55 : 0.52
-  return text.length * fontSize * widthRatio
+  // Delegate to variable-width character measurement for better accuracy
+  // with mixed character sets (Latin narrow/wide, CJK, emoji, etc.)
+  return measureTextWidth(text, fontSize, fontWeight)
 }
 
 /** Average character width in px for monospace fonts (uniform glyph width) */
