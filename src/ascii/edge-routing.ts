@@ -12,6 +12,7 @@ import {
   gridCoordDirection,
 } from './types.ts'
 import { getPath, mergePath } from './pathfinder.ts'
+import { stringWidth } from './text-width.ts'
 
 // ============================================================================
 // Direction utilities
@@ -196,7 +197,7 @@ export function determinePath(graph: AsciiGraph, edge: AsciiEdge): void {
 export function determineLabelLine(graph: AsciiGraph, edge: AsciiEdge): void {
   if (edge.text.length === 0) return
 
-  const lenLabel = edge.text.length
+  const lenLabel = stringWidth(edge.text)
   let prevStep = edge.path[0]!
   let largestLine: [GridCoord, GridCoord] = [prevStep, edge.path[1]!]
   let largestLineSize = 0

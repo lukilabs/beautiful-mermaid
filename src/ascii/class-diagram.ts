@@ -13,8 +13,9 @@
 import { parseClassDiagram } from '../class/parser.ts'
 import type { ClassDiagram, ClassNode, ClassMember, ClassRelationship, RelationshipType } from '../class/types.ts'
 import type { Canvas, AsciiConfig } from './types.ts'
-import { mkCanvas, canvasToString, increaseSize } from './canvas.ts'
+import { mkCanvas, canvasToString, increaseSize, drawText, drawTextClipped } from './canvas.ts'
 import { drawMultiBox } from './draw.ts'
+import { stringWidth } from './text-width.ts'
 
 // ============================================================================
 // Class member formatting
@@ -161,7 +162,7 @@ export function renderClassAscii(text: string, config: AsciiConfig): string {
     // Compute box dimensions from drawMultiBox logic
     let maxTextW = 0
     for (const section of sections) {
-      for (const line of section) maxTextW = Math.max(maxTextW, line.length)
+      for (const line of section) maxTextW = Math.max(maxTextW, stringWidth(line))
     }
     const boxW = maxTextW + 4 // 2 border + 2 padding
 
@@ -365,22 +366,20 @@ export function renderClassAscii(text: string, config: AsciiConfig): string {
         // Marker at target (pointing down into the target box)
         const markerChar = getMarkerShape(marker.type, useAscii, 'down')
         const my = toTY - 1
+        const markerWidth = stringWidth(markerChar)
         if (my >= 0 && my < totalH) {
-          for (let i = 0; i < markerChar.length; i++) {
-            const mx = toCX - Math.floor(markerChar.length / 2) + i
-            if (mx >= 0 && mx < totalW) canvas[mx]![my] = markerChar[i]!
-          }
+          const mx = toCX - Math.floor(markerWidth / 2)
+          if (mx >= 0) drawText(canvas, { x: mx, y: my }, markerChar)
         }
       }
       if (marker.markerAt === 'from') {
         // Marker at source (pointing down away from source box)
         const markerChar = getMarkerShape(marker.type, useAscii, 'down')
         const my = fromBY + 1
+        const markerWidth = stringWidth(markerChar)
         if (my < totalH) {
-          for (let i = 0; i < markerChar.length; i++) {
-            const mx = fromCX - Math.floor(markerChar.length / 2) + i
-            if (mx >= 0 && mx < totalW) canvas[mx]![my] = markerChar[i]!
-          }
+          const mx = fromCX - Math.floor(markerWidth / 2)
+          if (mx >= 0) drawText(canvas, { x: mx, y: my }, markerChar)
         }
       }
     } else if (toP.y + toP.height - 1 < fromP.y) {
@@ -419,11 +418,10 @@ export function renderClassAscii(text: string, config: AsciiConfig): string {
         // Marker at source (pointing up away from source box)
         const markerChar = getMarkerShape(marker.type, useAscii, 'up')
         const my = fromTY - 1
+        const markerWidth = stringWidth(markerChar)
         if (my >= 0 && my < totalH) {
-          for (let i = 0; i < markerChar.length; i++) {
-            const mx = fromCX - Math.floor(markerChar.length / 2) + i
-            if (mx >= 0 && mx < totalW) canvas[mx]![my] = markerChar[i]!
-          }
+          const mx = fromCX - Math.floor(markerWidth / 2)
+          if (mx >= 0) drawText(canvas, { x: mx, y: my }, markerChar)
         }
       }
       if (marker.markerAt === 'to') {
@@ -434,11 +432,10 @@ export function renderClassAscii(text: string, config: AsciiConfig): string {
         const markerDir = isHierarchical ? 'down' : 'up'
         const markerChar = getMarkerShape(marker.type, useAscii, markerDir)
         const my = toBY + 1
+        const markerWidth = stringWidth(markerChar)
         if (my < totalH) {
-          for (let i = 0; i < markerChar.length; i++) {
-            const mx = toCX - Math.floor(markerChar.length / 2) + i
-            if (mx >= 0 && mx < totalW) canvas[mx]![my] = markerChar[i]!
-          }
+          const mx = toCX - Math.floor(markerWidth / 2)
+          if (mx >= 0) drawText(canvas, { x: mx, y: my }, markerChar)
         }
       }
     } else {
@@ -466,22 +463,20 @@ export function renderClassAscii(text: string, config: AsciiConfig): string {
         // Marker at source (pointing down away from source box)
         const markerChar = getMarkerShape(marker.type, useAscii, 'down')
         const my = fromBY + 1
+        const markerWidth = stringWidth(markerChar)
         if (my < totalH) {
-          for (let i = 0; i < markerChar.length; i++) {
-            const mx = fromCX - Math.floor(markerChar.length / 2) + i
-            if (mx >= 0 && mx < totalW) canvas[mx]![my] = markerChar[i]!
-          }
+          const mx = fromCX - Math.floor(markerWidth / 2)
+          if (mx >= 0) drawText(canvas, { x: mx, y: my }, markerChar)
         }
       }
       if (marker.markerAt === 'to') {
         // Marker at target bottom (pointing up into the target box)
         const markerChar = getMarkerShape(marker.type, useAscii, 'up')
         const my = toP.y + toP.height
+        const markerWidth = stringWidth(markerChar)
         if (my < totalH) {
-          for (let i = 0; i < markerChar.length; i++) {
-            const mx = toCX - Math.floor(markerChar.length / 2) + i
-            if (mx >= 0 && mx < totalW) canvas[mx]![my] = markerChar[i]!
-          }
+          const mx = toCX - Math.floor(markerWidth / 2)
+          if (mx >= 0) drawText(canvas, { x: mx, y: my }, markerChar)
         }
       }
     }
@@ -504,16 +499,13 @@ export function renderClassAscii(text: string, config: AsciiConfig): string {
         // Same level: place label at midpoint of the detour line
         midY = Math.max(fromBY, toP.y + toP.height - 1) + 2
       }
-      const labelStart = midX - Math.floor(paddedLabel.length / 2)
-      // Clear the area first (overwrite line characters) then draw the padded label
-      for (let i = 0; i < paddedLabel.length; i++) {
-        const lx = labelStart + i
-        if (lx >= 0 && lx < totalW && midY >= 0 && midY < totalH) {
-          canvas[lx]![midY] = paddedLabel[i]!
-        }
+      const labelWidth = stringWidth(paddedLabel)
+      const labelStart = midX - Math.floor(labelWidth / 2)
+      if (midY >= 0 && midY < totalH) {
+        drawTextClipped(canvas, { x: labelStart, y: midY }, paddedLabel, 0, totalW - 1)
       }
     }
   }
 
-  return canvasToString(canvas)
+  return canvasToString(canvas, !config.preserveDisplayWidth)
 }

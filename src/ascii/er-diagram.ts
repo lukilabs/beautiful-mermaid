@@ -12,8 +12,9 @@
 import { parseErDiagram } from '../er/parser.ts'
 import type { ErDiagram, ErEntity, ErAttribute, Cardinality } from '../er/types.ts'
 import type { Canvas, AsciiConfig } from './types.ts'
-import { mkCanvas, canvasToString, increaseSize } from './canvas.ts'
+import { mkCanvas, canvasToString, increaseSize, drawText, drawTextClipped } from './canvas.ts'
 import { drawMultiBox } from './draw.ts'
+import { stringWidth } from './text-width.ts'
 
 // ============================================================================
 // Entity box content
@@ -108,7 +109,7 @@ export function renderErAscii(text: string, config: AsciiConfig): string {
 
     let maxTextW = 0
     for (const section of sections) {
-      for (const line of section) maxTextW = Math.max(maxTextW, line.length)
+      for (const line of section) maxTextW = Math.max(maxTextW, stringWidth(line))
     }
     const boxW = maxTextW + 4 // 2 border + 2 padding
 
@@ -229,29 +230,60 @@ export function renderErAscii(text: string, config: AsciiConfig): string {
 
       // Draw crow's foot markers at endpoints
       const leftChars = getCrowsFootChars(leftCard, useAscii)
-      for (let i = 0; i < leftChars.length; i++) {
-        const mx = startX + i
-        if (mx < totalW) canvas[mx]![lineY] = leftChars[i]!
-      }
+      if (startX < totalW) drawText(canvas, { x: startX, y: lineY }, leftChars)
 
       const rightChars = getCrowsFootChars(rightCard, useAscii)
-      for (let i = 0; i < rightChars.length; i++) {
-        const mx = endX - rightChars.length + 1 + i
-        if (mx >= 0 && mx < totalW) canvas[mx]![lineY] = rightChars[i]!
-      }
+      const rightWidth = stringWidth(rightChars)
+      const rightStart = endX - rightWidth + 1
+      if (rightStart >= 0) drawText(canvas, { x: rightStart, y: lineY }, rightChars)
 
       // Relationship label centered in the gap between the two entities, above the line.
-      // Clamp label to the gap region [startX, endX] to avoid overwriting box borders.
+      // If the gap is too narrow, move the label up and allow it to extend beyond the gap.
       if (rel.label) {
         const gapMid = Math.floor((startX + endX) / 2)
-        const labelStart = Math.max(startX, gapMid - Math.floor(rel.label.length / 2))
-        const labelY = lineY - 1
-        if (labelY >= 0) {
-          for (let i = 0; i < rel.label.length; i++) {
-            const lx = labelStart + i
-            if (lx >= startX && lx <= endX && lx < totalW) {
-              canvas[lx]![labelY] = rel.label[i]!
+        const labelWidth = stringWidth(rel.label)
+        const gapWidth = endX - startX + 1
+        let labelStart = gapMid - Math.floor(labelWidth / 2)
+        if (labelStart < 0) labelStart = 0
+        let labelY = lineY - 1
+
+        function canPlace(y: number, xStart: number): boolean {
+          if (y < 0) return false
+          const xEnd = Math.min(totalW - 1, xStart + labelWidth - 1)
+          for (let x = xStart; x <= xEnd; x++) {
+            const c = canvas[x]![y]!
+            if (c !== ' ' && c !== '\u200b') return false
+          }
+          return true
+        }
+
+        const minStart = startX + 1
+        const maxStart = endX - labelWidth
+
+        if (minStart <= maxStart) {
+          // Keep at least 1 space from both box borders.
+          if (labelStart < minStart) labelStart = minStart
+          if (labelStart > maxStart) labelStart = maxStart
+          if (labelY >= 0) {
+            drawTextClipped(canvas, { x: labelStart, y: labelY }, rel.label, startX, endX)
+          }
+        } else if (gapWidth < labelWidth + 2) {
+          // Try moving the label up to avoid colliding with boxes.
+          let placed = false
+          for (let dy = 0; dy < 3; dy++) {
+            const tryY = labelY - dy
+            if (canPlace(tryY, labelStart)) {
+              labelY = tryY
+              placed = true
+              break
             }
+          }
+          if (placed) {
+            increaseSize(canvas, labelStart + labelWidth, labelY + 1)
+            drawText(canvas, { x: labelStart, y: labelY }, rel.label)
+          } else if (labelY >= 0) {
+            // Fallback: keep clipped inside the gap.
+            drawTextClipped(canvas, { x: Math.max(startX, labelStart), y: labelY }, rel.label, startX, endX)
           }
         }
       }
@@ -290,20 +322,18 @@ export function renderErAscii(text: string, config: AsciiConfig): string {
       // Crow's foot markers (vertical direction)
       // Place markers near the entity connection points
       const upperChars = getCrowsFootChars(upperCard, useAscii)
+      const upperWidth = stringWidth(upperChars)
       if (startY < totalH) {
-        for (let i = 0; i < upperChars.length; i++) {
-          const mx = lineX - Math.floor(upperChars.length / 2) + i
-          if (mx >= 0 && mx < totalW) canvas[mx]![startY] = upperChars[i]!
-        }
+        const upperStart = lineX - Math.floor(upperWidth / 2)
+        if (upperStart >= 0) drawText(canvas, { x: upperStart, y: startY }, upperChars)
       }
 
       const targetX = lineX !== lowerCX ? lowerCX : lineX
       const lowerChars = getCrowsFootChars(lowerCard, useAscii)
+      const lowerWidth = stringWidth(lowerChars)
       if (endY >= 0 && endY < totalH) {
-        for (let i = 0; i < lowerChars.length; i++) {
-          const mx = targetX - Math.floor(lowerChars.length / 2) + i
-          if (mx >= 0 && mx < totalW) canvas[mx]![endY] = lowerChars[i]!
-        }
+        const lowerStart = targetX - Math.floor(lowerWidth / 2)
+        if (lowerStart >= 0) drawText(canvas, { x: lowerStart, y: endY }, lowerChars)
       }
 
       // Relationship label — placed to the right of the vertical line at the midpoint.
@@ -312,17 +342,12 @@ export function renderErAscii(text: string, config: AsciiConfig): string {
         const midY = Math.floor((startY + endY) / 2)
         const labelX = lineX + 2
         if (midY >= 0) {
-          for (let i = 0; i < rel.label.length; i++) {
-            const lx = labelX + i
-            if (lx >= 0) {
-              increaseSize(canvas, lx + 1, midY + 1)
-              canvas[lx]![midY] = rel.label[i]!
-            }
-          }
+          increaseSize(canvas, labelX + stringWidth(rel.label), midY + 1)
+          drawText(canvas, { x: labelX, y: midY }, rel.label)
         }
       }
     }
   }
 
-  return canvasToString(canvas)
+  return canvasToString(canvas, !config.preserveDisplayWidth)
 }

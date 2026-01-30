@@ -107,6 +107,8 @@ export interface AsciiConfig {
   paddingY: number
   /** Padding inside node boxes. Default: 1 */
   boxBorderPadding: number
+  /** Preserve zero-width placeholders in output to keep column alignment. Default: false */
+  preserveDisplayWidth: boolean
   /** Graph direction: "LR" or "TD". */
   graphDirection: 'LR' | 'TD'
 }

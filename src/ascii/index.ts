@@ -35,6 +35,8 @@ export interface AsciiRenderOptions {
   paddingY?: number
   /** Padding inside node boxes. Default: 1 */
   boxBorderPadding?: number
+  /** Preserve zero-width placeholders in output to keep column alignment. Default: false */
+  preserveDisplayWidth?: boolean
 }
 
 /**
@@ -87,6 +89,7 @@ export function renderMermaidAscii(
     paddingX: options.paddingX ?? 5,
     paddingY: options.paddingY ?? 5,
     boxBorderPadding: options.boxBorderPadding ?? 1,
+    preserveDisplayWidth: options.preserveDisplayWidth ?? false,
     graphDirection: 'TD', // default, overridden for flowcharts below
   }
 
@@ -126,7 +129,7 @@ export function renderMermaidAscii(
         flipCanvasVertically(graph.canvas)
       }
 
-      return canvasToString(graph.canvas)
+      return canvasToString(graph.canvas, !config.preserveDisplayWidth)
     }
   }
 }

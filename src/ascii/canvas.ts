@@ -7,6 +7,10 @@
 // ============================================================================
 
 import type { Canvas, DrawingCoord } from './types.ts'
+import { charWidth, stringWidth } from './text-width.ts'
+
+// Zero-width placeholder used to occupy the second cell of fullwidth chars.
+const ZERO_WIDTH = '\u200b'
 
 /**
  * Create a blank canvas filled with spaces.
@@ -130,11 +134,19 @@ export function mergeCanvases(
     for (let x = 0; x < overlay.length; x++) {
       for (let y = 0; y < overlay[0]!.length; y++) {
         const c = overlay[x]![y]!
+        if (c === ZERO_WIDTH) {
+          const mx = x + offset.x
+          const my = y + offset.y
+          if (merged[mx]![my] === ' ') merged[mx]![my] = ZERO_WIDTH
+          continue
+        }
         if (c !== ' ') {
           const mx = x + offset.x
           const my = y + offset.y
           const current = merged[mx]![my]!
-          if (!useAscii && isJunctionChar(c) && isJunctionChar(current)) {
+          if (current === ZERO_WIDTH) {
+            merged[mx]![my] = c
+          } else if (!useAscii && isJunctionChar(c) && isJunctionChar(current)) {
             merged[mx]![my] = mergeJunctions(current, c)
           } else {
             merged[mx]![my] = c
@@ -152,7 +164,7 @@ export function mergeCanvases(
 // ============================================================================
 
 /** Convert the canvas to a multi-line string (row by row, left to right). */
-export function canvasToString(canvas: Canvas): string {
+export function canvasToString(canvas: Canvas, stripZeroWidth: boolean = true): string {
   const [maxX, maxY] = getCanvasSize(canvas)
   const lines: string[] = []
   for (let y = 0; y <= maxY; y++) {
@@ -160,7 +172,7 @@ export function canvasToString(canvas: Canvas): string {
     for (let x = 0; x <= maxX; x++) {
       line += canvas[x]![y]!
     }
-    lines.push(line)
+    lines.push(stripZeroWidth ? line.replaceAll(ZERO_WIDTH, '') : line)
   }
   return lines.join('\n')
 }
@@ -220,9 +232,54 @@ export function flipCanvasVertically(canvas: Canvas): Canvas {
 
 /** Draw text string onto the canvas starting at the given coordinate. */
 export function drawText(canvas: Canvas, start: DrawingCoord, text: string): void {
-  increaseSize(canvas, start.x + text.length, start.y)
-  for (let i = 0; i < text.length; i++) {
-    canvas[start.x + i]![start.y] = text[i]!
+  const width = stringWidth(text)
+  increaseSize(canvas, start.x + width, start.y)
+  let x = start.x
+  for (const ch of text) {
+    const w = charWidth(ch)
+    if (w === 0) {
+      canvas[x]![start.y] = ch
+      continue
+    }
+    canvas[x]![start.y] = ch
+    for (let i = 1; i < w; i++) {
+      if (canvas[x + i]![start.y] === ' ') {
+        canvas[x + i]![start.y] = ZERO_WIDTH
+      }
+    }
+    x += w
+  }
+}
+
+/** Draw text while clipping to [minX, maxX] column bounds. */
+export function drawTextClipped(
+  canvas: Canvas,
+  start: DrawingCoord,
+  text: string,
+  minX: number,
+  maxX: number,
+): void {
+  let x = start.x
+  for (const ch of text) {
+    const w = charWidth(ch)
+    if (w === 0) {
+      if (x >= minX && x <= maxX) canvas[x]![start.y] = ch
+      continue
+    }
+    if (x + w - 1 < minX) {
+      x += w
+      continue
+    }
+    if (x > maxX) break
+    if (x >= minX && x + w - 1 <= maxX) {
+      canvas[x]![start.y] = ch
+      for (let i = 1; i < w; i++) {
+        if (canvas[x + i]![start.y] === ' ') {
+          canvas[x + i]![start.y] = ZERO_WIDTH
+        }
+      }
+    }
+    x += w
   }
 }
 

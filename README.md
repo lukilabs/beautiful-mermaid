@@ -385,6 +385,7 @@ Render a Mermaid diagram to ASCII/Unicode text. Synchronous.
 | `paddingX` | `number` | `5` | Horizontal node spacing |
 | `paddingY` | `number` | `5` | Vertical node spacing |
 | `boxBorderPadding` | `number` | `1` | Inner box padding |
+| `preserveDisplayWidth` | `boolean` | `false` | Keep zero-width placeholders for fullwidth alignment |
 
 ### `fromShikiTheme(theme): DiagramColors`
 
