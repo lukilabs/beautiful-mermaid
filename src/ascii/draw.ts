@@ -16,6 +16,7 @@ import {
 } from './types.ts'
 import { mkCanvas, copyCanvas, getCanvasSize, mergeCanvases, drawText } from './canvas.ts'
 import { determineDirection, dirEquals } from './edge-routing.ts'
+import { getDisplayWidth } from './cjk-width.ts'
 import { gridToDrawingCoord, lineToDrawing } from './grid.ts'
 
 // ============================================================================
@@ -71,7 +72,8 @@ export function drawBox(node: AsciiNode, graph: AsciiGraph): Canvas {
   // Center the display label inside the box
   const label = node.displayLabel
   const textY = from.y + Math.floor(h / 2)
-  const textX = from.x + Math.floor(w / 2) - Math.ceil(label.length / 2) + 1
+  const labelWidth = getDisplayWidth(label)
+  const textX = from.x + Math.floor((w - labelWidth) / 2) + 1
   for (let i = 0; i < label.length; i++) {
     box[textX + i]![textY] = label[i]!
   }
@@ -102,7 +104,7 @@ export function drawMultiBox(
   let maxTextWidth = 0
   for (const section of sections) {
     for (const line of section) {
-      maxTextWidth = Math.max(maxTextWidth, line.length)
+      maxTextWidth = Math.max(maxTextWidth, getDisplayWidth(line))
     }
   }
   const innerWidth = maxTextWidth + 2 * padding
