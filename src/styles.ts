@@ -7,12 +7,49 @@
 // contains font metrics, spacing constants, and stroke widths.
 // ============================================================================
 
+// ============================================================================
+// CJK / Fullwidth character utilities
+// Used to correctly calculate display width for Korean, Chinese, Japanese,
+// and other fullwidth characters that occupy 2 columns in terminal/monospace.
+// ============================================================================
+
+/**
+ * Check if a character is a fullwidth character (CJK, Hangul, etc.)
+ * Fullwidth characters occupy 2 columns in terminal/monospace display.
+ */
+export function isFullWidth(char: string): boolean {
+  const code = char.charCodeAt(0)
+  return (
+    (code >= 0x1100 && code <= 0x11ff) || // Hangul Jamo
+    (code >= 0x3000 && code <= 0x303f) || // CJK Punctuation
+    (code >= 0x3040 && code <= 0x309f) || // Hiragana
+    (code >= 0x30a0 && code <= 0x30ff) || // Katakana
+    (code >= 0x3130 && code <= 0x318f) || // Hangul Compatibility Jamo
+    (code >= 0x4e00 && code <= 0x9fff) || // CJK Unified Ideographs
+    (code >= 0xac00 && code <= 0xd7af) || // Hangul Syllables
+    (code >= 0xff00 && code <= 0xffef) // Fullwidth Forms
+  )
+}
+
+/**
+ * Calculate the display width of a string, accounting for fullwidth characters.
+ * Fullwidth characters (CJK, Hangul) count as 2, others count as 1.
+ */
+export function getDisplayWidth(text: string): number {
+  let width = 0
+  for (const char of text) {
+    width += isFullWidth(char) ? 2 : 1
+  }
+  return width
+}
+
 /** Average character width in px at the given font size and weight (proportional font) */
 export function estimateTextWidth(text: string, fontSize: number, fontWeight: number): number {
   // Inter average character widths as fraction of fontSize, per weight.
   // Heavier weights are slightly wider.
+  // Use getDisplayWidth() to account for fullwidth CJK characters.
   const widthRatio = fontWeight >= 600 ? 0.58 : fontWeight >= 500 ? 0.55 : 0.52
-  return text.length * fontSize * widthRatio
+  return getDisplayWidth(text) * fontSize * widthRatio
 }
 
 /** Average character width in px for monospace fonts (uniform glyph width) */
@@ -21,7 +58,8 @@ export function estimateMonoTextWidth(text: string, fontSize: number): number {
   // glyph widths for JetBrains Mono / SF Mono / Fira Code at small sizes (11px).
   // Previous value of 0.55 underestimated widths, causing class member labels to
   // extend beyond their box boundaries.
-  return text.length * fontSize * 0.6
+  // Use getDisplayWidth() to account for fullwidth CJK characters.
+  return getDisplayWidth(text) * fontSize * 0.6
 }
 
 /** Monospace font family used for code-like text (class members, types) */

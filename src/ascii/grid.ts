@@ -14,6 +14,7 @@ import { gridKey } from './types.ts'
 import { mkCanvas, setCanvasSizeToGrid } from './canvas.ts'
 import { determinePath, determineLabelLine } from './edge-routing.ts'
 import { drawBox } from './draw.ts'
+import { getDisplayWidth } from '../styles.ts'
 
 // ============================================================================
 // Grid coordinate → drawing coordinate conversion
@@ -104,8 +105,9 @@ export function setColumnWidth(graph: AsciiGraph, node: AsciiNode): void {
   const gc = node.gridCoord!
   const padding = graph.config.boxBorderPadding
 
-  // 3 columns: [border=1] [content=2*padding+labelLen] [border=1]
-  const colWidths = [1, 2 * padding + node.displayLabel.length, 1]
+  // 3 columns: [border=1] [content=2*padding+labelWidth] [border=1]
+  // Use getDisplayWidth() to correctly handle CJK/fullwidth characters
+  const colWidths = [1, 2 * padding + getDisplayWidth(node.displayLabel), 1]
   // 3 rows: [border=1] [content=1+2*padding] [border=1]
   const rowHeights = [1, 1 + 2 * padding, 1]
 
@@ -136,6 +138,57 @@ export function setColumnWidth(graph: AsciiGraph, node: AsciiNode): void {
     }
     const current = graph.rowHeight.get(gc.y - 1) ?? 0
     graph.rowHeight.set(gc.y - 1, Math.max(current, basePadding))
+  }
+}
+
+/**
+ * Adjust column widths to accommodate subgraph labels.
+ * This must be called BEFORE edge routing so edges account for the extra width.
+ */
+function adjustColumnWidthsForSubgraphLabels(graph: AsciiGraph): void {
+  for (const sg of graph.subgraphs) {
+    if (sg.nodes.length === 0) continue
+
+    // Find the grid column range for this subgraph's nodes
+    let minCol = Infinity
+    let maxCol = -Infinity
+    for (const node of sg.nodes) {
+      if (!node.gridCoord) continue
+      // Node occupies 3 columns (0, 1, 2 relative to gridCoord.x)
+      minCol = Math.min(minCol, node.gridCoord.x)
+      maxCol = Math.max(maxCol, node.gridCoord.x + 2)
+    }
+
+    // Also include child subgraphs' ranges
+    for (const child of sg.children) {
+      for (const node of child.nodes) {
+        if (!node.gridCoord) continue
+        minCol = Math.min(minCol, node.gridCoord.x)
+        maxCol = Math.max(maxCol, node.gridCoord.x + 2)
+      }
+    }
+
+    if (minCol === Infinity) continue
+
+    // Calculate current total width of columns in this range
+    let currentWidth = 0
+    for (let col = minCol; col <= maxCol; col++) {
+      currentWidth += graph.columnWidth.get(col) ?? 0
+    }
+
+    // Calculate required width for label (plus padding for borders and spacing)
+    const labelWidth = getDisplayWidth(sg.name)
+    const subgraphPadding = 4  // 2 on each side for borders and spacing
+    const requiredWidth = labelWidth + subgraphPadding
+
+    // If we need more width, distribute it among the columns
+    if (requiredWidth > currentWidth) {
+      const extraWidth = requiredWidth - currentWidth
+      // Add extra width to the middle column of the range
+      const middleCol = Math.floor((minCol + maxCol) / 2)
+      const currentMiddle = graph.columnWidth.get(middleCol) ?? 0
+      graph.columnWidth.set(middleCol, currentMiddle + extraWidth)
+    }
   }
 }
 
@@ -247,47 +300,17 @@ function calculateSubgraphBoundingBox(graph: AsciiGraph, sg: AsciiSubgraph): voi
 
   const subgraphPadding = 2
   const subgraphLabelSpace = 2
+
   sg.minX = minX - subgraphPadding
   sg.minY = minY - subgraphPadding - subgraphLabelSpace
   sg.maxX = maxX + subgraphPadding
   sg.maxY = maxY + subgraphPadding
 }
 
-/** Ensure non-overlapping root subgraphs have minimum spacing. */
-function ensureSubgraphSpacing(graph: AsciiGraph): void {
-  const minSpacing = 1
-  const rootSubgraphs = graph.subgraphs.filter(sg => sg.parent === null && sg.nodes.length > 0)
-
-  for (let i = 0; i < rootSubgraphs.length; i++) {
-    for (let j = i + 1; j < rootSubgraphs.length; j++) {
-      const sg1 = rootSubgraphs[i]!
-      const sg2 = rootSubgraphs[j]!
-
-      // Horizontal overlap → adjust vertical
-      if (sg1.minX < sg2.maxX && sg1.maxX > sg2.minX) {
-        if (sg1.maxY >= sg2.minY - minSpacing && sg1.minY < sg2.minY) {
-          sg2.minY = sg1.maxY + minSpacing + 1
-        } else if (sg2.maxY >= sg1.minY - minSpacing && sg2.minY < sg1.minY) {
-          sg1.minY = sg2.maxY + minSpacing + 1
-        }
-      }
-      // Vertical overlap → adjust horizontal
-      if (sg1.minY < sg2.maxY && sg1.maxY > sg2.minY) {
-        if (sg1.maxX >= sg2.minX - minSpacing && sg1.minX < sg2.minX) {
-          sg2.minX = sg1.maxX + minSpacing + 1
-        } else if (sg2.maxX >= sg1.minX - minSpacing && sg2.minX < sg1.minX) {
-          sg1.minX = sg2.maxX + minSpacing + 1
-        }
-      }
-    }
-  }
-}
-
 export function calculateSubgraphBoundingBoxes(graph: AsciiGraph): void {
   for (const sg of graph.subgraphs) {
     calculateSubgraphBoundingBox(graph, sg)
   }
-  ensureSubgraphSpacing(graph)
 }
 
 /**
@@ -425,6 +448,9 @@ export function createMapping(graph: AsciiGraph): void {
   for (const node of graph.nodes) {
     setColumnWidth(graph, node)
   }
+
+  // Adjust column widths for subgraph labels BEFORE edge routing
+  adjustColumnWidthsForSubgraphLabels(graph)
 
   // Route edges via A* and determine label positions
   for (const edge of graph.edges) {

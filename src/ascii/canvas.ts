@@ -7,6 +7,7 @@
 // ============================================================================
 
 import type { Canvas, DrawingCoord } from './types.ts'
+import { isFullWidth, getDisplayWidth } from '../styles.ts'
 
 /**
  * Create a blank canvas filled with spaces.
@@ -220,9 +221,18 @@ export function flipCanvasVertically(canvas: Canvas): Canvas {
 
 /** Draw text string onto the canvas starting at the given coordinate. */
 export function drawText(canvas: Canvas, start: DrawingCoord, text: string): void {
-  increaseSize(canvas, start.x + text.length, start.y)
-  for (let i = 0; i < text.length; i++) {
-    canvas[start.x + i]![start.y] = text[i]!
+  const displayWidth = getDisplayWidth(text)
+  increaseSize(canvas, start.x + displayWidth, start.y)
+
+  let offset = 0
+  for (const char of text) {
+    canvas[start.x + offset]![start.y] = char
+    offset++
+    // Fullwidth characters occupy 2 columns - clear the next cell
+    if (isFullWidth(char)) {
+      canvas[start.x + offset]![start.y] = ''
+      offset++
+    }
   }
 }
 
