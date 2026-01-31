@@ -14,9 +14,10 @@ import {
   Up, Down, Left, Right, UpperLeft, UpperRight, LowerLeft, LowerRight, Middle,
   drawingCoordEquals,
 } from './types.ts'
-import { mkCanvas, copyCanvas, getCanvasSize, mergeCanvases, drawText } from './canvas.ts'
+import { mkCanvas, copyCanvas, getCanvasSize, mergeCanvases, drawText, increaseSize } from './canvas.ts'
 import { determineDirection, dirEquals } from './edge-routing.ts'
 import { gridToDrawingCoord, lineToDrawing } from './grid.ts'
+import { isFullWidth, getDisplayWidth } from '../styles.ts'
 
 // ============================================================================
 // Box drawing — renders a node as a bordered rectangle
@@ -69,11 +70,28 @@ export function drawBox(node: AsciiNode, graph: AsciiGraph): Canvas {
   }
 
   // Center the display label inside the box
+  // Use getDisplayWidth() to correctly handle CJK/fullwidth characters
   const label = node.displayLabel
   const textY = from.y + Math.floor(h / 2)
-  const textX = from.x + Math.floor(w / 2) - Math.ceil(label.length / 2) + 1
-  for (let i = 0; i < label.length; i++) {
-    box[textX + i]![textY] = label[i]!
+  const displayWidth = getDisplayWidth(label)
+  const textX = from.x + Math.floor(w / 2) - Math.ceil(displayWidth / 2) + 1
+
+  // Ensure box is large enough for fullwidth characters
+  increaseSize(box, textX + displayWidth, textY + 1)
+
+  let offset = 0
+  for (const char of label) {
+    if (box[textX + offset]) {
+      box[textX + offset]![textY] = char
+    }
+    offset++
+    // Fullwidth characters occupy 2 columns in terminal display
+    if (isFullWidth(char)) {
+      if (box[textX + offset]) {
+        box[textX + offset]![textY] = '' // Empty cell after fullwidth char
+      }
+      offset++
+    }
   }
 
   return box
@@ -99,10 +117,11 @@ export function drawMultiBox(
   padding: number = 1,
 ): Canvas {
   // Compute width: widest line across all sections + 2*padding + 2 border chars
+  // Use getDisplayWidth() to correctly handle CJK/fullwidth characters
   let maxTextWidth = 0
   for (const section of sections) {
     for (const line of section) {
-      maxTextWidth = Math.max(maxTextWidth, line.length)
+      maxTextWidth = Math.max(maxTextWidth, getDisplayWidth(line))
     }
   }
   const innerWidth = maxTextWidth + 2 * padding
@@ -151,10 +170,22 @@ export function drawMultiBox(
     const lines = section.length > 0 ? section : ['']
 
     // Draw section text lines
+    // Handle fullwidth characters correctly
     for (const line of lines) {
       const startX = 1 + padding
-      for (let i = 0; i < line.length; i++) {
-        canvas[startX + i]![row] = line[i]!
+      let offset = 0
+      for (const char of line) {
+        if (canvas[startX + offset]) {
+          canvas[startX + offset]![row] = char
+        }
+        offset++
+        // Fullwidth characters occupy 2 columns
+        if (isFullWidth(char)) {
+          if (canvas[startX + offset]) {
+            canvas[startX + offset]![row] = '' // Empty cell after fullwidth char
+          }
+          offset++
+        }
       }
       row++
     }
@@ -447,7 +478,10 @@ function drawTextOnLine(canvas: Canvas, line: DrawingCoord[], label: string): vo
   const maxY = Math.max(line[0]!.y, line[1]!.y)
   const middleX = minX + Math.floor((maxX - minX) / 2)
   const middleY = minY + Math.floor((maxY - minY) / 2)
-  const startX = middleX - Math.floor(label.length / 2)
+  // Use getDisplayWidth() for correct centering with CJK characters
+  // Use (labelWidth - 1) / 2 for better centering of even-width labels on vertical lines
+  const labelWidth = getDisplayWidth(label)
+  const startX = middleX - Math.floor((labelWidth - 1) / 2)
   drawText(canvas, { x: startX, y: middleY }, label)
 }
 
@@ -496,12 +530,24 @@ export function drawSubgraphLabel(sg: AsciiSubgraph, graph: AsciiGraph): [Canvas
 
   const canvas = mkCanvas(width, height)
   const labelY = 1 // second row inside the subgraph box
-  let labelX = Math.floor(width / 2) - Math.floor(sg.name.length / 2)
+
+  // Use getDisplayWidth() for correct centering with CJK characters
+  const displayWidth = getDisplayWidth(sg.name)
+  let labelX = Math.floor(width / 2) - Math.floor(displayWidth / 2)
   if (labelX < 1) labelX = 1
 
-  for (let i = 0; i < sg.name.length; i++) {
-    if (labelX + i < width) {
-      canvas[labelX + i]![labelY] = sg.name[i]!
+  let offset = 0
+  for (const char of sg.name) {
+    if (labelX + offset < width && canvas[labelX + offset]) {
+      canvas[labelX + offset]![labelY] = char
+    }
+    offset++
+    // Fullwidth characters occupy 2 columns
+    if (isFullWidth(char)) {
+      if (labelX + offset < width && canvas[labelX + offset]) {
+        canvas[labelX + offset]![labelY] = '' // Empty cell after fullwidth char
+      }
+      offset++
     }
   }
 
