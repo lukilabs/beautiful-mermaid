@@ -408,6 +408,42 @@ describe('parseMermaid – style statements', () => {
 })
 
 // ============================================================================
+// linkStyle directives
+// ============================================================================
+
+describe('parseMermaid – linkStyle directives', () => {
+  it('applies linkStyle to a specific edge index', () => {
+    const g = parseMermaid(`graph TD
+      A --> B
+      B --> C
+      linkStyle 0 stroke:#f00,stroke-width:3px`)
+    expect(g.edges[0]!.inlineStyle).toEqual({ stroke: '#f00', 'stroke-width': '3px' })
+    expect(g.edges[1]!.inlineStyle).toBeUndefined()
+  })
+
+  it('applies linkStyle to multiple indices', () => {
+    const g = parseMermaid(`graph TD
+      A --> B
+      B --> C
+      C --> D
+      linkStyle 0,2 stroke:#0f0`)
+    expect(g.edges[0]!.inlineStyle).toEqual({ stroke: '#0f0' })
+    expect(g.edges[1]!.inlineStyle).toBeUndefined()
+    expect(g.edges[2]!.inlineStyle).toEqual({ stroke: '#0f0' })
+  })
+
+  it('applies default linkStyle to all edges and merges with specific overrides', () => {
+    const g = parseMermaid(`graph TD
+      A --> B
+      B --> C
+      linkStyle default stroke:#333,stroke-width:2px
+      linkStyle 1 stroke:#f00`)
+    expect(g.edges[0]!.inlineStyle).toEqual({ stroke: '#333', 'stroke-width': '2px' })
+    expect(g.edges[1]!.inlineStyle).toEqual({ stroke: '#f00', 'stroke-width': '2px' })
+  })
+})
+
+// ============================================================================
 // Subgraph direction override (Batch 2.7)
 // ============================================================================
 
