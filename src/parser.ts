@@ -55,6 +55,7 @@ function parseFlowchart(lines: string[]): MermaidGraph {
     classDefs: new Map(),
     classAssignments: new Map(),
     nodeStyles: new Map(),
+    linkStyles: new Map(),
   }
 
   // Subgraph stack for nested subgraphs.
@@ -91,6 +92,26 @@ function parseFlowchart(lines: string[]): MermaidGraph {
       const props = parseStyleProps(styleMatch[2]!)
       for (const id of nodeIds) {
         graph.nodeStyles.set(id, { ...graph.nodeStyles.get(id), ...props })
+      }
+      continue
+    }
+
+    // --- linkStyle statement: `linkStyle N stroke:#f00,stroke-width:3px` ---
+    // Also supports comma-separated indices: `linkStyle 0,2,3 stroke:#f00`
+    // Also supports `default` keyword: `linkStyle default stroke:#f00`
+    const linkStyleMatch = line.match(/^linkStyle\s+([\d,]+|default)\s+(.+)$/)
+    if (linkStyleMatch) {
+      const indexSpec = linkStyleMatch[1]!
+      const props = parseStyleProps(linkStyleMatch[2]!)
+      if (indexSpec === 'default') {
+        graph.defaultLinkStyle = { ...graph.defaultLinkStyle, ...props }
+      } else {
+        const indices = indexSpec.split(',').map(s => parseInt(s.trim(), 10))
+        for (const idx of indices) {
+          if (!isNaN(idx)) {
+            graph.linkStyles.set(idx, { ...graph.linkStyles.get(idx), ...props })
+          }
+        }
       }
       continue
     }
@@ -141,6 +162,9 @@ function parseFlowchart(lines: string[]): MermaidGraph {
     parseEdgeLine(line, graph, subgraphStack)
   }
 
+  // Apply linkStyle directives to edges
+  applyLinkStyles(graph)
+
   return graph
 }
 
@@ -168,6 +192,7 @@ function parseStateDiagram(lines: string[]): MermaidGraph {
     classDefs: new Map(),
     classAssignments: new Map(),
     nodeStyles: new Map(),
+    linkStyles: new Map(),
   }
 
   // Track composite state nesting (like subgraphs)
@@ -314,7 +339,10 @@ function ensureStateNode(
 /** Parse "fill:#f00,stroke:#333" style property strings into a Record */
 function parseStyleProps(propsStr: string): Record<string, string> {
   const props: Record<string, string> = {}
-  for (const pair of propsStr.split(',')) {
+  // Handle both comma-separated and semicolon-terminated formats
+  // e.g., "stroke:#f00,stroke-width:3px" or "stroke:#f00,stroke-width:3px;"
+  const cleaned = propsStr.replace(/;$/, '') // Remove trailing semicolon if present
+  for (const pair of cleaned.split(',')) {
     const colonIdx = pair.indexOf(':')
     if (colonIdx > 0) {
       const key = pair.slice(0, colonIdx).trim()
@@ -325,6 +353,23 @@ function parseStyleProps(propsStr: string): Record<string, string> {
     }
   }
   return props
+}
+
+/**
+ * Apply linkStyle directives to edges.
+ * Merges default link styles with index-specific styles.
+ */
+function applyLinkStyles(graph: MermaidGraph): void {
+  for (let i = 0; i < graph.edges.length; i++) {
+    const edge = graph.edges[i]!
+    const defaultStyle = graph.defaultLinkStyle
+    const indexStyle = graph.linkStyles.get(i)
+
+    if (defaultStyle || indexStyle) {
+      // Merge default style with index-specific style (index takes precedence)
+      edge.inlineStyle = { ...defaultStyle, ...indexStyle }
+    }
+  }
 }
 
 // ============================================================================

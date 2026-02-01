@@ -216,6 +216,7 @@ function preComputeSubgraphLayout(
       hasArrowEnd: originalEdge.hasArrowEnd,
       points,
       labelPosition,
+      inlineStyle: originalEdge.inlineStyle,
     }
   })
 
@@ -680,6 +681,7 @@ function extractPositionedGraph(
       hasArrowEnd: originalEdge.hasArrowEnd,
       points,
       labelPosition,
+      inlineStyle: originalEdge.inlineStyle,
     }
   })
 

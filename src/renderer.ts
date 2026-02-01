@@ -145,7 +145,11 @@ function renderEdge(edge: PositionedEdge): string {
 
   const pathData = pointsToPolylinePath(edge.points)
   const dashArray = edge.style === 'dotted' ? ' stroke-dasharray="4 4"' : ''
-  const strokeWidth = edge.style === 'thick' ? STROKE_WIDTHS.connector * 2 : STROKE_WIDTHS.connector
+
+  // Resolve stroke and stroke-width — inline styles (from linkStyle) override defaults
+  const stroke = escapeXml(edge.inlineStyle?.stroke ?? 'var(--_line)')
+  const defaultStrokeWidth = edge.style === 'thick' ? STROKE_WIDTHS.connector * 2 : STROKE_WIDTHS.connector
+  const strokeWidth = escapeXml(edge.inlineStyle?.['stroke-width'] ?? String(defaultStrokeWidth))
 
   // Build marker attributes based on arrow direction flags
   let markers = ''
@@ -153,7 +157,7 @@ function renderEdge(edge: PositionedEdge): string {
   if (edge.hasArrowStart) markers += ' marker-start="url(#arrowhead-start)"'
 
   return (
-    `<polyline points="${pathData}" fill="none" stroke="var(--_line)" ` +
+    `<polyline points="${pathData}" fill="none" stroke="${stroke}" ` +
     `stroke-width="${strokeWidth}"${dashArray}${markers} />`
   )
 }

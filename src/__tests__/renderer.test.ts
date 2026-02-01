@@ -431,6 +431,30 @@ describe('renderSvg – inline styles', () => {
   })
 })
 
+describe('renderSvg – edge inline styles', () => {
+  it('applies inline stroke override to edges', () => {
+    const edge = makeEdge({ inlineStyle: { stroke: '#123456' } })
+    const graph = makeGraph({ edges: [edge] })
+    const svg = renderSvg(graph, lightColors)
+    expect(svg).toContain('stroke="#123456"')
+  })
+
+  it('applies inline stroke-width override to edges', () => {
+    const edge = makeEdge({ inlineStyle: { 'stroke-width': '5' } })
+    const graph = makeGraph({ edges: [edge] })
+    const svg = renderSvg(graph, lightColors)
+    expect(svg).toContain('stroke-width="5"')
+  })
+
+  it('escapes injection in edge inline stroke', () => {
+    const edge = makeEdge({ inlineStyle: { stroke: 'red" onmouseover="alert(1)' } })
+    const graph = makeGraph({ edges: [edge] })
+    const svg = renderSvg(graph, lightColors)
+    expect(svg).not.toContain('onmouseover="alert')
+    expect(svg).toContain('red&quot; onmouseover=&quot;alert(1)')
+  })
+})
+
 // ============================================================================
 // XML escaping
 // ============================================================================

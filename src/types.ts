@@ -12,6 +12,10 @@ export interface MermaidGraph {
   classAssignments: Map<string, string>
   /** Maps node IDs to inline styles (from `style X fill:#f00,stroke:#333`) */
   nodeStyles: Map<string, Record<string, string>>
+  /** Maps edge indices to inline styles (from `linkStyle N stroke:#f00`) */
+  linkStyles: Map<number, Record<string, string>>
+  /** Default link style applied to all edges (from `linkStyle default ...`) */
+  defaultLinkStyle?: Record<string, string>
 }
 
 export type Direction = 'TD' | 'TB' | 'LR' | 'BT' | 'RL'
@@ -50,6 +54,8 @@ export interface MermaidEdge {
   hasArrowStart: boolean
   /** Whether to render an arrowhead at the end (target end) of the edge */
   hasArrowEnd: boolean
+  /** Inline styles from linkStyle directive (stroke, stroke-width, etc.) */
+  inlineStyle?: Record<string, string>
 }
 
 export type EdgeStyle = 'solid' | 'dotted' | 'thick'
@@ -98,6 +104,8 @@ export interface PositionedEdge {
   points: Point[]
   /** Layout-computed label center position (avoids label-label collisions) */
   labelPosition?: Point
+  /** Inline styles from linkStyle directive (stroke, stroke-width, etc.) */
+  inlineStyle?: Record<string, string>
 }
 
 export interface Point {
