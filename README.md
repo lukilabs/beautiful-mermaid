@@ -56,6 +56,24 @@ bun add beautiful-mermaid
 pnpm add beautiful-mermaid
 ```
 
+## AI Agent Skills
+
+Install specialized skills for AI coding assistants (Claude Code, Cursor, Windsurf, etc.):
+
+```bash
+npx skillkit install beautiful-mermaid
+```
+
+This installs comprehensive skills for:
+- **Flowcharts** — 12 node shapes, subgraphs, state diagrams
+- **Sequence diagrams** — Actors, messages, loops, alt/opt/par blocks
+- **Class diagrams** — UML classes, relationships, visibility modifiers
+- **ER diagrams** — Entities, crow's foot cardinality
+- **Theming** — 15 built-in themes, Shiki/VS Code integration
+- **ASCII rendering** — Unicode/ASCII terminal output
+
+Skills include syntax guides, examples, and best practices for AI-assisted diagram generation.
+
 ## Quick Start
 
 ### SVG Output
