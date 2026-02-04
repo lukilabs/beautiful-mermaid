@@ -1,6 +1,6 @@
 import type { PositionedClassDiagram, PositionedClassNode, PositionedClassRelationship, ClassMember, RelationshipType } from './types.ts'
-import type { DiagramColors } from '../theme.ts'
-import { svgOpenTag, buildStyleBlock } from '../theme.ts'
+import type { DiagramColors, ResolvedColors } from '../theme.ts'
+import { svgOpenTag, buildStyleBlock, svgOpenTagStatic, buildStaticStyleBlock, createColorFn } from '../theme.ts'
 import { FONT_SIZES, FONT_WEIGHTS, STROKE_WIDTHS, estimateTextWidth, TEXT_BASELINE_SHIFT } from '../styles.ts'
 import { CLS } from './layout.ts'
 
@@ -31,34 +31,47 @@ const CLS_FONT = {
  * @param colors - DiagramColors with bg/fg and optional enrichment variables.
  * @param transparent - If true, renders with transparent background.
  */
+/** Color accessor function type */
+type ColorFn = ReturnType<typeof createColorFn>
+
 export function renderClassSvg(
   diagram: PositionedClassDiagram,
   colors: DiagramColors,
   font: string = 'Inter',
-  transparent: boolean = false
+  transparent: boolean = false,
+  resolved: ResolvedColors | null = null,
+  noStyleBlock: boolean = false,
+  markerId: string = ''
 ): string {
   const parts: string[] = []
+  const c = createColorFn(resolved)
+  const mid = markerId ? `${markerId}-` : ''
 
   // SVG root with CSS variables + style block (with mono font) + defs
-  parts.push(svgOpenTag(diagram.width, diagram.height, colors, transparent))
-  parts.push(buildStyleBlock(font, true))
+  if (resolved) {
+    parts.push(svgOpenTagStatic(diagram.width, diagram.height, resolved.bg, transparent, font, noStyleBlock))
+    parts.push(buildStaticStyleBlock(font, true, noStyleBlock))
+  } else {
+    parts.push(svgOpenTag(diagram.width, diagram.height, colors, transparent))
+    parts.push(buildStyleBlock(font, true))
+  }
   parts.push('<defs>')
-  parts.push(relationshipMarkerDefs())
+  parts.push(relationshipMarkerDefs(c, mid))
   parts.push('</defs>')
 
   // 1. Relationship lines (rendered behind boxes)
   for (const rel of diagram.relationships) {
-    parts.push(renderRelationship(rel))
+    parts.push(renderRelationship(rel, c, mid))
   }
 
   // 2. Class boxes
   for (const cls of diagram.classes) {
-    parts.push(renderClassBox(cls))
+    parts.push(renderClassBox(cls, c, noStyleBlock))
   }
 
   // 3. Relationship labels and cardinality
   for (const rel of diagram.relationships) {
-    parts.push(renderRelationshipLabels(rel))
+    parts.push(renderRelationshipLabels(rel, c))
   }
 
   parts.push('</svg>')
@@ -81,23 +94,23 @@ export function renderClassSvg(
  *
  * Uses var(--_arrow) for fill/stroke and var(--bg) for hollow marker fills.
  */
-function relationshipMarkerDefs(): string {
+function relationshipMarkerDefs(c: ColorFn, mid: string): string {
   return (
     // Hollow triangle (inheritance, realization) — points at target
-    `  <marker id="cls-inherit" markerWidth="12" markerHeight="10" refX="12" refY="5" orient="auto-start-reverse">` +
-    `\n    <polygon points="0 0, 12 5, 0 10" fill="var(--bg)" stroke="var(--_arrow)" stroke-width="1.5" />` +
+    `  <marker id="${mid}cls-inherit" markerWidth="12" markerHeight="10" refX="12" refY="5" orient="auto-start-reverse">` +
+    `\n    <polygon points="0 0, 12 5, 0 10" fill="${c.bg()}" stroke="${c('_arrow')}" stroke-width="1.5" />` +
     `\n  </marker>` +
     // Filled diamond (composition) — points at source
-    `\n  <marker id="cls-composition" markerWidth="12" markerHeight="10" refX="0" refY="5" orient="auto-start-reverse">` +
-    `\n    <polygon points="6 0, 12 5, 6 10, 0 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="1" />` +
+    `\n  <marker id="${mid}cls-composition" markerWidth="12" markerHeight="10" refX="0" refY="5" orient="auto-start-reverse">` +
+    `\n    <polygon points="6 0, 12 5, 6 10, 0 5" fill="${c('_arrow')}" stroke="${c('_arrow')}" stroke-width="1" />` +
     `\n  </marker>` +
     // Hollow diamond (aggregation) — points at source
-    `\n  <marker id="cls-aggregation" markerWidth="12" markerHeight="10" refX="0" refY="5" orient="auto-start-reverse">` +
-    `\n    <polygon points="6 0, 12 5, 6 10, 0 5" fill="var(--bg)" stroke="var(--_arrow)" stroke-width="1.5" />` +
+    `\n  <marker id="${mid}cls-aggregation" markerWidth="12" markerHeight="10" refX="0" refY="5" orient="auto-start-reverse">` +
+    `\n    <polygon points="6 0, 12 5, 6 10, 0 5" fill="${c.bg()}" stroke="${c('_arrow')}" stroke-width="1.5" />` +
     `\n  </marker>` +
     // Open arrow (association, dependency)
-    `\n  <marker id="cls-arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto-start-reverse">` +
-    `\n    <polyline points="0 0, 8 3, 0 6" fill="none" stroke="var(--_arrow)" stroke-width="1.5" />` +
+    `\n  <marker id="${mid}cls-arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto-start-reverse">` +
+    `\n    <polyline points="0 0, 8 3, 0 6" fill="none" stroke="${c('_arrow')}" stroke-width="1.5" />` +
     `\n  </marker>`
   )
 }
@@ -107,20 +120,20 @@ function relationshipMarkerDefs(): string {
 // ============================================================================
 
 /** Render a class box with 3 compartments: header, attributes, methods */
-function renderClassBox(cls: PositionedClassNode): string {
+function renderClassBox(cls: PositionedClassNode, c: ColorFn, noStyleBlock: boolean = false): string {
   const { x, y, width, height, headerHeight, attrHeight, methodHeight } = cls
   const parts: string[] = []
 
   // Outer rectangle (full box)
   parts.push(
     `<rect x="${x}" y="${y}" width="${width}" height="${height}" ` +
-    `rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="${STROKE_WIDTHS.outerBox}" />`
+    `rx="0" ry="0" fill="${c('_node-fill')}" stroke="${c('_node-stroke')}" stroke-width="${STROKE_WIDTHS.outerBox}" />`
   )
 
   // Header background
   parts.push(
     `<rect x="${x}" y="${y}" width="${width}" height="${headerHeight}" ` +
-    `rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="${STROKE_WIDTHS.outerBox}" />`
+    `rx="0" ry="0" fill="${c('_group-hdr')}" stroke="${c('_node-stroke')}" stroke-width="${STROKE_WIDTHS.outerBox}" />`
   )
 
   // Annotation (<<interface>>, <<abstract>>, etc.)
@@ -130,7 +143,7 @@ function renderClassBox(cls: PositionedClassNode): string {
     parts.push(
       `<text x="${x + width / 2}" y="${annotY}" text-anchor="middle" dy="${TEXT_BASELINE_SHIFT}" ` +
       `font-size="${CLS_FONT.annotationSize}" font-weight="${CLS_FONT.annotationWeight}" ` +
-      `font-style="italic" fill="var(--_text-muted)">&lt;&lt;${escapeXml(cls.annotation)}&gt;&gt;</text>`
+      `font-style="italic" fill="${c('_text-muted')}">&lt;&lt;${escapeXml(cls.annotation)}&gt;&gt;</text>`
     )
     nameY = y + headerHeight / 2 + 6
   }
@@ -138,14 +151,14 @@ function renderClassBox(cls: PositionedClassNode): string {
   // Class name
   parts.push(
     `<text x="${x + width / 2}" y="${nameY}" text-anchor="middle" dy="${TEXT_BASELINE_SHIFT}" ` +
-    `font-size="${FONT_SIZES.nodeLabel}" font-weight="700" fill="var(--_text)">${escapeXml(cls.label)}</text>`
+    `font-size="${FONT_SIZES.nodeLabel}" font-weight="700" fill="${c('_text')}">${escapeXml(cls.label)}</text>`
   )
 
   // Divider line between header and attributes
   const attrTop = y + headerHeight
   parts.push(
     `<line x1="${x}" y1="${attrTop}" x2="${x + width}" y2="${attrTop}" ` +
-    `stroke="var(--_node-stroke)" stroke-width="${STROKE_WIDTHS.innerBox}" />`
+    `stroke="${c('_node-stroke')}" stroke-width="${STROKE_WIDTHS.innerBox}" />`
   )
 
   // Attributes
@@ -153,21 +166,21 @@ function renderClassBox(cls: PositionedClassNode): string {
   for (let i = 0; i < cls.attributes.length; i++) {
     const member = cls.attributes[i]!
     const memberY = attrTop + 4 + i * memberRowH + memberRowH / 2
-    parts.push(renderMember(member, x + CLS.boxPadX, memberY))
+    parts.push(renderMember(member, x + CLS.boxPadX, memberY, c, noStyleBlock))
   }
 
   // Divider line between attributes and methods
   const methodTop = attrTop + attrHeight
   parts.push(
     `<line x1="${x}" y1="${methodTop}" x2="${x + width}" y2="${methodTop}" ` +
-    `stroke="var(--_node-stroke)" stroke-width="${STROKE_WIDTHS.innerBox}" />`
+    `stroke="${c('_node-stroke')}" stroke-width="${STROKE_WIDTHS.innerBox}" />`
   )
 
   // Methods
   for (let i = 0; i < cls.methods.length; i++) {
     const member = cls.methods[i]!
     const memberY = methodTop + 4 + i * memberRowH + memberRowH / 2
-    parts.push(renderMember(member, x + CLS.boxPadX, memberY))
+    parts.push(renderMember(member, x + CLS.boxPadX, memberY, c, noStyleBlock))
   }
 
   return parts.join('\n')
@@ -181,26 +194,27 @@ function renderClassBox(cls: PositionedClassNode): string {
  *   - colon separator → textFaint
  *   - type annotation → textMuted
  */
-function renderMember(member: ClassMember, x: number, y: number): string {
+function renderMember(member: ClassMember, x: number, y: number, c: ColorFn, noStyleBlock: boolean = false): string {
   const fontStyle = member.isAbstract ? ' font-style="italic"' : ''
   const decoration = member.isStatic ? ' text-decoration="underline"' : ''
+  const monoFont = noStyleBlock ? ` font-family="'JetBrains Mono','SF Mono','Fira Code',ui-monospace,monospace"` : ''
 
   // Build tspan parts for syntax-highlighted member text
   const spans: string[] = []
 
   if (member.visibility) {
-    spans.push(`<tspan fill="var(--_text-faint)">${escapeXml(member.visibility)} </tspan>`)
+    spans.push(`<tspan fill="${c('_text-faint')}">${escapeXml(member.visibility)} </tspan>`)
   }
 
-  spans.push(`<tspan fill="var(--_text-sec)">${escapeXml(member.name)}</tspan>`)
+  spans.push(`<tspan fill="${c('_text-sec')}">${escapeXml(member.name)}</tspan>`)
 
   if (member.type) {
-    spans.push(`<tspan fill="var(--_text-faint)">: </tspan>`)
-    spans.push(`<tspan fill="var(--_text-muted)">${escapeXml(member.type)}</tspan>`)
+    spans.push(`<tspan fill="${c('_text-faint')}">: </tspan>`)
+    spans.push(`<tspan fill="${c('_text-muted')}">${escapeXml(member.type)}</tspan>`)
   }
 
   return (
-    `<text x="${x}" y="${y}" class="mono" dy="${TEXT_BASELINE_SHIFT}" ` +
+    `<text x="${x}" y="${y}" class="mono"${monoFont} dy="${TEXT_BASELINE_SHIFT}" ` +
     `font-size="${CLS_FONT.memberSize}" font-weight="${CLS_FONT.memberWeight}"${fontStyle}${decoration}>` +
     `${spans.join('')}</text>`
   )
@@ -211,7 +225,7 @@ function renderMember(member: ClassMember, x: number, y: number): string {
 // ============================================================================
 
 /** Render a relationship line with appropriate markers */
-function renderRelationship(rel: PositionedClassRelationship): string {
+function renderRelationship(rel: PositionedClassRelationship, c: ColorFn, mid: string): string {
   if (rel.points.length < 2) return ''
 
   const pathData = rel.points.map(p => `${p.x},${p.y}`).join(' ')
@@ -219,10 +233,10 @@ function renderRelationship(rel: PositionedClassRelationship): string {
   const dashArray = isDashed ? ' stroke-dasharray="6 4"' : ''
 
   // Determine markers based on relationship type and which end has the marker
-  const markers = getRelationshipMarkers(rel.type, rel.markerAt)
+  const markers = getRelationshipMarkers(rel.type, rel.markerAt, mid)
 
   return (
-    `<polyline points="${pathData}" fill="none" stroke="var(--_line)" ` +
+    `<polyline points="${pathData}" fill="none" stroke="${c('_line')}" ` +
     `stroke-width="${STROKE_WIDTHS.connector}"${dashArray}${markers} />`
   )
 }
@@ -233,37 +247,37 @@ function renderRelationship(rel: PositionedClassRelationship): string {
  *   - 'from' → marker-start (prefix arrows like `<|--`, `*--`, `o--`)
  *   - 'to'   → marker-end   (suffix arrows like `..|>`, `-->`, `--*`)
  */
-function getRelationshipMarkers(type: RelationshipType, markerAt: 'from' | 'to'): string {
-  const markerId = getMarkerDefId(type)
-  if (!markerId) return ''
+function getRelationshipMarkers(type: RelationshipType, markerAt: 'from' | 'to', mid: string): string {
+  const defId = getMarkerDefId(type, mid)
+  if (!defId) return ''
 
   if (markerAt === 'from') {
-    return ` marker-start="url(#${markerId})"`
+    return ` marker-start="url(#${defId})"`
   } else {
-    return ` marker-end="url(#${markerId})"`
+    return ` marker-end="url(#${defId})"`
   }
 }
 
 /** Map relationship type to its SVG marker definition ID */
-function getMarkerDefId(type: RelationshipType): string | null {
+function getMarkerDefId(type: RelationshipType, mid: string): string | null {
   switch (type) {
     case 'inheritance':
     case 'realization':
-      return 'cls-inherit'
+      return `${mid}cls-inherit`
     case 'composition':
-      return 'cls-composition'
+      return `${mid}cls-composition`
     case 'aggregation':
-      return 'cls-aggregation'
+      return `${mid}cls-aggregation`
     case 'association':
     case 'dependency':
-      return 'cls-arrow'
+      return `${mid}cls-arrow`
     default:
       return null
   }
 }
 
 /** Render relationship labels and cardinality text */
-function renderRelationshipLabels(rel: PositionedClassRelationship): string {
+function renderRelationshipLabels(rel: PositionedClassRelationship, c: ColorFn): string {
   if (!rel.label && !rel.fromCardinality && !rel.toCardinality) return ''
   if (rel.points.length < 2) return ''
 
@@ -275,7 +289,7 @@ function renderRelationshipLabels(rel: PositionedClassRelationship): string {
     parts.push(
       `<text x="${pos.x}" y="${pos.y - 8}" text-anchor="middle" ` +
       `font-size="${FONT_SIZES.edgeLabel}" font-weight="${FONT_WEIGHTS.edgeLabel}" ` +
-      `fill="var(--_text-muted)">${escapeXml(rel.label)}</text>`
+      `fill="${c('_text-muted')}">${escapeXml(rel.label)}</text>`
     )
   }
 
@@ -287,7 +301,7 @@ function renderRelationshipLabels(rel: PositionedClassRelationship): string {
     parts.push(
       `<text x="${p.x + offset.x}" y="${p.y + offset.y}" text-anchor="middle" ` +
       `font-size="${FONT_SIZES.edgeLabel}" font-weight="${FONT_WEIGHTS.edgeLabel}" ` +
-      `fill="var(--_text-muted)">${escapeXml(rel.fromCardinality)}</text>`
+      `fill="${c('_text-muted')}">${escapeXml(rel.fromCardinality)}</text>`
     )
   }
 
@@ -299,7 +313,7 @@ function renderRelationshipLabels(rel: PositionedClassRelationship): string {
     parts.push(
       `<text x="${p.x + offset.x}" y="${p.y + offset.y}" text-anchor="middle" ` +
       `font-size="${FONT_SIZES.edgeLabel}" font-weight="${FONT_WEIGHTS.edgeLabel}" ` +
-      `fill="var(--_text-muted)">${escapeXml(rel.toCardinality)}</text>`
+      `fill="${c('_text-muted')}">${escapeXml(rel.toCardinality)}</text>`
     )
   }
 

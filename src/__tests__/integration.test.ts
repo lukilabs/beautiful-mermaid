@@ -213,8 +213,9 @@ describe('renderMermaid – Batch 2 edge features', () => {
 
   it('renders bidirectional arrows', async () => {
     const svg = await renderMermaid('graph TD\n  A <--> B')
-    expect(svg).toContain('marker-end="url(#arrowhead)"')
-    expect(svg).toContain('marker-start="url(#arrowhead-start)"')
+    // Marker IDs may be namespaced (e.g. m1234-arrowhead) for multi-SVG safety
+    expect(svg).toMatch(/marker-end="url\(#[^"]*arrowhead\)"/)
+    expect(svg).toMatch(/marker-start="url\(#[^"]*arrowhead-start\)"/)
   })
 
   it('renders parallel links with &', async () => {

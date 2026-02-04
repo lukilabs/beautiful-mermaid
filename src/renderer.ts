@@ -1,6 +1,6 @@
 import type { PositionedGraph, PositionedNode, PositionedEdge, PositionedGroup, Point } from './types.ts'
-import type { DiagramColors } from './theme.ts'
-import { svgOpenTag, buildStyleBlock } from './theme.ts'
+import type { DiagramColors, ResolvedColors, RGBA } from './theme.ts'
+import { svgOpenTag, buildStyleBlock, svgOpenTagStatic, buildStaticStyleBlock, createColorFn, toHex, HEX_RE } from './theme.ts'
 import { FONT_SIZES, FONT_WEIGHTS, STROKE_WIDTHS, ARROW_HEAD, estimateTextWidth, TEXT_BASELINE_SHIFT } from './styles.ts'
 
 // ============================================================================
@@ -34,42 +34,52 @@ export function renderSvg(
   graph: PositionedGraph,
   colors: DiagramColors,
   font: string = 'Inter',
-  transparent: boolean = false
+  transparent: boolean = false,
+  resolved: ResolvedColors | null = null,
+  noStyleBlock: boolean = false,
+  markerId: string = ''
 ): string {
   const parts: string[] = []
+  const c = createColorFn(resolved)
+  const mid = markerId ? `${markerId}-` : ''
 
   // SVG root with CSS variables + style block + defs
-  parts.push(svgOpenTag(graph.width, graph.height, colors, transparent))
-  parts.push(buildStyleBlock(font, false))
+  if (resolved) {
+    parts.push(svgOpenTagStatic(graph.width, graph.height, resolved.bg, transparent, font, noStyleBlock))
+    parts.push(buildStaticStyleBlock(font, false, noStyleBlock))
+  } else {
+    parts.push(svgOpenTag(graph.width, graph.height, colors, transparent))
+    parts.push(buildStyleBlock(font, false))
+  }
   parts.push('<defs>')
-  parts.push(arrowMarkerDefs())
+  parts.push(arrowMarkerDefs(c, mid))
   parts.push('</defs>')
 
   // 1. Group backgrounds (subgraph rectangles with header bands)
   for (const group of graph.groups) {
-    parts.push(renderGroup(group, font))
+    parts.push(renderGroup(group, font, c))
   }
 
   // 2. Edges (polylines — rendered behind nodes)
   for (const edge of graph.edges) {
-    parts.push(renderEdge(edge))
+    parts.push(renderEdge(edge, c, mid))
   }
 
   // 3. Edge labels (positioned at midpoint of edge)
   for (const edge of graph.edges) {
     if (edge.label) {
-      parts.push(renderEdgeLabel(edge, font))
+      parts.push(renderEdgeLabel(edge, font, c))
     }
   }
 
   // 4. Node shapes
   for (const node of graph.nodes) {
-    parts.push(renderNodeShape(node))
+    parts.push(renderNodeShape(node, c, !!resolved))
   }
 
   // 5. Node labels
   for (const node of graph.nodes) {
-    parts.push(renderNodeLabel(node, font))
+    parts.push(renderNodeLabel(node, font, c, !!resolved))
   }
 
   parts.push('</svg>')
@@ -81,22 +91,27 @@ export function renderSvg(
 // Arrow marker definitions
 // ============================================================================
 
+/** Color accessor function type */
+type ColorFn = ReturnType<typeof createColorFn>
+
 /**
  * Reusable arrow head markers — both forward (end) and reverse (start) variants.
  * The reverse marker uses orient="auto-start-reverse" to flip automatically.
  * Arrow color uses var(--_arrow) CSS variable.
+ *
+ * @param mid - Marker ID prefix for multi-SVG isolation (e.g. 'mA3f2-')
  */
-function arrowMarkerDefs(): string {
+function arrowMarkerDefs(c: ColorFn, mid: string): string {
   const w = ARROW_HEAD.width
   const h = ARROW_HEAD.height
   return (
     // Forward arrow (marker-end) — orient="auto" ensures arrow points along line direction
-    `  <marker id="arrowhead" markerWidth="${w}" markerHeight="${h}" refX="${w}" refY="${h / 2}" orient="auto">` +
-    `\n    <polygon points="0 0, ${w} ${h / 2}, 0 ${h}" fill="var(--_arrow)" />` +
+    `  <marker id="${mid}arrowhead" markerWidth="${w}" markerHeight="${h}" refX="${w}" refY="${h / 2}" orient="auto">` +
+    `\n    <polygon points="0 0, ${w} ${h / 2}, 0 ${h}" fill="${c('_arrow')}" />` +
     `\n  </marker>` +
     // Reverse arrow (marker-start) — refX=0 so it sits at the line start, auto-start-reverse flips it
-    `\n  <marker id="arrowhead-start" markerWidth="${w}" markerHeight="${h}" refX="0" refY="${h / 2}" orient="auto-start-reverse">` +
-    `\n    <polygon points="${w} 0, 0 ${h / 2}, ${w} ${h}" fill="var(--_arrow)" />` +
+    `\n  <marker id="${mid}arrowhead-start" markerWidth="${w}" markerHeight="${h}" refX="0" refY="${h / 2}" orient="auto-start-reverse">` +
+    `\n    <polygon points="${w} 0, 0 ${h / 2}, ${w} ${h}" fill="${c('_arrow')}" />` +
     `\n  </marker>`
   )
 }
@@ -105,32 +120,32 @@ function arrowMarkerDefs(): string {
 // Group rendering (subgraph backgrounds)
 // ============================================================================
 
-function renderGroup(group: PositionedGroup, font: string): string {
+function renderGroup(group: PositionedGroup, font: string, c: ColorFn): string {
   const headerHeight = FONT_SIZES.groupHeader + 16
   const parts: string[] = []
 
   // Outer rectangle
   parts.push(
     `<rect x="${group.x}" y="${group.y}" width="${group.width}" height="${group.height}" ` +
-    `rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="${STROKE_WIDTHS.outerBox}" />`
+    `rx="0" ry="0" fill="${c('_group-fill')}" stroke="${c('_node-stroke')}" stroke-width="${STROKE_WIDTHS.outerBox}" />`
   )
 
   // Header band
   parts.push(
     `<rect x="${group.x}" y="${group.y}" width="${group.width}" height="${headerHeight}" ` +
-    `rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="${STROKE_WIDTHS.outerBox}" />`
+    `rx="0" ry="0" fill="${c('_group-hdr')}" stroke="${c('_node-stroke')}" stroke-width="${STROKE_WIDTHS.outerBox}" />`
   )
 
   // Header label
   parts.push(
     `<text x="${group.x + 12}" y="${group.y + headerHeight / 2}" ` +
     `dy="${TEXT_BASELINE_SHIFT}" font-size="${FONT_SIZES.groupHeader}" font-weight="${FONT_WEIGHTS.groupHeader}" ` +
-    `fill="var(--_text-sec)">${escapeXml(group.label)}</text>`
+    `fill="${c('_text-sec')}">${escapeXml(group.label)}</text>`
   )
 
   // Render nested groups recursively
   for (const child of group.children) {
-    parts.push(renderGroup(child, font))
+    parts.push(renderGroup(child, font, c))
   }
 
   return parts.join('\n')
@@ -140,7 +155,7 @@ function renderGroup(group: PositionedGroup, font: string): string {
 // Edge rendering
 // ============================================================================
 
-function renderEdge(edge: PositionedEdge): string {
+function renderEdge(edge: PositionedEdge, c: ColorFn, mid: string): string {
   if (edge.points.length < 2) return ''
 
   const pathData = pointsToPolylinePath(edge.points)
@@ -149,11 +164,11 @@ function renderEdge(edge: PositionedEdge): string {
 
   // Build marker attributes based on arrow direction flags
   let markers = ''
-  if (edge.hasArrowEnd) markers += ' marker-end="url(#arrowhead)"'
-  if (edge.hasArrowStart) markers += ' marker-start="url(#arrowhead-start)"'
+  if (edge.hasArrowEnd) markers += ` marker-end="url(#${mid}arrowhead)"`
+  if (edge.hasArrowStart) markers += ` marker-start="url(#${mid}arrowhead-start)"`
 
   return (
-    `<polyline points="${pathData}" fill="none" stroke="var(--_line)" ` +
+    `<polyline points="${pathData}" fill="none" stroke="${c('_line')}" ` +
     `stroke-width="${strokeWidth}"${dashArray}${markers} />`
   )
 }
@@ -163,7 +178,7 @@ function pointsToPolylinePath(points: Point[]): string {
   return points.map(p => `${p.x},${p.y}`).join(' ')
 }
 
-function renderEdgeLabel(edge: PositionedEdge, font: string): string {
+function renderEdgeLabel(edge: PositionedEdge, font: string, c: ColorFn): string {
   // Use dagre-computed label position when available (layout-aware, avoids collisions).
   // Fall back to geometric midpoint of the edge polyline.
   const mid = edge.labelPosition ?? edgeMidpoint(edge.points)
@@ -178,10 +193,10 @@ function renderEdgeLabel(edge: PositionedEdge, font: string): string {
   return (
     `<rect x="${mid.x - bgWidth / 2}" y="${mid.y - bgHeight / 2}" ` +
     `width="${bgWidth}" height="${bgHeight}" rx="4" ry="4" ` +
-    `fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="0.5" />\n` +
+    `fill="${c.bg()}" stroke="${c('_inner-stroke')}" stroke-width="0.5" />\n` +
     `<text x="${mid.x}" y="${mid.y}" text-anchor="middle" dy="${TEXT_BASELINE_SHIFT}" ` +
     `font-size="${FONT_SIZES.edgeLabel}" font-weight="${FONT_WEIGHTS.edgeLabel}" ` +
-    `fill="var(--_text-muted)">${escapeXml(label)}</text>`
+    `fill="${c('_text-muted')}">${escapeXml(label)}</text>`
   )
 }
 
@@ -221,15 +236,19 @@ function dist(a: Point, b: Point): number {
 // Node rendering
 // ============================================================================
 
-function renderNodeShape(node: PositionedNode): string {
+function renderNodeShape(node: PositionedNode, c: ColorFn, isStatic: boolean = false): string {
   const { x, y, width, height, shape, inlineStyle } = node
+
+  // Normalize inline styles when in static mode - convert any non-hex color
+  // formats to hex, ensuring PDF renderers can process them.
+  const normalizedStyle = isStatic && inlineStyle ? normalizeInlineStyles(inlineStyle) : inlineStyle
 
   // Resolve fill and stroke — inline styles (from mermaid `style` directives)
   // override the CSS variable defaults. When no inline style is present, the
-  // CSS variable handles theming automatically via color-mix() derivation.
-  const fill = escapeXml(inlineStyle?.fill ?? 'var(--_node-fill)')
-  const stroke = escapeXml(inlineStyle?.stroke ?? 'var(--_node-stroke)')
-  const sw = escapeXml(inlineStyle?.['stroke-width'] ?? String(STROKE_WIDTHS.innerBox))
+  // color accessor handles theming (either CSS var or literal hex).
+  const fill = escapeXml(normalizedStyle?.fill ?? c('_node-fill'))
+  const stroke = escapeXml(normalizedStyle?.stroke ?? c('_node-stroke'))
+  const sw = escapeXml(normalizedStyle?.['stroke-width'] ?? String(STROKE_WIDTHS.innerBox))
 
   switch (shape) {
     case 'diamond':
@@ -255,9 +274,9 @@ function renderNodeShape(node: PositionedNode): string {
     case 'trapezoid-alt':
       return renderTrapezoidAlt(x, y, width, height, fill, stroke, sw)
     case 'state-start':
-      return renderStateStart(x, y, width, height)
+      return renderStateStart(x, y, width, height, c)
     case 'state-end':
-      return renderStateEnd(x, y, width, height)
+      return renderStateEnd(x, y, width, height, c)
     case 'rectangle':
     default:
       return renderRect(x, y, width, height, fill, stroke, sw)
@@ -427,23 +446,23 @@ function renderTrapezoidAlt(x: number, y: number, w: number, h: number, fill: st
 // --- Batch 3: State diagram pseudostates ---
 
 /** State start: small filled circle using primary text color */
-function renderStateStart(x: number, y: number, w: number, h: number): string {
+function renderStateStart(x: number, y: number, w: number, h: number, c: ColorFn): string {
   const cx = x + w / 2
   const cy = y + h / 2
   const r = Math.min(w, h) / 2 - 2
-  return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="var(--_text)" stroke="none" />`
+  return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${c('_text')}" stroke="none" />`
 }
 
 /** State end: bullseye — outer ring + inner filled circle using primary text color */
-function renderStateEnd(x: number, y: number, w: number, h: number): string {
+function renderStateEnd(x: number, y: number, w: number, h: number, c: ColorFn): string {
   const cx = x + w / 2
   const cy = y + h / 2
   const outerR = Math.min(w, h) / 2 - 2
   const innerR = outerR - 4
   return (
     `<circle cx="${cx}" cy="${cy}" r="${outerR}" ` +
-    `fill="none" stroke="var(--_text)" stroke-width="${STROKE_WIDTHS.innerBox * 2}" />` +
-    `\n<circle cx="${cx}" cy="${cy}" r="${innerR}" fill="var(--_text)" stroke="none" />`
+    `fill="none" stroke="${c('_text')}" stroke-width="${STROKE_WIDTHS.innerBox * 2}" />` +
+    `\n<circle cx="${cx}" cy="${cy}" r="${innerR}" fill="${c('_text')}" stroke="none" />`
   )
 }
 
@@ -451,7 +470,7 @@ function renderStateEnd(x: number, y: number, w: number, h: number): string {
 // Node label rendering
 // ============================================================================
 
-function renderNodeLabel(node: PositionedNode, font: string): string {
+function renderNodeLabel(node: PositionedNode, font: string, c: ColorFn, isStatic: boolean = false): string {
   // State pseudostates have no label
   if (node.shape === 'state-start' || node.shape === 'state-end') {
     if (!node.label) return ''
@@ -460,8 +479,9 @@ function renderNodeLabel(node: PositionedNode, font: string): string {
   const cx = node.x + node.width / 2
   const cy = node.y + node.height / 2
 
-  // Resolve text color — inline styles can override the CSS variable default
-  const textColor = escapeXml(node.inlineStyle?.color ?? 'var(--_text)')
+  // Resolve text color - inline styles can override the color accessor default
+  const normalizedStyle = isStatic && node.inlineStyle ? normalizeInlineStyles(node.inlineStyle) : node.inlineStyle
+  const textColor = escapeXml(normalizedStyle?.color ?? c('_text'))
 
   return (
     `<text x="${cx}" y="${cy}" text-anchor="middle" dy="${TEXT_BASELINE_SHIFT}" ` +
@@ -473,6 +493,51 @@ function renderNodeLabel(node: PositionedNode, font: string): string {
 // ============================================================================
 // Utilities
 // ============================================================================
+
+/**
+ * Normalize inline style values for static SVG output.
+ * Converts rgb()/rgba() to hex (preserving alpha), passes hex through unchanged.
+ * Strips var() references, hsl(), hsla(), named colors, and other non-hex formats.
+ *
+ * Uses HEX_RE from theme.ts (the same regex used by validateHexColor) to keep
+ * validation and normalization rules aligned in a single source of truth.
+ *
+ * Returns `undefined` when all style values are stripped (empty result), so
+ * callers fall back to theme defaults rather than emitting empty overrides.
+ *
+ * Results are cached per input object via WeakMap. Cached results are frozen
+ * to prevent external mutation from corrupting the cache.
+ */
+const normalizedStylesCache = new WeakMap<Record<string, string>, Record<string, string> | undefined>()
+
+function normalizeInlineStyles(style: Record<string, string>): Record<string, string> | undefined {
+  if (normalizedStylesCache.has(style)) return normalizedStylesCache.get(style)
+
+  const result: Record<string, string> = {}
+  let count = 0
+  for (const [key, value] of Object.entries(style)) {
+    if (value.startsWith('var(')) continue
+
+    const rgbMatch = value.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?\s*\)/)
+    if (rgbMatch) {
+      const rgba: RGBA = { r: +rgbMatch[1]!, g: +rgbMatch[2]!, b: +rgbMatch[3]! }
+      if (rgbMatch[4]) {
+        const a = parseFloat(rgbMatch[4])
+        rgba.a = a <= 1 ? Math.round(a * 255) : Math.round(a)
+      }
+      result[key] = toHex(rgba)
+      count++
+    } else if (HEX_RE.test(value)) {
+      result[key] = value
+      count++
+    }
+    // hsl(), hsla(), named colors, other formats → dropped
+  }
+
+  const out = count > 0 ? Object.freeze(result) as Record<string, string> : undefined
+  normalizedStylesCache.set(style, out)
+  return out
+}
 
 /** Escape special XML characters in text content */
 function escapeXml(text: string): string {

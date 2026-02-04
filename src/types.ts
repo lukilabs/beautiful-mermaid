@@ -151,6 +151,55 @@ export interface RenderOptions {
   nodeSpacing?: number
   /** Vertical spacing between layers. Default: 40 */
   layerSpacing?: number
-  /** Render with transparent background (no background style on SVG). Default: false */
+  /**
+   * Render with transparent background. Default: false.
+   *
+   * In static mode, uses explicit `background:none` on the SVG root.
+   * In dynamic mode, omits the background style entirely.
+   */
   transparent?: boolean
+  /**
+   * Output mode for color handling. Default: 'dynamic'.
+   *
+   * - `'dynamic'` - colors are set via CSS custom properties on the `<svg>` tag
+   *   with `color-mix()` fallbacks in a `<style>` block. Produces compact,
+   *   themeable SVG that works in modern browsers.
+   *
+   * - `'static'` - all colors are resolved to literal hex values at render time.
+   *   Produces PDF-compatible SVG for renderers (Typst, WeasyPrint, Inkscape,
+   *   librsvg) that don't evaluate CSS custom properties or `color-mix()`.
+   */
+  output?: 'dynamic' | 'static'
+
+  /**
+   * Pre-resolved color palette. When provided, skips resolveColors() computation.
+   * Useful for rendering multiple diagrams with the same palette - resolve once,
+   * reuse across calls. Implies output: 'static'.
+   *
+   * @example
+   * ```ts
+   * const palette = resolveColors({ bg: '#1a1b26', fg: '#a9b1d6' })
+   * const svg1 = await renderMermaid(diagram1, { resolvedColors: palette })
+   * const svg2 = await renderMermaid(diagram2, { resolvedColors: palette })
+   * ```
+   */
+  resolvedColors?: import('./theme.ts').ResolvedColors
+
+  /**
+   * When true, omits the `<style>` block entirely from static SVG output.
+   * Font-family attributes are inlined directly on `<text>` elements instead.
+   * Only applies when output is 'static' (or resolvedColors is set).
+   *
+   * Useful for environments that strip `<style>` blocks (email clients,
+   * some PDF renderers, SVG sanitizers).
+   */
+  noStyleBlock?: boolean
+
+  /**
+   * Custom marker ID prefix for multi-SVG isolation.
+   * When multiple SVGs share a DOM, marker IDs (arrowheads, etc.) can collide.
+   * Set this to a unique string per diagram, or leave unset for auto-generation.
+   * Pass `false` to disable namespacing (use bare IDs like 'arrowhead').
+   */
+  markerId?: string | false
 }
