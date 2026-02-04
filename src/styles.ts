@@ -85,6 +85,56 @@ export const STROKE_WIDTHS = {
  */
 export const TEXT_BASELINE_SHIFT = '0.35em' as const
 
+/** Line height multiplier for multiline text (relative to font size) */
+export const LINE_HEIGHT_RATIO = 1.4
+
+/** Maximum label width in px before auto-wrapping at word boundaries */
+export const MAX_LABEL_WIDTH = 200
+
+/**
+ * Wrap text into multiple lines:
+ * 1. Split on existing `\n` characters (from `<br>` normalization)
+ * 2. Word-wrap any line exceeding `maxWidth` at word boundaries
+ *
+ * Returns an array of lines.
+ */
+export function wrapText(text: string, fontSize: number, fontWeight: number, maxWidth: number = MAX_LABEL_WIDTH): string[] {
+  const hardLines = text.split('\n')
+  const result: string[] = []
+
+  for (const line of hardLines) {
+    const lineWidth = estimateTextWidth(line, fontSize, fontWeight)
+    if (lineWidth <= maxWidth) {
+      result.push(line)
+      continue
+    }
+
+    // Word-wrap this line
+    const words = line.split(/\s+/)
+    let currentLine = ''
+
+    for (const word of words) {
+      if (currentLine.length === 0) {
+        currentLine = word
+        continue
+      }
+      const testLine = currentLine + ' ' + word
+      const testWidth = estimateTextWidth(testLine, fontSize, fontWeight)
+      if (testWidth <= maxWidth) {
+        currentLine = testLine
+      } else {
+        result.push(currentLine)
+        currentLine = word
+      }
+    }
+    if (currentLine.length > 0) {
+      result.push(currentLine)
+    }
+  }
+
+  return result
+}
+
 /** Arrow head dimensions */
 export const ARROW_HEAD = {
   width: 8,

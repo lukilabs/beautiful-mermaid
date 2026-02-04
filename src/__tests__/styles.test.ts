@@ -3,7 +3,7 @@
  * Theme resolution tests are in theme.test.ts (CSS custom property system).
  */
 import { describe, it, expect } from 'bun:test'
-import { estimateTextWidth, FONT_SIZES, FONT_WEIGHTS, NODE_PADDING, STROKE_WIDTHS, ARROW_HEAD } from '../styles.ts'
+import { estimateTextWidth, FONT_SIZES, FONT_WEIGHTS, NODE_PADDING, STROKE_WIDTHS, ARROW_HEAD, wrapText, LINE_HEIGHT_RATIO, MAX_LABEL_WIDTH } from '../styles.ts'
 import { THEMES, DEFAULTS, fromShikiTheme, buildStyleBlock, svgOpenTag } from '../theme.ts'
 import type { DiagramColors } from '../theme.ts'
 
@@ -177,5 +177,55 @@ describe('constants', () => {
   it('ARROW_HEAD has expected values', () => {
     expect(ARROW_HEAD.width).toBe(8)
     expect(ARROW_HEAD.height).toBe(4.8)
+  })
+
+  it('LINE_HEIGHT_RATIO is 1.4', () => {
+    expect(LINE_HEIGHT_RATIO).toBe(1.4)
+  })
+
+  it('MAX_LABEL_WIDTH is 200', () => {
+    expect(MAX_LABEL_WIDTH).toBe(200)
+  })
+})
+
+// ============================================================================
+// Text wrapping
+// ============================================================================
+
+describe('wrapText', () => {
+  it('returns single-element array for short text', () => {
+    const lines = wrapText('Hello', 13, 500)
+    expect(lines).toEqual(['Hello'])
+  })
+
+  it('splits on existing newlines', () => {
+    const lines = wrapText('Line 1\nLine 2', 13, 500)
+    expect(lines).toEqual(['Line 1', 'Line 2'])
+  })
+
+  it('preserves multiple newlines as separate lines', () => {
+    const lines = wrapText('A\nB\nC', 13, 500)
+    expect(lines).toEqual(['A', 'B', 'C'])
+  })
+
+  it('auto-wraps long lines at word boundaries', () => {
+    // Create a long text that exceeds maxWidth of 200px
+    const longText = 'This is a very long label that should be wrapped at word boundaries'
+    const lines = wrapText(longText, 13, 500, 100)
+    expect(lines.length).toBeGreaterThan(1)
+    // All words should still be present
+    expect(lines.join(' ')).toBe(longText)
+  })
+
+  it('does not wrap text that fits within maxWidth', () => {
+    const lines = wrapText('Short', 13, 500, 200)
+    expect(lines).toEqual(['Short'])
+  })
+
+  it('handles combined newlines and word wrapping', () => {
+    const text = 'Short line\nThis is a very long line that should definitely be word wrapped'
+    const lines = wrapText(text, 13, 500, 100)
+    expect(lines.length).toBeGreaterThan(2)
+    expect(lines[0]).toBe('Short line')
   })
 })
