@@ -10,7 +10,7 @@
  * - Comments and error cases
  */
 import { describe, it, expect } from 'bun:test'
-import { parseMermaid } from '../parser.ts'
+import { parseMermaid, normalizeLabel } from '../parser.ts'
 
 // ============================================================================
 // Graph header parsing
@@ -703,5 +703,74 @@ describe('parseMermaid – state diagrams', () => {
     // Should have transitions for: [*]→Idle, Idle→Processing, parse→validate,
     // validate→execute, Processing→Complete, Complete→[*]
     expect(g.edges).toHaveLength(6)
+  })
+})
+
+// ============================================================================
+// Label normalization (multiline support)
+// ============================================================================
+
+describe('normalizeLabel', () => {
+  it('strips surrounding double quotes', () => {
+    expect(normalizeLabel('"Hello World"')).toBe('Hello World')
+  })
+
+  it('does not strip quotes that are not surrounding', () => {
+    expect(normalizeLabel('He said "hi"')).toBe('He said "hi"')
+  })
+
+  it('does not strip single quotes', () => {
+    expect(normalizeLabel("'Hello'")).toBe("'Hello'")
+  })
+
+  it('replaces <br> with newline', () => {
+    expect(normalizeLabel('Line 1<br>Line 2')).toBe('Line 1\nLine 2')
+  })
+
+  it('replaces <br/> with newline', () => {
+    expect(normalizeLabel('Line 1<br/>Line 2')).toBe('Line 1\nLine 2')
+  })
+
+  it('replaces <br /> with newline', () => {
+    expect(normalizeLabel('Line 1<br />Line 2')).toBe('Line 1\nLine 2')
+  })
+
+  it('is case-insensitive for <BR>', () => {
+    expect(normalizeLabel('Line 1<BR>Line 2')).toBe('Line 1\nLine 2')
+  })
+
+  it('handles multiple <br> tags', () => {
+    expect(normalizeLabel('A<br>B<br/>C')).toBe('A\nB\nC')
+  })
+
+  it('handles both quotes and <br> together', () => {
+    expect(normalizeLabel('"Line 1<br>Line 2"')).toBe('Line 1\nLine 2')
+  })
+})
+
+describe('parseMermaid – multiline labels', () => {
+  it('normalizes <br> in node labels', () => {
+    const g = parseMermaid('graph TD\n  A[Line 1<br>Line 2]')
+    expect(g.nodes.get('A')!.label).toBe('Line 1\nLine 2')
+  })
+
+  it('normalizes <br/> in node labels', () => {
+    const g = parseMermaid('graph TD\n  A[First<br/>Second]')
+    expect(g.nodes.get('A')!.label).toBe('First\nSecond')
+  })
+
+  it('strips quotes from node labels', () => {
+    const g = parseMermaid('graph TD\n  A["Quoted Label"]')
+    expect(g.nodes.get('A')!.label).toBe('Quoted Label')
+  })
+
+  it('normalizes <br> in edge labels', () => {
+    const g = parseMermaid('graph TD\n  A -->|Line 1<br>Line 2| B')
+    expect(g.edges[0]!.label).toBe('Line 1\nLine 2')
+  })
+
+  it('normalizes <br> in subgraph labels', () => {
+    const g = parseMermaid('graph TD\n  subgraph sg1 [Line 1<br>Line 2]\n    A\n  end')
+    expect(g.subgraphs[0]!.label).toBe('Line 1\nLine 2')
   })
 })

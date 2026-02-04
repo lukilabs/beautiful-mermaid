@@ -535,3 +535,51 @@ describe('renderSvg – CSS variable theming', () => {
     expect(svg).toContain('fill="var(--_arrow)"')
   })
 })
+
+// ============================================================================
+// Multiline label rendering
+// ============================================================================
+
+describe('renderSvg – multiline labels', () => {
+  it('renders single-line label without tspan', () => {
+    const node = makeNode({ label: 'Hello' })
+    const graph = makeGraph({ nodes: [node] })
+    const svg = renderSvg(graph, lightColors)
+    expect(svg).toContain('>Hello</text>')
+    expect(svg).not.toContain('<tspan')
+  })
+
+  it('renders multiline node label with tspan elements', () => {
+    const node = makeNode({ label: 'Line 1\nLine 2' })
+    const graph = makeGraph({ nodes: [node] })
+    const svg = renderSvg(graph, lightColors)
+    expect(svg).toContain('<tspan')
+    expect(svg).toContain('>Line 1</tspan>')
+    expect(svg).toContain('>Line 2</tspan>')
+  })
+
+  it('renders three-line node label with three tspan elements', () => {
+    const node = makeNode({ label: 'A\nB\nC' })
+    const graph = makeGraph({ nodes: [node] })
+    const svg = renderSvg(graph, lightColors)
+    const tspanCount = (svg.match(/<tspan/g) ?? []).length
+    expect(tspanCount).toBe(3)
+  })
+
+  it('renders multiline edge label with tspan elements', () => {
+    const edge = makeEdge({ label: 'Yes\nNo' })
+    const graph = makeGraph({ edges: [edge] })
+    const svg = renderSvg(graph, lightColors)
+    expect(svg).toContain('<tspan')
+    expect(svg).toContain('>Yes</tspan>')
+    expect(svg).toContain('>No</tspan>')
+  })
+
+  it('escapes XML in multiline tspan content', () => {
+    const node = makeNode({ label: '<b>Bold</b>\n"Quoted"' })
+    const graph = makeGraph({ nodes: [node] })
+    const svg = renderSvg(graph, lightColors)
+    expect(svg).toContain('&lt;b&gt;Bold&lt;/b&gt;')
+    expect(svg).toContain('&quot;Quoted&quot;')
+  })
+})

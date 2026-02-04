@@ -113,10 +113,10 @@ function parseFlowchart(lines: string[]): MermaidGraph {
       let label: string
       if (bracketMatch) {
         id = bracketMatch[1]!
-        label = bracketMatch[2]!
+        label = normalizeLabel(bracketMatch[2]!)
       } else {
         // Use the label text as id (slugified)
-        label = rest
+        label = normalizeLabel(rest)
         id = rest.replace(/\s+/g, '_').replace(/[^\w]/g, '')
       }
       const sg: MermaidSubgraph = { id, label, nodeIds: [], children: [] }
@@ -216,7 +216,7 @@ function parseStateDiagram(lines: string[]): MermaidGraph {
     // --- state alias: `state "Description" as s1` (without brace) ---
     const stateAliasMatch = line.match(/^state\s+"([^"]+)"\s+as\s+(\w+)\s*$/)
     if (stateAliasMatch) {
-      const label = stateAliasMatch[1]!
+      const label = normalizeLabel(stateAliasMatch[1]!)
       const id = stateAliasMatch[2]!
       registerStateNode(graph, compositeStack, { id, label, shape: 'rounded' })
       continue
@@ -227,7 +227,8 @@ function parseStateDiagram(lines: string[]): MermaidGraph {
     if (transitionMatch) {
       let sourceId = transitionMatch[1]!
       let targetId = transitionMatch[3]!
-      const edgeLabel = transitionMatch[4]?.trim() || undefined
+      const rawTransLabel = transitionMatch[4]?.trim() || undefined
+      const edgeLabel = rawTransLabel ? normalizeLabel(rawTransLabel) : undefined
 
       // Handle [*] pseudostates — each occurrence gets a unique ID
       if (sourceId === '[*]') {
@@ -261,7 +262,7 @@ function parseStateDiagram(lines: string[]): MermaidGraph {
     const stateDescMatch = line.match(/^([\w-]+)\s*:\s*(.+)$/)
     if (stateDescMatch) {
       const id = stateDescMatch[1]!
-      const label = stateDescMatch[2]!.trim()
+      const label = normalizeLabel(stateDescMatch[2]!.trim())
       registerStateNode(graph, compositeStack, { id, label, shape: 'rounded' })
       continue
     }
@@ -310,6 +311,22 @@ function ensureStateNode(
 // ============================================================================
 // Shared utilities
 // ============================================================================
+
+/**
+ * Normalize a label string:
+ * - Strip surrounding double quotes (standard Mermaid behavior)
+ * - Replace `<br>`, `<br/>`, `<br />` (case-insensitive) with `\n`
+ */
+export function normalizeLabel(label: string): string {
+  let result = label
+  // Strip surrounding quotes
+  if (result.length >= 2 && result.startsWith('"') && result.endsWith('"')) {
+    result = result.slice(1, -1)
+  }
+  // Replace <br> variants with newline
+  result = result.replace(/<br\s*\/?>/gi, '\n')
+  return result
+}
 
 /** Parse "fill:#f00,stroke:#333" style property strings into a Record */
 function parseStyleProps(propsStr: string): Record<string, string> {
@@ -409,7 +426,8 @@ function parseEdgeLine(
 
     const hasArrowStart = Boolean(arrowMatch[1])
     const arrowOp = arrowMatch[2]!
-    const edgeLabel = arrowMatch[3]?.trim() || undefined
+    const rawEdgeLabel = arrowMatch[3]?.trim() || undefined
+    const edgeLabel = rawEdgeLabel ? normalizeLabel(rawEdgeLabel) : undefined
     remaining = remaining.slice(arrowMatch[0].length).trim()
 
     const style = arrowStyleFromOp(arrowOp)
@@ -495,7 +513,7 @@ function consumeNode(
     const match = text.match(regex)
     if (match) {
       id = match[1]!
-      const label = match[2]!
+      const label = normalizeLabel(match[2]!)
       registerNode(graph, subgraphStack, { id, label, shape })
       remaining = text.slice(match[0].length)
       break

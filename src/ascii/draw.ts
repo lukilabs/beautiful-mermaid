@@ -68,12 +68,21 @@ export function drawBox(node: AsciiNode, graph: AsciiGraph): Canvas {
     box[to.x]![to.y] = '+'
   }
 
-  // Center the display label inside the box
+  // Center the display label inside the box (supports multiline via \n)
   const label = node.displayLabel
-  const textY = from.y + Math.floor(h / 2)
-  const textX = from.x + Math.floor(w / 2) - Math.ceil(label.length / 2) + 1
-  for (let i = 0; i < label.length; i++) {
-    box[textX + i]![textY] = label[i]!
+  const lines = label.split('\n')
+  const totalLines = lines.length
+  const startY = from.y + Math.floor(h / 2) - Math.floor(totalLines / 2)
+
+  for (let lineIdx = 0; lineIdx < totalLines; lineIdx++) {
+    const line = lines[lineIdx]!
+    const textY = startY + lineIdx
+    const textX = from.x + Math.floor(w / 2) - Math.ceil(line.length / 2) + 1
+    for (let i = 0; i < line.length; i++) {
+      if (textX + i > from.x && textX + i < to.x && textY > from.y && textY < to.y) {
+        box[textX + i]![textY] = line[i]!
+      }
+    }
   }
 
   return box
