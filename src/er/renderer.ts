@@ -1,6 +1,6 @@
 import type { PositionedErDiagram, PositionedErEntity, PositionedErRelationship, ErAttribute, Cardinality } from './types.ts'
-import type { DiagramColors } from '../theme.ts'
-import { svgOpenTag, buildStyleBlock } from '../theme.ts'
+import type { DiagramColors, ResolvedColors } from '../theme.ts'
+import { svgOpenTag, buildStyleBlock, svgOpenTagStatic, buildStaticStyleBlock, createColorFn } from '../theme.ts'
 import { FONT_SIZES, FONT_WEIGHTS, STROKE_WIDTHS, estimateTextWidth, TEXT_BASELINE_SHIFT } from '../styles.ts'
 
 // ============================================================================
@@ -30,38 +30,50 @@ const ER_FONT = {
  * @param colors - DiagramColors with bg/fg and optional enrichment variables.
  * @param transparent - If true, renders with transparent background.
  */
+/** Color accessor function type */
+type ColorFn = ReturnType<typeof createColorFn>
+
 export function renderErSvg(
   diagram: PositionedErDiagram,
   colors: DiagramColors,
   font: string = 'Inter',
-  transparent: boolean = false
+  transparent: boolean = false,
+  resolved: ResolvedColors | null = null,
+  noStyleBlock: boolean = false,
+  markerId: string = ''
 ): string {
   const parts: string[] = []
+  const c = createColorFn(resolved)
 
   // SVG root with CSS variables + style block (with mono font) + defs
-  parts.push(svgOpenTag(diagram.width, diagram.height, colors, transparent))
-  parts.push(buildStyleBlock(font, true))
+  if (resolved) {
+    parts.push(svgOpenTagStatic(diagram.width, diagram.height, resolved.bg, transparent, font, noStyleBlock))
+    parts.push(buildStaticStyleBlock(font, true, noStyleBlock))
+  } else {
+    parts.push(svgOpenTag(diagram.width, diagram.height, colors, transparent))
+    parts.push(buildStyleBlock(font, true))
+  }
   parts.push('<defs>')
   parts.push('</defs>') // No marker defs — we draw crow's foot inline
 
   // 1. Relationship lines
   for (const rel of diagram.relationships) {
-    parts.push(renderRelationshipLine(rel))
+    parts.push(renderRelationshipLine(rel, c))
   }
 
   // 2. Entity boxes
   for (const entity of diagram.entities) {
-    parts.push(renderEntityBox(entity))
+    parts.push(renderEntityBox(entity, c, noStyleBlock))
   }
 
   // 3. Cardinality markers at relationship endpoints
   for (const rel of diagram.relationships) {
-    parts.push(renderCardinality(rel))
+    parts.push(renderCardinality(rel, c))
   }
 
   // 4. Relationship labels
   for (const rel of diagram.relationships) {
-    parts.push(renderRelationshipLabel(rel))
+    parts.push(renderRelationshipLabel(rel, c))
   }
 
   parts.push('</svg>')
@@ -73,47 +85,47 @@ export function renderErSvg(
 // ============================================================================
 
 /** Render an entity box with header and attribute rows */
-function renderEntityBox(entity: PositionedErEntity): string {
+function renderEntityBox(entity: PositionedErEntity, c: ColorFn, noStyleBlock: boolean = false): string {
   const { x, y, width, height, headerHeight, rowHeight, label, attributes } = entity
   const parts: string[] = []
 
   // Outer rectangle
   parts.push(
     `<rect x="${x}" y="${y}" width="${width}" height="${height}" ` +
-    `rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="${STROKE_WIDTHS.outerBox}" />`
+    `rx="0" ry="0" fill="${c('_node-fill')}" stroke="${c('_node-stroke')}" stroke-width="${STROKE_WIDTHS.outerBox}" />`
   )
 
   // Header background
   parts.push(
     `<rect x="${x}" y="${y}" width="${width}" height="${headerHeight}" ` +
-    `rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="${STROKE_WIDTHS.outerBox}" />`
+    `rx="0" ry="0" fill="${c('_group-hdr')}" stroke="${c('_node-stroke')}" stroke-width="${STROKE_WIDTHS.outerBox}" />`
   )
 
   // Entity name
   parts.push(
     `<text x="${x + width / 2}" y="${y + headerHeight / 2}" text-anchor="middle" dy="${TEXT_BASELINE_SHIFT}" ` +
-    `font-size="${FONT_SIZES.nodeLabel}" font-weight="700" fill="var(--_text)">${escapeXml(label)}</text>`
+    `font-size="${FONT_SIZES.nodeLabel}" font-weight="700" fill="${c('_text')}">${escapeXml(label)}</text>`
   )
 
   // Divider
   const attrTop = y + headerHeight
   parts.push(
     `<line x1="${x}" y1="${attrTop}" x2="${x + width}" y2="${attrTop}" ` +
-    `stroke="var(--_node-stroke)" stroke-width="${STROKE_WIDTHS.innerBox}" />`
+    `stroke="${c('_node-stroke')}" stroke-width="${STROKE_WIDTHS.innerBox}" />`
   )
 
   // Attribute rows
   for (let i = 0; i < attributes.length; i++) {
     const attr = attributes[i]!
     const rowY = attrTop + i * rowHeight + rowHeight / 2
-    parts.push(renderAttribute(attr, x, rowY, width))
+    parts.push(renderAttribute(attr, x, rowY, width, c, noStyleBlock))
   }
 
   // Empty row placeholder when no attributes
   if (attributes.length === 0) {
     parts.push(
       `<text x="${x + width / 2}" y="${attrTop + rowHeight / 2}" text-anchor="middle" dy="${TEXT_BASELINE_SHIFT}" ` +
-      `font-size="${ER_FONT.attrSize}" fill="var(--_text-faint)" font-style="italic">(no attributes)</text>`
+      `font-size="${ER_FONT.attrSize}" fill="${c('_text-faint')}" font-style="italic">(no attributes)</text>`
     )
   }
 
@@ -127,8 +139,9 @@ function renderEntityBox(entity: PositionedErEntity): string {
  *
  * Key badge uses var(--_key-badge) for background tint.
  */
-function renderAttribute(attr: ErAttribute, boxX: number, y: number, boxWidth: number): string {
+function renderAttribute(attr: ErAttribute, boxX: number, y: number, boxWidth: number, c: ColorFn, noStyleBlock: boolean = false): string {
   const parts: string[] = []
+  const monoFont = noStyleBlock ? ` font-family="'JetBrains Mono','SF Mono','Fira Code',ui-monospace,monospace"` : ''
 
   // Key badges on the left (keep proportional font — they're visual tags, not code)
   let keyWidth = 0
@@ -137,28 +150,28 @@ function renderAttribute(attr: ErAttribute, boxX: number, y: number, boxWidth: n
     keyWidth = estimateTextWidth(keyText, ER_FONT.keySize, ER_FONT.keyWeight) + 8
     parts.push(
       `<rect x="${boxX + 6}" y="${y - 7}" width="${keyWidth}" height="14" rx="2" ry="2" ` +
-      `fill="var(--_key-badge)" />`
+      `fill="${c('_key-badge')}" />`
     )
     parts.push(
       `<text x="${boxX + 6 + keyWidth / 2}" y="${y}" text-anchor="middle" dy="${TEXT_BASELINE_SHIFT}" ` +
-      `font-size="${ER_FONT.keySize}" font-weight="${ER_FONT.keyWeight}" fill="var(--_text-sec)">${attr.keys.join(',')}</text>`
+      `font-size="${ER_FONT.keySize}" font-weight="${ER_FONT.keyWeight}" fill="${c('_text-sec')}">${attr.keys.join(',')}</text>`
     )
   }
 
   // Type (left-aligned after keys, monospace with syntax highlighting)
   const typeX = boxX + 8 + (keyWidth > 0 ? keyWidth + 6 : 0)
   parts.push(
-    `<text x="${typeX}" y="${y}" class="mono" dy="${TEXT_BASELINE_SHIFT}" ` +
+    `<text x="${typeX}" y="${y}" class="mono"${monoFont} dy="${TEXT_BASELINE_SHIFT}" ` +
     `font-size="${ER_FONT.attrSize}" font-weight="${ER_FONT.attrWeight}">` +
-    `<tspan fill="var(--_text-muted)">${escapeXml(attr.type)}</tspan></text>`
+    `<tspan fill="${c('_text-muted')}">${escapeXml(attr.type)}</tspan></text>`
   )
 
   // Name (right-aligned, monospace with syntax highlighting)
   const nameX = boxX + boxWidth - 8
   parts.push(
-    `<text x="${nameX}" y="${y}" class="mono" text-anchor="end" dy="${TEXT_BASELINE_SHIFT}" ` +
+    `<text x="${nameX}" y="${y}" class="mono"${monoFont} text-anchor="end" dy="${TEXT_BASELINE_SHIFT}" ` +
     `font-size="${ER_FONT.attrSize}" font-weight="${ER_FONT.attrWeight}">` +
-    `<tspan fill="var(--_text-sec)">${escapeXml(attr.name)}</tspan></text>`
+    `<tspan fill="${c('_text-sec')}">${escapeXml(attr.name)}</tspan></text>`
   )
 
   return parts.join('\n')
@@ -169,20 +182,20 @@ function renderAttribute(attr: ErAttribute, boxX: number, y: number, boxWidth: n
 // ============================================================================
 
 /** Render a relationship line */
-function renderRelationshipLine(rel: PositionedErRelationship): string {
+function renderRelationshipLine(rel: PositionedErRelationship, c: ColorFn): string {
   if (rel.points.length < 2) return ''
 
   const pathData = rel.points.map(p => `${p.x},${p.y}`).join(' ')
   const dashArray = !rel.identifying ? ' stroke-dasharray="6 4"' : ''
 
   return (
-    `<polyline points="${pathData}" fill="none" stroke="var(--_line)" ` +
+    `<polyline points="${pathData}" fill="none" stroke="${c('_line')}" ` +
     `stroke-width="${STROKE_WIDTHS.connector}"${dashArray} />`
   )
 }
 
 /** Render a relationship label at the midpoint */
-function renderRelationshipLabel(rel: PositionedErRelationship): string {
+function renderRelationshipLabel(rel: PositionedErRelationship, c: ColorFn): string {
   if (!rel.label || rel.points.length < 2) return ''
 
   const mid = midpoint(rel.points)
@@ -194,9 +207,9 @@ function renderRelationshipLabel(rel: PositionedErRelationship): string {
 
   return (
     `<rect x="${mid.x - bgW / 2}" y="${mid.y - bgH / 2}" width="${bgW}" height="${bgH}" rx="2" ry="2" ` +
-    `fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="0.5" />` +
+    `fill="${c.bg()}" stroke="${c('_inner-stroke')}" stroke-width="0.5" />` +
     `\n<text x="${mid.x}" y="${mid.y}" text-anchor="middle" dy="${TEXT_BASELINE_SHIFT}" ` +
-    `font-size="${FONT_SIZES.edgeLabel}" font-weight="${FONT_WEIGHTS.edgeLabel}" fill="var(--_text-muted)">${escapeXml(rel.label)}</text>`
+    `font-size="${FONT_SIZES.edgeLabel}" font-weight="${FONT_WEIGHTS.edgeLabel}" fill="${c('_text-muted')}">${escapeXml(rel.label)}</text>`
   )
 }
 
@@ -209,19 +222,19 @@ function renderRelationshipLabel(rel: PositionedErRelationship): string {
  *   'many':      ─╢─   (crow's foot + single line)
  *   'zero-many': ─o╣─  (circle + crow's foot)
  */
-function renderCardinality(rel: PositionedErRelationship): string {
+function renderCardinality(rel: PositionedErRelationship, c: ColorFn): string {
   if (rel.points.length < 2) return ''
   const parts: string[] = []
 
   // Entity1 side (first point, direction toward second point)
   const p1 = rel.points[0]!
   const p2 = rel.points[1]!
-  parts.push(renderCrowsFoot(p1, p2, rel.cardinality1))
+  parts.push(renderCrowsFoot(p1, p2, rel.cardinality1, c))
 
   // Entity2 side (last point, direction toward second-to-last point)
   const pN = rel.points[rel.points.length - 1]!
   const pN1 = rel.points[rel.points.length - 2]!
-  parts.push(renderCrowsFoot(pN, pN1, rel.cardinality2))
+  parts.push(renderCrowsFoot(pN, pN1, rel.cardinality2, c))
 
   return parts.join('\n')
 }
@@ -233,7 +246,8 @@ function renderCardinality(rel: PositionedErRelationship): string {
 function renderCrowsFoot(
   point: { x: number; y: number },
   toward: { x: number; y: number },
-  cardinality: Cardinality
+  cardinality: Cardinality,
+  c: ColorFn
 ): string {
   const parts: string[] = []
   const sw = STROKE_WIDTHS.connector + 0.25
@@ -267,7 +281,7 @@ function renderCrowsFoot(
     parts.push(
       `<line x1="${tipX + px * halfW}" y1="${tipY + py * halfW}" ` +
       `x2="${tipX - px * halfW}" y2="${tipY - py * halfW}" ` +
-      `stroke="var(--_line)" stroke-width="${sw}" />`
+      `stroke="${c('_line')}" stroke-width="${sw}" />`
     )
     // Second line slightly back for "exactly one" emphasis
     const line2X = tipX - ux * 4
@@ -275,7 +289,7 @@ function renderCrowsFoot(
     parts.push(
       `<line x1="${line2X + px * halfW}" y1="${line2Y + py * halfW}" ` +
       `x2="${line2X - px * halfW}" y2="${line2Y - py * halfW}" ` +
-      `stroke="var(--_line)" stroke-width="${sw}" />`
+      `stroke="${c('_line')}" stroke-width="${sw}" />`
     )
   }
 
@@ -290,19 +304,19 @@ function renderCrowsFoot(
       // Top fan line
       `<line x1="${cfTipX + px * fanW}" y1="${cfTipY + py * fanW}" ` +
       `x2="${backX}" y2="${backY}" ` +
-      `stroke="var(--_line)" stroke-width="${sw}" />`
+      `stroke="${c('_line')}" stroke-width="${sw}" />`
     )
     parts.push(
       // Center line
       `<line x1="${cfTipX}" y1="${cfTipY}" ` +
       `x2="${backX}" y2="${backY}" ` +
-      `stroke="var(--_line)" stroke-width="${sw}" />`
+      `stroke="${c('_line')}" stroke-width="${sw}" />`
     )
     parts.push(
       // Bottom fan line
       `<line x1="${cfTipX - px * fanW}" y1="${cfTipY - py * fanW}" ` +
       `x2="${backX}" y2="${backY}" ` +
-      `stroke="var(--_line)" stroke-width="${sw}" />`
+      `stroke="${c('_line')}" stroke-width="${sw}" />`
     )
   }
 
@@ -313,7 +327,7 @@ function renderCrowsFoot(
     const circleY = point.y - uy * circleOffset
     parts.push(
       `<circle cx="${circleX}" cy="${circleY}" r="4" ` +
-      `fill="var(--bg)" stroke="var(--_line)" stroke-width="${sw}" />`
+      `fill="${c.bg()}" stroke="${c('_line')}" stroke-width="${sw}" />`
     )
   }
 

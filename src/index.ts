@@ -21,8 +21,8 @@
 // ============================================================================
 
 export type { RenderOptions, MermaidGraph, PositionedGraph } from './types.ts'
-export type { DiagramColors, ThemeName } from './theme.ts'
-export { fromShikiTheme, THEMES, DEFAULTS } from './theme.ts'
+export type { DiagramColors, ThemeName, ResolvedColors, ColorKey, RGBA } from './theme.ts'
+export { fromShikiTheme, THEMES, DEFAULTS, resolveColors, colorMix, createColorFn, validateHexColor, HEX_RE, COLOR_GRAPH, generateMarkerId, parseHex, toHex } from './theme.ts'
 export { parseMermaid } from './parser.ts'
 export { renderMermaidAscii } from './ascii/index.ts'
 export type { AsciiRenderOptions } from './ascii/index.ts'
@@ -31,8 +31,8 @@ import { parseMermaid } from './parser.ts'
 import { layoutGraph } from './layout.ts'
 import { renderSvg } from './renderer.ts'
 import type { RenderOptions } from './types.ts'
-import type { DiagramColors } from './theme.ts'
-import { DEFAULTS } from './theme.ts'
+import type { DiagramColors, ResolvedColors } from './theme.ts'
+import { DEFAULTS, resolveColors, generateMarkerId } from './theme.ts'
 
 // New diagram type imports
 import { parseSequenceDiagram } from './sequence/parser.ts'
@@ -118,6 +118,17 @@ export async function renderMermaid(
   const transparent = options.transparent ?? false
   const diagramType = detectDiagramType(text)
 
+  // Static color mode: resolve all CSS variables to literal hex values.
+  // Pre-resolved palettes take priority, then output mode flag.
+  const resolved: ResolvedColors | null = options.resolvedColors
+    ?? (options.output === 'static' ? resolveColors(colors) : null)
+  const noStyleBlock = options.noStyleBlock ?? false
+
+  // Marker ID prefix for multi-SVG isolation
+  const markerId = options.markerId === false
+    ? ''
+    : (options.markerId ?? (resolved ? '' : generateMarkerId()))
+
   // Preprocess: strip leading/trailing whitespace, filter comments
   const lines = text.split(/[\n;]/).map(l => l.trim()).filter(l => l.length > 0 && !l.startsWith('%%'))
 
@@ -125,24 +136,24 @@ export async function renderMermaid(
     case 'sequence': {
       const diagram = parseSequenceDiagram(lines)
       const positioned = layoutSequenceDiagram(diagram, options)
-      return renderSequenceSvg(positioned, colors, font, transparent)
+      return renderSequenceSvg(positioned, colors, font, transparent, resolved, noStyleBlock, markerId)
     }
     case 'class': {
       const diagram = parseClassDiagram(lines)
       const positioned = await layoutClassDiagram(diagram, options)
-      return renderClassSvg(positioned, colors, font, transparent)
+      return renderClassSvg(positioned, colors, font, transparent, resolved, noStyleBlock, markerId)
     }
     case 'er': {
       const diagram = parseErDiagram(lines)
       const positioned = await layoutErDiagram(diagram, options)
-      return renderErSvg(positioned, colors, font, transparent)
+      return renderErSvg(positioned, colors, font, transparent, resolved, noStyleBlock, markerId)
     }
     case 'flowchart':
     default: {
       // Flowchart + state diagram pipeline (original)
       const graph = parseMermaid(text)
       const positioned = await layoutGraph(graph, options)
-      return renderSvg(positioned, colors, font, transparent)
+      return renderSvg(positioned, colors, font, transparent, resolved, noStyleBlock, markerId)
     }
   }
 }
