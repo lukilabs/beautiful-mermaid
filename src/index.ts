@@ -10,6 +10,8 @@
 //   - Sequence diagrams (sequenceDiagram)
 //   - Class diagrams (classDiagram)
 //   - ER diagrams (erDiagram)
+//   - C4 diagrams (C4Context / C4Container / C4Component / C4Dynamic / C4Deployment)
+//   - ArchiMate diagrams (archimate-layered)
 //
 // Theming uses CSS custom properties (--bg, --fg, + optional enrichment).
 // See src/theme.ts for the full variable system.
@@ -26,6 +28,14 @@ export { fromShikiTheme, THEMES, DEFAULTS } from './theme.ts'
 export { parseMermaid } from './parser.ts'
 export { renderMermaidAscii } from './ascii/index.ts'
 export type { AsciiRenderOptions } from './ascii/index.ts'
+
+// C4 type exports
+export { parseC4 } from './c4/parser.ts'
+export type { C4Diagram, C4DiagramType, C4Element, C4Relationship, C4Boundary } from './c4/types.ts'
+
+// ArchiMate type exports
+export { parseArchimate } from './archimate/parser.ts'
+export type { ArchiMateDiagram, ArchiMateElement, ArchiMateRelationship, ArchiMateLayer } from './archimate/types.ts'
 
 import { parseMermaid } from './parser.ts'
 import { layoutGraph } from './layout.ts'
@@ -45,16 +55,29 @@ import { parseErDiagram } from './er/parser.ts'
 import { layoutErDiagram } from './er/layout.ts'
 import { renderErSvg } from './er/renderer.ts'
 
+// C4 diagram imports
+import { parseC4 } from './c4/parser.ts'
+import { layoutC4Diagram } from './c4/layout.ts'
+import { renderC4Svg } from './c4/renderer.ts'
+
+// ArchiMate diagram imports
+import { parseArchimate } from './archimate/parser.ts'
+import { layoutArchiMateDiagram } from './archimate/layout.ts'
+import { renderArchiMateSvg } from './archimate/renderer.ts'
+
 /**
  * Detect the diagram type from the mermaid source text.
  * Returns the type keyword used for routing to the correct pipeline.
  */
-function detectDiagramType(text: string): 'flowchart' | 'sequence' | 'class' | 'er' {
-  const firstLine = text.trim().split('\n')[0]?.trim().toLowerCase() ?? ''
+function detectDiagramType(text: string): 'flowchart' | 'sequence' | 'class' | 'er' | 'c4' | 'archimate' {
+  const firstLine = text.trim().split('\n')[0]?.trim() ?? ''
+  const firstLineLower = firstLine.toLowerCase()
 
-  if (/^sequencediagram\s*$/.test(firstLine)) return 'sequence'
-  if (/^classdiagram\s*$/.test(firstLine)) return 'class'
-  if (/^erdiagram\s*$/.test(firstLine)) return 'er'
+  if (/^sequencediagram\s*$/i.test(firstLine)) return 'sequence'
+  if (/^classdiagram\s*$/i.test(firstLine)) return 'class'
+  if (/^erdiagram\s*$/i.test(firstLine)) return 'er'
+  if (/^c4(context|container|component|dynamic|deployment)\s*$/i.test(firstLine)) return 'c4'
+  if (/^archimate-layered\s*$/i.test(firstLineLower)) return 'archimate'
 
   // Default: flowchart/state (handled by parseMermaid internally)
   return 'flowchart'
@@ -136,6 +159,16 @@ export async function renderMermaid(
       const diagram = parseErDiagram(lines)
       const positioned = await layoutErDiagram(diagram, options)
       return renderErSvg(positioned, colors, font, transparent)
+    }
+    case 'c4': {
+      const diagram = parseC4(lines)
+      const positioned = await layoutC4Diagram(diagram, options)
+      return renderC4Svg(positioned, colors, font, transparent)
+    }
+    case 'archimate': {
+      const diagram = parseArchimate(lines)
+      const positioned = await layoutArchiMateDiagram(diagram, options)
+      return renderArchiMateSvg(positioned, colors, font, transparent)
     }
     case 'flowchart':
     default: {

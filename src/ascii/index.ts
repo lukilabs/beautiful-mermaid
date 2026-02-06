@@ -10,6 +10,8 @@
 //   - Sequence diagrams (sequenceDiagram) — column-based timeline layout
 //   - Class diagrams (classDiagram) — level-based UML layout
 //   - ER diagrams (erDiagram) — grid layout with crow's foot notation
+//   - C4 diagrams (C4Context / C4Container / C4Component / C4Dynamic / C4Deployment)
+//   - ArchiMate diagrams (archimate-layered)
 //
 // Usage:
 //   import { renderMermaidAscii } from 'beautiful-mermaid'
@@ -24,6 +26,8 @@ import { canvasToString, flipCanvasVertically } from './canvas.ts'
 import { renderSequenceAscii } from './sequence.ts'
 import { renderClassAscii } from './class-diagram.ts'
 import { renderErAscii } from './er-diagram.ts'
+import { renderC4Ascii } from './c4-diagram.ts'
+import { renderArchimateAscii } from './archimate-diagram.ts'
 import type { AsciiConfig } from './types.ts'
 
 export interface AsciiRenderOptions {
@@ -41,12 +45,14 @@ export interface AsciiRenderOptions {
  * Detect the diagram type from the mermaid source text.
  * Mirrors the detection logic in src/index.ts for the SVG renderer.
  */
-function detectDiagramType(text: string): 'flowchart' | 'sequence' | 'class' | 'er' {
-  const firstLine = text.trim().split('\n')[0]?.trim().toLowerCase() ?? ''
+function detectDiagramType(text: string): 'flowchart' | 'sequence' | 'class' | 'er' | 'c4' | 'archimate' {
+  const firstLine = text.trim().split('\n')[0]?.trim() ?? ''
 
-  if (/^sequencediagram\s*$/.test(firstLine)) return 'sequence'
-  if (/^classdiagram\s*$/.test(firstLine)) return 'class'
-  if (/^erdiagram\s*$/.test(firstLine)) return 'er'
+  if (/^sequencediagram\s*$/i.test(firstLine)) return 'sequence'
+  if (/^classdiagram\s*$/i.test(firstLine)) return 'class'
+  if (/^erdiagram\s*$/i.test(firstLine)) return 'er'
+  if (/^c4(context|container|component|dynamic|deployment)\s*$/i.test(firstLine)) return 'c4'
+  if (/^archimate-layered\s*$/i.test(firstLine)) return 'archimate'
 
   // Default: flowchart/state (handled by parseMermaid internally)
   return 'flowchart'
@@ -101,6 +107,12 @@ export function renderMermaidAscii(
 
     case 'er':
       return renderErAscii(text, config)
+
+    case 'c4':
+      return renderC4Ascii(text, config)
+
+    case 'archimate':
+      return renderArchimateAscii(text, config)
 
     case 'flowchart':
     default: {

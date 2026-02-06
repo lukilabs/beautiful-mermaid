@@ -105,6 +105,8 @@ async function generateHtml(): Promise<string> {
     Sequence: '#10b981',
     Class: '#f59e0b',
     ER: '#ef4444',
+    C4: '#0ea5e9',
+    ArchiMate: '#d97706',
     'Theme Showcase': '#06b6d4',
   }
 
@@ -114,6 +116,8 @@ async function generateHtml(): Promise<string> {
     'Sequence': 'Sequence: ',
     'Class': 'Class: ',
     'ER': 'ER: ',
+    'C4': 'C4: ',
+    'ArchiMate': 'ArchiMate: ',
     'Theme Showcase': 'Theme: ',
   }
 

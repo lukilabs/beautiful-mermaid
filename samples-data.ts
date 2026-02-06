@@ -1098,4 +1098,215 @@ export const samples: Sample[] = [
   STUDENT ||--o{ ENROLLMENT : enrolled
   COURSE ||--o{ ENROLLMENT : has`,
   },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  C4 — System Context, Container, Component diagrams
+  // ══════════════════════════════════════════════════════════════════════════
+
+  {
+    title: 'C4: System Context',
+    category: 'C4',
+    description: 'C4 System Context diagram showing a banking customer interacting with the Internet Banking System.',
+    source: `C4Context
+  title System Context diagram for Internet Banking System
+  Person(customer, "Banking Customer", "A customer of the bank")
+  System(bankingSystem, "Internet Banking System", "Allows customers to view information about their bank accounts")
+  System_Ext(mailSystem, "E-mail System", "The internal Microsoft Exchange e-mail system")
+  Rel(customer, bankingSystem, "Uses")
+  Rel(bankingSystem, mailSystem, "Sends e-mails using")`,
+  },
+  {
+    title: 'C4: Container Diagram',
+    category: 'C4',
+    description: 'C4 Container diagram with system boundary, web app, API, and database containers.',
+    source: `C4Container
+  title Container diagram for Internet Banking System
+  Person(customer, "Customer", "A banking customer")
+  System_Boundary(bank, "Internet Banking") {
+    Container(web, "Web Application", "Java, Spring MVC", "Delivers static content and the single page app")
+    Container(api, "API Application", "Java, Spring Boot", "Provides Internet banking functionality via API")
+    ContainerDb(db, "Database", "Oracle 12c", "Stores user registration, authentication, and access logs")
+  }
+  System_Ext(mail, "E-mail System", "Microsoft Exchange")
+  Rel(customer, web, "Uses", "HTTPS")
+  Rel(web, api, "Makes API calls to", "JSON/HTTPS")
+  Rel(api, db, "Reads from and writes to", "JDBC")
+  Rel(api, mail, "Sends e-mails using", "SMTP")`,
+  },
+  {
+    title: 'C4: Component Diagram',
+    category: 'C4',
+    description: 'C4 Component diagram showing internal structure of the API Application.',
+    source: `C4Component
+  title Component diagram for API Application
+  Container_Boundary(api, "API Application") {
+    Component(auth, "Auth Controller", "Spring MVC", "Handles authentication")
+    Component(accounts, "Accounts Controller", "Spring MVC", "Provides account information")
+    Component(security, "Security Component", "Spring Security", "Authentication and authorization")
+    ComponentDb(repo, "Account Repository", "Spring Data", "Accesses account data")
+  }
+  ContainerDb(db, "Database", "Oracle 12c")
+  Rel(auth, security, "Uses")
+  Rel(accounts, repo, "Uses")
+  Rel(security, db, "Reads from", "JDBC")
+  Rel(repo, db, "Reads from and writes to", "JDBC")`,
+  },
+  {
+    title: 'C4: Simple Microservices',
+    category: 'C4',
+    description: 'A simple C4 Context diagram showing microservice architecture.',
+    source: `C4Context
+  Person(user, "User", "End user of the platform")
+  System(gateway, "API Gateway", "Routes requests to microservices")
+  System(auth, "Auth Service", "Handles authentication and authorization")
+  System(orders, "Order Service", "Manages customer orders")
+  System_Ext(payment, "Payment Provider", "External payment processing")
+  Rel(user, gateway, "Sends requests to")
+  Rel(gateway, auth, "Authenticates via")
+  Rel(gateway, orders, "Routes to")
+  Rel(orders, payment, "Processes payments via")`,
+  },
+  {
+    title: 'C4: Deployment Diagram',
+    category: 'C4',
+    description: 'C4 Deployment diagram showing infrastructure topology.',
+    source: `C4Deployment
+  title Deployment Diagram for Internet Banking System
+  Deployment_Node(aws, "AWS", "Amazon Web Services") {
+    Deployment_Node(ec2, "EC2 Instance", "t3.large") {
+      Container(web, "Web Application", "Java, Spring MVC")
+    }
+    Deployment_Node(rds, "Amazon RDS", "db.r5.large") {
+      ContainerDb(db, "Database", "Oracle 12c")
+    }
+  }
+  Deployment_Node(client, "Customer Device", "Browser") {
+    Container(browser, "Web Browser", "Chrome, Firefox, Safari")
+  }
+  Rel(browser, web, "Makes requests to", "HTTPS")
+  Rel(web, db, "Reads from and writes to", "JDBC")`,
+  },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  ARCHIMATE — Enterprise Architecture diagrams
+  // ══════════════════════════════════════════════════════════════════════════
+
+  {
+    title: 'ArchiMate: Simple Layered',
+    category: 'ArchiMate',
+    description: 'Simple ArchiMate layered view with Business, Application, and Technology layers.',
+    source: `archimate-layered
+  business:
+    actor Customer
+    service "Online Banking" as OB
+  application:
+    component "Web App" as WA
+    service "Auth Service" as AS
+  technology:
+    node "AWS EC2" as EC2
+  Customer -->|serves| OB
+  OB -->|realization| WA
+  WA -->|assignment| EC2`,
+  },
+  {
+    title: 'ArchiMate: Business Process',
+    category: 'ArchiMate',
+    description: 'ArchiMate diagram showing a business process with supporting application components.',
+    source: `archimate-layered
+  business:
+    actor "Sales Rep" as SR
+    process "Order Processing" as OP
+    service "Order Fulfillment" as OF
+    object "Order" as O
+  application:
+    component "CRM System" as CRM
+    component "ERP System" as ERP
+    dataObject "Order DB" as ODB
+  SR -->|triggering| OP
+  OP -->|realization| OF
+  OP -->|access| O
+  CRM -->|serving| OP
+  ERP -->|serving| OF
+  ERP -->|access| ODB`,
+  },
+  {
+    title: 'ArchiMate: Full Stack',
+    category: 'ArchiMate',
+    description: 'A comprehensive ArchiMate diagram spanning Business, Application, and Technology layers.',
+    source: `archimate-layered
+  business:
+    actor Customer
+    service "Banking Service" as BS
+    process "Payment" as Pay
+    process "Account Mgmt" as AM
+  application:
+    component "Mobile App" as MA
+    component "Web Portal" as WP
+    component "Core Banking" as CB
+    dataObject "Account Data" as AD
+  technology:
+    node "App Server" as AS
+    node "Database Server" as DBS
+    artifact "Docker" as D
+    device "Load Balancer" as LB
+  Customer -->|serves| BS
+  BS -->|realization| Pay
+  BS -->|realization| AM
+  MA -->|serving| Customer
+  WP -->|serving| Customer
+  CB -->|realization| Pay
+  CB -->|realization| AM
+  CB -->|access| AD
+  AS -->|assignment| CB
+  DBS -->|assignment| AD
+  D -->|assignment| AS
+  LB -->|serving| AS`,
+  },
+  {
+    title: 'ArchiMate: Strategy & Motivation',
+    category: 'ArchiMate',
+    description: 'ArchiMate diagram with Strategy and Motivation layers.',
+    source: `archimate-layered
+  strategy:
+    capability "Digital Transformation" as DT
+    resource "IT Budget" as ITB
+    courseOfAction "Cloud Migration" as CM
+  motivation:
+    goal "Reduce Costs" as RC
+    driver "Market Competition" as MC
+    principle "Cloud First" as CF
+  business:
+    process "Service Delivery" as SD
+  MC -->|influence| RC
+  RC -->|realization| CF
+  CF -->|realization| CM
+  CM -->|realization| DT
+  ITB -->|assignment| DT
+  DT -->|realization| SD`,
+  },
+  {
+    title: 'ArchiMate: Implementation',
+    category: 'ArchiMate',
+    description: 'ArchiMate Implementation & Migration view showing work packages and deliverables.',
+    source: `archimate-layered
+  implementation:
+    workPackage "Phase 1" as P1
+    workPackage "Phase 2" as P2
+    deliverable "API Gateway" as AG
+    deliverable "Microservices" as MS
+    plateau "Current State" as CS
+    plateau "Target State" as TS
+  application:
+    component "Legacy System" as LS
+    component "New Platform" as NP
+  P1 -->|realization| AG
+  P2 -->|realization| MS
+  AG -->|association| NP
+  MS -->|association| NP
+  CS -->|triggering| P1
+  P1 -->|triggering| P2
+  P2 -->|realization| TS
+  LS -->|association| CS
+  NP -->|association| TS`,
+  },
 ]
