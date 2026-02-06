@@ -14,6 +14,7 @@ import type { ErDiagram, ErEntity, ErAttribute, Cardinality } from '../er/types.
 import type { Canvas, AsciiConfig } from './types.ts'
 import { mkCanvas, canvasToString, increaseSize } from './canvas.ts'
 import { drawMultiBox } from './draw.ts'
+import { displayWidth, drawTextWide } from './display-width.ts'
 
 // ============================================================================
 // Entity box content
@@ -108,7 +109,7 @@ export function renderErAscii(text: string, config: AsciiConfig): string {
 
     let maxTextW = 0
     for (const section of sections) {
-      for (const line of section) maxTextW = Math.max(maxTextW, line.length)
+      for (const line of section) maxTextW = Math.max(maxTextW, displayWidth(line))
     }
     const boxW = maxTextW + 4 // 2 border + 2 padding
 
@@ -244,15 +245,10 @@ export function renderErAscii(text: string, config: AsciiConfig): string {
       // Clamp label to the gap region [startX, endX] to avoid overwriting box borders.
       if (rel.label) {
         const gapMid = Math.floor((startX + endX) / 2)
-        const labelStart = Math.max(startX, gapMid - Math.floor(rel.label.length / 2))
+        const labelStart = Math.max(startX, gapMid - Math.floor(displayWidth(rel.label) / 2))
         const labelY = lineY - 1
         if (labelY >= 0) {
-          for (let i = 0; i < rel.label.length; i++) {
-            const lx = labelStart + i
-            if (lx >= startX && lx <= endX && lx < totalW) {
-              canvas[lx]![labelY] = rel.label[i]!
-            }
-          }
+          drawTextWide(canvas, labelStart, labelY, rel.label)
         }
       }
     } else {
@@ -312,13 +308,9 @@ export function renderErAscii(text: string, config: AsciiConfig): string {
         const midY = Math.floor((startY + endY) / 2)
         const labelX = lineX + 2
         if (midY >= 0) {
-          for (let i = 0; i < rel.label.length; i++) {
-            const lx = labelX + i
-            if (lx >= 0) {
-              increaseSize(canvas, lx + 1, midY + 1)
-              canvas[lx]![midY] = rel.label[i]!
-            }
-          }
+          const labelW = displayWidth(rel.label)
+          increaseSize(canvas, labelX + labelW, midY + 1)
+          drawTextWide(canvas, labelX, midY, rel.label)
         }
       }
     }

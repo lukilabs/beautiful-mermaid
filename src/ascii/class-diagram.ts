@@ -15,6 +15,7 @@ import type { ClassDiagram, ClassNode, ClassMember, ClassRelationship, Relations
 import type { Canvas, AsciiConfig } from './types.ts'
 import { mkCanvas, canvasToString, increaseSize } from './canvas.ts'
 import { drawMultiBox } from './draw.ts'
+import { displayWidth, drawTextWide } from './display-width.ts'
 
 // ============================================================================
 // Class member formatting
@@ -161,7 +162,7 @@ export function renderClassAscii(text: string, config: AsciiConfig): string {
     // Compute box dimensions from drawMultiBox logic
     let maxTextW = 0
     for (const section of sections) {
-      for (const line of section) maxTextW = Math.max(maxTextW, line.length)
+      for (const line of section) maxTextW = Math.max(maxTextW, displayWidth(line))
     }
     const boxW = maxTextW + 4 // 2 border + 2 padding
 
@@ -504,13 +505,10 @@ export function renderClassAscii(text: string, config: AsciiConfig): string {
         // Same level: place label at midpoint of the detour line
         midY = Math.max(fromBY, toP.y + toP.height - 1) + 2
       }
-      const labelStart = midX - Math.floor(paddedLabel.length / 2)
+      const labelStart = midX - Math.floor(displayWidth(paddedLabel) / 2)
       // Clear the area first (overwrite line characters) then draw the padded label
-      for (let i = 0; i < paddedLabel.length; i++) {
-        const lx = labelStart + i
-        if (lx >= 0 && lx < totalW && midY >= 0 && midY < totalH) {
-          canvas[lx]![midY] = paddedLabel[i]!
-        }
+      if (midY >= 0 && midY < totalH) {
+        drawTextWide(canvas, labelStart, midY, paddedLabel)
       }
     }
   }

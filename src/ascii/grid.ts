@@ -11,6 +11,7 @@ import type {
   GridCoord, DrawingCoord, Direction, AsciiGraph, AsciiNode, AsciiSubgraph,
 } from './types.ts'
 import { gridKey } from './types.ts'
+import { displayWidth } from './display-width.ts'
 import { mkCanvas, setCanvasSizeToGrid } from './canvas.ts'
 import { determinePath, determineLabelLine } from './edge-routing.ts'
 import { drawBox } from './draw.ts'
@@ -105,7 +106,7 @@ export function setColumnWidth(graph: AsciiGraph, node: AsciiNode): void {
   const padding = graph.config.boxBorderPadding
 
   // 3 columns: [border=1] [content=2*padding+labelLen] [border=1]
-  const colWidths = [1, 2 * padding + node.displayLabel.length, 1]
+  const colWidths = [1, 2 * padding + displayWidth(node.displayLabel), 1]
   // 3 rows: [border=1] [content=1+2*padding] [border=1]
   const rowHeights = [1, 1 + 2 * padding, 1]
 
