@@ -7,6 +7,7 @@
 // ============================================================================
 
 import type { Canvas, DrawingCoord } from './types.ts'
+import { displayWidth, drawTextWide, WIDE_CHAR_PAD } from './display-width.ts'
 
 /**
  * Create a blank canvas filled with spaces.
@@ -158,6 +159,8 @@ export function canvasToString(canvas: Canvas): string {
   for (let y = 0; y <= maxY; y++) {
     let line = ''
     for (let x = 0; x <= maxX; x++) {
+      // Skip padding cells that follow a wide (CJK) character
+      if (canvas[x]![y]! === WIDE_CHAR_PAD) continue
       line += canvas[x]![y]!
     }
     lines.push(line)
@@ -220,10 +223,8 @@ export function flipCanvasVertically(canvas: Canvas): Canvas {
 
 /** Draw text string onto the canvas starting at the given coordinate. */
 export function drawText(canvas: Canvas, start: DrawingCoord, text: string): void {
-  increaseSize(canvas, start.x + text.length, start.y)
-  for (let i = 0; i < text.length; i++) {
-    canvas[start.x + i]![start.y] = text[i]!
-  }
+  increaseSize(canvas, start.x + displayWidth(text), start.y)
+  drawTextWide(canvas, start.x, start.y, text)
 }
 
 /**

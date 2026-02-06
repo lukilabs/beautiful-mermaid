@@ -15,6 +15,7 @@ import {
   drawingCoordEquals,
 } from './types.ts'
 import { mkCanvas, copyCanvas, getCanvasSize, mergeCanvases, drawText } from './canvas.ts'
+import { displayWidth, drawTextWide } from './display-width.ts'
 import { determineDirection, dirEquals } from './edge-routing.ts'
 import { gridToDrawingCoord, lineToDrawing } from './grid.ts'
 
@@ -71,10 +72,8 @@ export function drawBox(node: AsciiNode, graph: AsciiGraph): Canvas {
   // Center the display label inside the box
   const label = node.displayLabel
   const textY = from.y + Math.floor(h / 2)
-  const textX = from.x + Math.floor(w / 2) - Math.ceil(label.length / 2) + 1
-  for (let i = 0; i < label.length; i++) {
-    box[textX + i]![textY] = label[i]!
-  }
+  const textX = from.x + Math.floor(w / 2) - Math.ceil(displayWidth(label) / 2) + 1
+  drawTextWide(box, textX, textY, label)
 
   return box
 }
@@ -102,7 +101,7 @@ export function drawMultiBox(
   let maxTextWidth = 0
   for (const section of sections) {
     for (const line of section) {
-      maxTextWidth = Math.max(maxTextWidth, line.length)
+      maxTextWidth = Math.max(maxTextWidth, displayWidth(line))
     }
   }
   const innerWidth = maxTextWidth + 2 * padding
@@ -153,9 +152,7 @@ export function drawMultiBox(
     // Draw section text lines
     for (const line of lines) {
       const startX = 1 + padding
-      for (let i = 0; i < line.length; i++) {
-        canvas[startX + i]![row] = line[i]!
-      }
+      drawTextWide(canvas, startX, row, line)
       row++
     }
 
@@ -447,7 +444,7 @@ function drawTextOnLine(canvas: Canvas, line: DrawingCoord[], label: string): vo
   const maxY = Math.max(line[0]!.y, line[1]!.y)
   const middleX = minX + Math.floor((maxX - minX) / 2)
   const middleY = minY + Math.floor((maxY - minY) / 2)
-  const startX = middleX - Math.floor(label.length / 2)
+  const startX = middleX - Math.floor(displayWidth(label) / 2)
   drawText(canvas, { x: startX, y: middleY }, label)
 }
 
@@ -496,14 +493,10 @@ export function drawSubgraphLabel(sg: AsciiSubgraph, graph: AsciiGraph): [Canvas
 
   const canvas = mkCanvas(width, height)
   const labelY = 1 // second row inside the subgraph box
-  let labelX = Math.floor(width / 2) - Math.floor(sg.name.length / 2)
+  let labelX = Math.floor(width / 2) - Math.floor(displayWidth(sg.name) / 2)
   if (labelX < 1) labelX = 1
 
-  for (let i = 0; i < sg.name.length; i++) {
-    if (labelX + i < width) {
-      canvas[labelX + i]![labelY] = sg.name[i]!
-    }
-  }
+  drawTextWide(canvas, labelX, labelY, sg.name)
 
   return [canvas, { x: sg.minX, y: sg.minY }]
 }
