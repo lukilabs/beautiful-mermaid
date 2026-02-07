@@ -294,6 +294,85 @@ describe('parseMermaid – no-arrow edges', () => {
 })
 
 // ============================================================================
+// Text-embedded label arrows: -- label --> syntax (Issue #32)
+// ============================================================================
+
+describe('parseMermaid – text-embedded label arrows', () => {
+  it('parses solid arrow with text label: -- Yes -->', () => {
+    const g = parseMermaid('graph TD\n  B -- Yes --> C')
+    expect(g.edges).toHaveLength(1)
+    expect(g.edges[0]!.source).toBe('B')
+    expect(g.edges[0]!.target).toBe('C')
+    expect(g.edges[0]!.label).toBe('Yes')
+    expect(g.edges[0]!.style).toBe('solid')
+    expect(g.edges[0]!.hasArrowEnd).toBe(true)
+    expect(g.edges[0]!.hasArrowStart).toBe(false)
+  })
+
+  it('parses solid line with text label (no arrow): -- Yes ---', () => {
+    const g = parseMermaid('graph TD\n  A -- connects --- B')
+    expect(g.edges[0]!.label).toBe('connects')
+    expect(g.edges[0]!.style).toBe('solid')
+    expect(g.edges[0]!.hasArrowEnd).toBe(false)
+  })
+
+  it('parses dotted arrow with text label: -. Maybe .->', () => {
+    const g = parseMermaid('graph TD\n  A -. Maybe .-> B')
+    expect(g.edges[0]!.label).toBe('Maybe')
+    expect(g.edges[0]!.style).toBe('dotted')
+    expect(g.edges[0]!.hasArrowEnd).toBe(true)
+  })
+
+  it('parses thick arrow with text label: == Sure ==>', () => {
+    const g = parseMermaid('graph TD\n  A == Sure ==> B')
+    expect(g.edges[0]!.label).toBe('Sure')
+    expect(g.edges[0]!.style).toBe('thick')
+    expect(g.edges[0]!.hasArrowEnd).toBe(true)
+  })
+
+  it('parses multi-word text label: -- Long Label Text -->', () => {
+    const g = parseMermaid('graph TD\n  A -- Long Label Text --> B')
+    expect(g.edges[0]!.label).toBe('Long Label Text')
+  })
+
+  it('works with shaped nodes: B{Decision} -- Yes --> C[Result]', () => {
+    const g = parseMermaid('graph TD\n  B{Decision} -- Yes --> C[Result]')
+    expect(g.edges[0]!.source).toBe('B')
+    expect(g.edges[0]!.target).toBe('C')
+    expect(g.edges[0]!.label).toBe('Yes')
+    expect(g.nodes.get('B')!.shape).toBe('diamond')
+    expect(g.nodes.get('C')!.shape).toBe('rectangle')
+  })
+
+  it('handles the exact Issue #32 scenario', () => {
+    const g = parseMermaid(`flowchart TD
+      A(Start) --> B{Is it sunny?}
+      B -- Yes --> C[Go to the park]
+      B -- No --> D[Stay indoors]
+      C --> E[Finish]
+      D --> E`)
+    expect(g.edges).toHaveLength(5)
+    // Check the two text-embedded label edges
+    const yesEdge = g.edges.find(e => e.label === 'Yes')
+    expect(yesEdge).toBeDefined()
+    expect(yesEdge!.source).toBe('B')
+    expect(yesEdge!.target).toBe('C')
+    const noEdge = g.edges.find(e => e.label === 'No')
+    expect(noEdge).toBeDefined()
+    expect(noEdge!.source).toBe('B')
+    expect(noEdge!.target).toBe('D')
+  })
+
+  it('both label syntaxes produce equivalent edges', () => {
+    const g1 = parseMermaid('graph TD\n  A -->|Yes| B')
+    const g2 = parseMermaid('graph TD\n  A -- Yes --> B')
+    expect(g1.edges[0]!.label).toBe(g2.edges[0]!.label)
+    expect(g1.edges[0]!.style).toBe(g2.edges[0]!.style)
+    expect(g1.edges[0]!.hasArrowEnd).toBe(g2.edges[0]!.hasArrowEnd)
+  })
+})
+
+// ============================================================================
 // Bidirectional arrows (Batch 2.4)
 // ============================================================================
 

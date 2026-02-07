@@ -348,6 +348,24 @@ function parseStyleProps(propsStr: string): Record<string, string> {
 const ARROW_REGEX = /^(<)?(-->|-.->|==>|---|-\.-|===)(?:\|([^|]*)\|)?/
 
 /**
+ * "Text-embedded" label arrow regex — matches arrows where the label is
+ * placed between the line characters and the arrow tip.
+ *
+ * Examples:
+ *   -- Yes -->    solid arrow with label "Yes"
+ *   -- Yes ---    solid line (no arrow) with label "Yes"
+ *   -. Maybe .->  dotted arrow with label "Maybe"
+ *   == Sure ==>   thick arrow with label "Sure"
+ *
+ * Capture groups:
+ *   1: optional leading `<` for bidirectional
+ *   2: opening chars (-- / -. / ==)
+ *   3: label text
+ *   4: closing arrow/line (-->  / --- / .-> / .-  / ==> / ===)
+ */
+const TEXT_ARROW_REGEX = /^(<)?(--|-\.|==)\s+(.+?)\s+(-->|---|\.->|\.-|==>|===)/
+
+/**
  * Node shape patterns — ordered from most specific delimiters to least.
  * Multi-char delimiters must be tried before single-char to avoid false matches.
  */
@@ -404,16 +422,33 @@ function parseEdgeLine(
 
   // Parse arrow + node-group pairs until the line is exhausted
   while (remaining.length > 0) {
+    let hasArrowStart: boolean
+    let edgeLabel: string | undefined
+    let style: EdgeStyle
+    let hasArrowEnd: boolean
+
+    // Try standard arrow first: -->|label|
     const arrowMatch = remaining.match(ARROW_REGEX)
-    if (!arrowMatch) break
+    // Try text-embedded label arrow: -- label -->
+    const textArrowMatch = !arrowMatch ? remaining.match(TEXT_ARROW_REGEX) : null
 
-    const hasArrowStart = Boolean(arrowMatch[1])
-    const arrowOp = arrowMatch[2]!
-    const edgeLabel = arrowMatch[3]?.trim() || undefined
-    remaining = remaining.slice(arrowMatch[0].length).trim()
-
-    const style = arrowStyleFromOp(arrowOp)
-    const hasArrowEnd = arrowOp.endsWith('>')
+    if (arrowMatch) {
+      hasArrowStart = Boolean(arrowMatch[1])
+      const arrowOp = arrowMatch[2]!
+      edgeLabel = arrowMatch[3]?.trim() || undefined
+      remaining = remaining.slice(arrowMatch[0].length).trim()
+      style = arrowStyleFromOp(arrowOp)
+      hasArrowEnd = arrowOp.endsWith('>')
+    } else if (textArrowMatch) {
+      hasArrowStart = Boolean(textArrowMatch[1])
+      const closingOp = textArrowMatch[4]!
+      edgeLabel = textArrowMatch[3]?.trim() || undefined
+      remaining = remaining.slice(textArrowMatch[0].length).trim()
+      style = textArrowStyleFromOps(textArrowMatch[2]!, closingOp)
+      hasArrowEnd = closingOp.endsWith('>')
+    } else {
+      break
+    }
 
     // Parse the next node group
     const nextGroup = consumeNodeGroup(remaining, graph, subgraphStack)
@@ -558,5 +593,15 @@ function arrowStyleFromOp(op: string): EdgeStyle {
   if (op === '==>') return 'thick'
   if (op === '===') return 'thick'
   // '-->'' and '---' are both solid
+  return 'solid'
+}
+
+/** Map text-embedded arrow opening/closing operators to edge style */
+function textArrowStyleFromOps(openOp: string, closeOp: string): EdgeStyle {
+  // Dotted: -. ... .-> or -. ... .-
+  if (openOp === '-.' || closeOp === '.->' || closeOp === '.-') return 'dotted'
+  // Thick: == ... ==> or == ... ===
+  if (openOp === '==' || closeOp === '==>' || closeOp === '===') return 'thick'
+  // Solid: -- ... --> or -- ... ---
   return 'solid'
 }
