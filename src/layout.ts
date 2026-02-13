@@ -2,7 +2,7 @@
 // importing the pre-built browser bundle avoids Bun.build hanging on 30+ CJS file resolution
 import dagre from '@dagrejs/dagre/dist/dagre.js'
 import type { MermaidGraph, MermaidSubgraph, PositionedGraph, PositionedNode, PositionedEdge, PositionedGroup, Point, RenderOptions } from './types.ts'
-import { estimateTextWidth, FONT_SIZES, FONT_WEIGHTS, NODE_PADDING, GROUP_HEADER_CONTENT_PAD } from './styles.ts'
+import { estimateTextWidth, splitLabel, FONT_SIZES, FONT_WEIGHTS, NODE_PADDING, GROUP_HEADER_CONTENT_PAD, LINE_HEIGHT } from './styles.ts'
 import { centerToTopLeft, snapToOrthogonal, clipToDiamondBoundary, clipToCircleBoundary, clipEndpointsToNodes } from './dagre-adapter.ts'
 
 /** Shapes that render as circles — need edge endpoint clipping to the circle boundary */
@@ -116,9 +116,12 @@ function preComputeSubgraphLayout(
       internalEdgeIndices.add(i)
       const edgeLabel: Record<string, unknown> = { _index: i }
       if (edge.label) {
+        const edgeLines = splitLabel(edge.label)
         edgeLabel.label = edge.label
-        edgeLabel.width = estimateTextWidth(edge.label, FONT_SIZES.edgeLabel, FONT_WEIGHTS.edgeLabel) + 8
-        edgeLabel.height = FONT_SIZES.edgeLabel + 6
+        edgeLabel.width = Math.max(...edgeLines.map(l => estimateTextWidth(l, FONT_SIZES.edgeLabel, FONT_WEIGHTS.edgeLabel))) + 8
+        edgeLabel.height = (edgeLines.length > 1
+          ? FONT_SIZES.edgeLabel + (edgeLines.length - 1) * FONT_SIZES.edgeLabel * LINE_HEIGHT
+          : FONT_SIZES.edgeLabel) + 6
         edgeLabel.labelpos = 'c'
       }
       subG.setEdge(edge.source, edge.target, edgeLabel)
@@ -354,9 +357,12 @@ export async function layoutGraph(
     const target = subgraphEntryNode.get(edge.target) ?? edge.target
     const edgeLabel: Record<string, unknown> = { _index: i }
     if (edge.label) {
+      const edgeLines = splitLabel(edge.label)
       edgeLabel.label = edge.label
-      edgeLabel.width = estimateTextWidth(edge.label, FONT_SIZES.edgeLabel, FONT_WEIGHTS.edgeLabel) + 8
-      edgeLabel.height = FONT_SIZES.edgeLabel + 6
+      edgeLabel.width = Math.max(...edgeLines.map(l => estimateTextWidth(l, FONT_SIZES.edgeLabel, FONT_WEIGHTS.edgeLabel))) + 8
+      edgeLabel.height = (edgeLines.length > 1
+        ? FONT_SIZES.edgeLabel + (edgeLines.length - 1) * FONT_SIZES.edgeLabel * LINE_HEIGHT
+        : FONT_SIZES.edgeLabel) + 6
       edgeLabel.labelpos = 'c'
     }
 
@@ -403,10 +409,15 @@ function directionToDagre(dir: MermaidGraph['direction']): string {
 
 /** Estimate node size based on label text + shape padding */
 function estimateNodeSize(id: string, label: string, shape: string): { width: number; height: number } {
-  const textWidth = estimateTextWidth(label, FONT_SIZES.nodeLabel, FONT_WEIGHTS.nodeLabel)
+  // Support <br> tags for multi-line labels
+  const lines = splitLabel(label)
+  const textWidth = Math.max(...lines.map(l => estimateTextWidth(l, FONT_SIZES.nodeLabel, FONT_WEIGHTS.nodeLabel)))
+  const textHeight = lines.length > 1
+    ? FONT_SIZES.nodeLabel + (lines.length - 1) * FONT_SIZES.nodeLabel * LINE_HEIGHT
+    : FONT_SIZES.nodeLabel
 
   let width = textWidth + NODE_PADDING.horizontal * 2
-  let height = FONT_SIZES.nodeLabel + NODE_PADDING.vertical * 2
+  let height = textHeight + NODE_PADDING.vertical * 2
 
   // Diamonds need extra space because text is inside a rotated square
   if (shape === 'diamond') {

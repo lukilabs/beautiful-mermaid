@@ -361,9 +361,11 @@ const NODE_PATTERNS: Array<{ regex: RegExp; shape: NodeShape }> = [
   { regex: /^([\w-]+)\[\[(.+?)\]\]/,     shape: 'subroutine' },    // A[[text]]
   { regex: /^([\w-]+)\[\((.+?)\)\]/,     shape: 'cylinder' },      // A[(text)]
 
-  // Trapezoid variants — must come before plain [text]
+  // Trapezoid & parallelogram variants — must come before plain [text]
   { regex: /^([\w-]+)\[\/(.+?)\\\]/,     shape: 'trapezoid' },     // A[/text\]
   { regex: /^([\w-]+)\[\\(.+?)\/\]/,     shape: 'trapezoid-alt' }, // A[\text/]
+  { regex: /^([\w-]+)\[\/(.+?)\/\]/,     shape: 'trapezoid' },     // A[/text/]  (parallelogram)
+  { regex: /^([\w-]+)\[\\(.+?)\\\]/,     shape: 'trapezoid-alt' }, // A[\text\]  (parallelogram alt)
 
   // Asymmetric flag shape
   { regex: /^([\w-]+)>(.+?)\]/,          shape: 'asymmetric' },    // A>text]
@@ -376,6 +378,12 @@ const NODE_PATTERNS: Array<{ regex: RegExp; shape: NodeShape }> = [
   { regex: /^([\w-]+)\((.+?)\)/,         shape: 'rounded' },       // A(text)
   { regex: /^([\w-]+)\{(.+?)\}/,         shape: 'diamond' },       // A{text}
 ]
+
+/** Strip optional surrounding double-quotes from a mermaid label */
+function stripQuotes(s: string): string {
+  if (s.length >= 2 && s.startsWith('"') && s.endsWith('"')) return s.slice(1, -1)
+  return s
+}
 
 /** Regex for a bare node reference (just an ID, no shape brackets) */
 const BARE_NODE_REGEX = /^([\w-]+)/
@@ -409,7 +417,8 @@ function parseEdgeLine(
 
     const hasArrowStart = Boolean(arrowMatch[1])
     const arrowOp = arrowMatch[2]!
-    const edgeLabel = arrowMatch[3]?.trim() || undefined
+    const rawEdgeLabel = arrowMatch[3]?.trim() || undefined
+    const edgeLabel = rawEdgeLabel ? stripQuotes(rawEdgeLabel) : undefined
     remaining = remaining.slice(arrowMatch[0].length).trim()
 
     const style = arrowStyleFromOp(arrowOp)
@@ -495,7 +504,7 @@ function consumeNode(
     const match = text.match(regex)
     if (match) {
       id = match[1]!
-      const label = match[2]!
+      const label = stripQuotes(match[2]!)
       registerNode(graph, subgraphStack, { id, label, shape })
       remaining = text.slice(match[0].length)
       break
