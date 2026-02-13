@@ -7,6 +7,11 @@
 // contains font metrics, spacing constants, and stroke widths.
 // ============================================================================
 
+/** Split a label on `<br>` / `<br/>` / `<br />` tags (case-insensitive) */
+export function splitLabel(text: string): string[] {
+  return text.split(/<br\s*\/?>/i)
+}
+
 /** Average character width in px at the given font size and weight (proportional font) */
 export function estimateTextWidth(text: string, fontSize: number, fontWeight: number): number {
   // Inter average character widths as fraction of fontSize, per weight.
@@ -14,6 +19,9 @@ export function estimateTextWidth(text: string, fontSize: number, fontWeight: nu
   const widthRatio = fontWeight >= 600 ? 0.58 : fontWeight >= 500 ? 0.55 : 0.52
   return text.length * fontSize * widthRatio
 }
+
+/** Line height multiplier for multi-line text (1.3× the font size) */
+export const LINE_HEIGHT = 1.3
 
 /** Average character width in px for monospace fonts (uniform glyph width) */
 export function estimateMonoTextWidth(text: string, fontSize: number): number {

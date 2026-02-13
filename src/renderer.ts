@@ -1,7 +1,7 @@
 import type { PositionedGraph, PositionedNode, PositionedEdge, PositionedGroup, Point } from './types.ts'
 import type { DiagramColors } from './theme.ts'
 import { svgOpenTag, buildStyleBlock } from './theme.ts'
-import { FONT_SIZES, FONT_WEIGHTS, STROKE_WIDTHS, ARROW_HEAD, estimateTextWidth, TEXT_BASELINE_SHIFT } from './styles.ts'
+import { FONT_SIZES, FONT_WEIGHTS, STROKE_WIDTHS, ARROW_HEAD, estimateTextWidth, TEXT_BASELINE_SHIFT, splitLabel, LINE_HEIGHT } from './styles.ts'
 
 // ============================================================================
 // SVG renderer — converts a PositionedGraph into an SVG string.
@@ -168,20 +168,42 @@ function renderEdgeLabel(edge: PositionedEdge, font: string): string {
   // Fall back to geometric midpoint of the edge polyline.
   const mid = edge.labelPosition ?? edgeMidpoint(edge.points)
   const label = edge.label!
-  const textWidth = estimateTextWidth(label, FONT_SIZES.edgeLabel, FONT_WEIGHTS.edgeLabel)
+  const lines = splitLabel(label)
+  const maxLineWidth = Math.max(...lines.map(l => estimateTextWidth(l, FONT_SIZES.edgeLabel, FONT_WEIGHTS.edgeLabel)))
   const padding = 8
 
   // Background pill behind text for readability
-  const bgWidth = textWidth + padding * 2
-  const bgHeight = FONT_SIZES.edgeLabel + padding * 2
+  const lineSpacing = FONT_SIZES.edgeLabel * LINE_HEIGHT
+  const textHeight = lines.length > 1
+    ? FONT_SIZES.edgeLabel + (lines.length - 1) * lineSpacing
+    : FONT_SIZES.edgeLabel
+  const bgWidth = maxLineWidth + padding * 2
+  const bgHeight = textHeight + padding * 2
+
+  let textEl: string
+  if (lines.length <= 1) {
+    textEl = (
+      `<text x="${mid.x}" y="${mid.y}" text-anchor="middle" dy="${TEXT_BASELINE_SHIFT}" ` +
+      `font-size="${FONT_SIZES.edgeLabel}" font-weight="${FONT_WEIGHTS.edgeLabel}" ` +
+      `fill="var(--_text-muted)">${escapeXml(label)}</text>`
+    )
+  } else {
+    const startY = mid.y - textHeight / 2 + FONT_SIZES.edgeLabel * 0.35
+    const tspans = lines.map((line, i) =>
+      `<tspan x="${mid.x}" ${i === 0 ? `y="${startY}"` : `dy="${lineSpacing}"`}>${escapeXml(line)}</tspan>`
+    ).join('')
+    textEl = (
+      `<text text-anchor="middle" ` +
+      `font-size="${FONT_SIZES.edgeLabel}" font-weight="${FONT_WEIGHTS.edgeLabel}" ` +
+      `fill="var(--_text-muted)">${tspans}</text>`
+    )
+  }
 
   return (
     `<rect x="${mid.x - bgWidth / 2}" y="${mid.y - bgHeight / 2}" ` +
     `width="${bgWidth}" height="${bgHeight}" rx="4" ry="4" ` +
     `fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="0.5" />\n` +
-    `<text x="${mid.x}" y="${mid.y}" text-anchor="middle" dy="${TEXT_BASELINE_SHIFT}" ` +
-    `font-size="${FONT_SIZES.edgeLabel}" font-weight="${FONT_WEIGHTS.edgeLabel}" ` +
-    `fill="var(--_text-muted)">${escapeXml(label)}</text>`
+    textEl
   )
 }
 
@@ -463,10 +485,28 @@ function renderNodeLabel(node: PositionedNode, font: string): string {
   // Resolve text color — inline styles can override the CSS variable default
   const textColor = escapeXml(node.inlineStyle?.color ?? 'var(--_text)')
 
+  const lines = splitLabel(node.label)
+  if (lines.length <= 1) {
+    return (
+      `<text x="${cx}" y="${cy}" text-anchor="middle" dy="${TEXT_BASELINE_SHIFT}" ` +
+      `font-size="${FONT_SIZES.nodeLabel}" font-weight="${FONT_WEIGHTS.nodeLabel}" ` +
+      `fill="${textColor}">${escapeXml(node.label)}</text>`
+    )
+  }
+
+  // Multi-line: use <tspan> elements. Center the block vertically.
+  const lineSpacing = FONT_SIZES.nodeLabel * LINE_HEIGHT
+  const totalHeight = FONT_SIZES.nodeLabel + (lines.length - 1) * lineSpacing
+  const startY = cy - totalHeight / 2 + FONT_SIZES.nodeLabel * 0.35
+
+  const tspans = lines.map((line, i) =>
+    `<tspan x="${cx}" ${i === 0 ? `y="${startY}"` : `dy="${lineSpacing}"`}>${escapeXml(line)}</tspan>`
+  ).join('')
+
   return (
-    `<text x="${cx}" y="${cy}" text-anchor="middle" dy="${TEXT_BASELINE_SHIFT}" ` +
+    `<text text-anchor="middle" ` +
     `font-size="${FONT_SIZES.nodeLabel}" font-weight="${FONT_WEIGHTS.nodeLabel}" ` +
-    `fill="${textColor}">${escapeXml(node.label)}</text>`
+    `fill="${textColor}">${tspans}</text>`
   )
 }
 
