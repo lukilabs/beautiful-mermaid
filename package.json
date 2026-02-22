@@ -26,6 +26,7 @@
     "sequence-diagram",
     "class-diagram",
     "er-diagram",
+    "xychart",
     "state-diagram",
     "visualization",
     "theming"
@@ -37,8 +38,11 @@
     "samples": "bun run index.ts",
     "dev": "bun run dev.ts",
     "bench": "bun run bench.ts",
-    "build": "bun run index.ts && mkdir -p dist && mv index.html dist/ && cp -r public/* dist/",
-    "deploy": "bun run build && wrangler pages deploy dist --project-name craft-agents-mermaid"
+    "build": "tsup",
+    "build:samples": "bun run index.ts && mkdir -p dist && mv index.html dist/ && cp -r public/* dist/",
+    "deploy": "bun run build:samples && wrangler pages deploy dist --project-name craft-agents-mermaid",
+    "xychart-test": "bun run xychart-test.ts",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
     "elkjs": "^0.11.0",

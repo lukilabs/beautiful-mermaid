@@ -43,14 +43,18 @@ import { renderClassSvg } from './class/renderer.ts'
 import { parseErDiagram } from './er/parser.ts'
 import { layoutErDiagramSync } from './er/layout.ts'
 import { renderErSvg } from './er/renderer.ts'
+import { parseXYChart } from './xychart/parser.ts'
+import { layoutXYChart } from './xychart/layout.ts'
+import { renderXYChartSvg } from './xychart/renderer.ts'
 
 /**
  * Detect the diagram type from the mermaid source text.
  * Returns the type keyword used for routing to the correct pipeline.
  */
-function detectDiagramType(text: string): 'flowchart' | 'sequence' | 'class' | 'er' {
-  const firstLine = text.trim().split('\n')[0]?.trim().toLowerCase() ?? ''
+function detectDiagramType(text: string): 'flowchart' | 'sequence' | 'class' | 'er' | 'xychart' {
+  const firstLine = text.trim().split(/[\n;]/)[0]?.trim().toLowerCase() ?? ''
 
+  if (/^xychart(-beta)?\b/.test(firstLine)) return 'xychart'
   if (/^sequencediagram\s*$/.test(firstLine)) return 'sequence'
   if (/^classdiagram\s*$/.test(firstLine)) return 'class'
   if (/^erdiagram\s*$/.test(firstLine)) return 'er'
@@ -134,6 +138,11 @@ export function renderMermaidSVG(
       const diagram = parseErDiagram(lines)
       const positioned = layoutErDiagramSync(diagram, options)
       return renderErSvg(positioned, colors, font, transparent)
+    }
+    case 'xychart': {
+      const chart = parseXYChart(lines)
+      const positioned = await layoutXYChart(chart, options)
+      return renderXYChartSvg(positioned, colors, font, transparent)
     }
     case 'flowchart':
     default: {

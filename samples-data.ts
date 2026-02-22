@@ -1155,4 +1155,108 @@ export const samples: Sample[] = [
   STUDENT ||--o{ ENROLLMENT : enrolled
   COURSE ||--o{ ENROLLMENT : has`,
   },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  XY CHARTS (xychart-beta)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  {
+    title: 'XY: Simple Bar Chart',
+    category: 'XY Chart',
+    description: 'Basic bar chart with categorical x-axis.',
+    source: `xychart-beta
+    title "Product Sales"
+    x-axis [Widgets, Gadgets, Gizmos, Doodads, Thingamajigs]
+    bar [150, 230, 180, 95, 310]`,
+  },
+  {
+    title: 'XY: Line Chart',
+    category: 'XY Chart',
+    description: 'Line chart showing revenue growth over quarters.',
+    source: `xychart-beta
+    title "Revenue Growth"
+    x-axis [2019, 2020, 2021, 2022, 2023]
+    line [500, 620, 780, 950, 1200]`,
+  },
+  {
+    title: 'XY: Bar and Line Overlay',
+    category: 'XY Chart',
+    description: 'Bars with a line overlay and both axis titles.',
+    source: `xychart-beta
+    title "Monthly Revenue"
+    x-axis "Month" [Jan, Feb, Mar, Apr, May, Jun]
+    y-axis "Revenue (USD)" 0 --> 10000
+    bar [5000, 6200, 7800, 4500, 9200, 8100]
+    line [5000, 6200, 7800, 4500, 9200, 8100]`,
+  },
+  {
+    title: 'XY: Horizontal Bars',
+    category: 'XY Chart',
+    description: 'Horizontal bar chart showing language popularity.',
+    source: `xychart-beta horizontal
+    title "Language Popularity"
+    x-axis [Python, JavaScript, Java, Go, Rust]
+    bar [30, 25, 20, 12, 8]`,
+  },
+  {
+    title: 'XY: Multiple Bar Series',
+    category: 'XY Chart',
+    description: 'Two bar series comparing years side by side.',
+    source: `xychart-beta
+    title "2023 vs 2024 Sales"
+    x-axis [Q1, Q2, Q3, Q4]
+    bar [200, 250, 300, 280]
+    bar [230, 280, 320, 350]`,
+  },
+  {
+    title: 'XY: Dual Lines',
+    category: 'XY Chart',
+    description: 'Two lines comparing planned vs actual values.',
+    source: `xychart-beta
+    title "Planned vs Actual"
+    x-axis [Q1, Q2, Q3, Q4]
+    line [100, 200, 300, 400]
+    line [90, 210, 280, 420]`,
+  },
+  {
+    title: 'XY: Numeric X-Axis',
+    category: 'XY Chart',
+    description: 'Line chart using a numeric x-axis range.',
+    source: `xychart-beta
+    title "Distribution Curve"
+    x-axis 0 --> 100
+    line [5, 15, 35, 60, 80, 95, 80, 60, 35, 15, 5]`,
+  },
+  {
+    title: 'XY: 12-Month Dataset',
+    category: 'XY Chart',
+    description: 'Full year monthly data with bar and trend line.',
+    source: `xychart-beta
+    title "Monthly Active Users (2024)"
+    x-axis [Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec]
+    y-axis "Users" 0 --> 30000
+    bar [12000, 13500, 15200, 16800, 18500, 20100, 19800, 21500, 23000, 24200, 25800, 28000]
+    line [12000, 13500, 15200, 16800, 18500, 20100, 19800, 21500, 23000, 24200, 25800, 28000]`,
+  },
+  {
+    title: 'XY: Horizontal Combined',
+    category: 'XY Chart',
+    description: 'Horizontal chart with both bars and a trend line.',
+    source: `xychart-beta horizontal
+    title "Budget vs Actual"
+    x-axis [Eng, Sales, Marketing, Ops, HR]
+    bar [500, 350, 200, 150, 100]
+    line [480, 380, 180, 160, 95]`,
+  },
+  {
+    title: 'XY: Sprint Burndown',
+    category: 'XY Chart',
+    description: 'Sprint burndown chart with actual and ideal lines.',
+    source: `xychart-beta
+    title "Sprint Burndown"
+    x-axis [D1, D2, D3, D4, D5, D6, D7, D8, D9, D10]
+    y-axis "Story Points" 0 --> 80
+    line [72, 65, 58, 50, 45, 38, 30, 22, 12, 0]
+    line [72, 65, 58, 50, 43, 36, 29, 22, 14, 0]`,
+  },
 ]
