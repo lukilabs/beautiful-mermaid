@@ -228,7 +228,7 @@ async function generateHtml(): Promise<string> {
         <p class="description">${formatDescription(sample.description)}</p>
       </div>
       <div class="sample-content">
-        <div class="source-panel">
+        <div class="source-panel" id="source-panel-${i}">
           ${highlightedSources[i]}
           ${sample.options ? `<div class="options"><strong>Options:</strong> <code>${escapeHtml(JSON.stringify(sample.options))}</code></div>` : ''}
           <button class="edit-btn" data-sample="${i}">Edit</button>
@@ -1702,16 +1702,28 @@ ${bundleJs}
     editingSampleIndex = -1;
   }
 
-  function saveAndRender() {
+  async function saveAndRender() {
     var index = editingSampleIndex;
     if (index < 0) return;
     var source = editTextarea.value;
     samples[index].source = source;
 
-    // Re-render SVG
+    // Close dialog immediately so user sees results rendering
+    closeEditDialog();
+
+    // Update source panel with plain text (Shiki not available at runtime)
+    var sourcePanel = document.getElementById('source-panel-' + index);
+    if (sourcePanel) {
+      var shikiEl = sourcePanel.querySelector('.shiki');
+      if (shikiEl) {
+        shikiEl.innerHTML = '<code>' + escapeHtml(source) + '</code>';
+      }
+    }
+
+    // Re-render SVG (async — renderMermaid returns a Promise)
     var svgContainer = document.getElementById('svg-' + index);
     try {
-      var svg = renderMermaid(source, samples[index].options);
+      var svg = await renderMermaid(source, samples[index].options);
       svgContainer.innerHTML = svg;
       var svgEl = svgContainer.querySelector('svg');
       if (svgEl) {
@@ -1745,8 +1757,6 @@ ${bundleJs}
         asciiContainer.textContent = '(ASCII error: ' + e.message + ')';
       }
     }
-
-    closeEditDialog();
   }
 
   // Event listeners
