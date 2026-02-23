@@ -21,6 +21,7 @@ import type {
   MermaidGraph,
   MermaidSubgraph,
   MermaidEdge,
+  Direction,
   PositionedGraph,
   PositionedNode,
   PositionedEdge,
@@ -38,12 +39,14 @@ import { clipEdgeToShape } from './shape-clipping.ts'
 // ============================================================================
 
 /** Default render options (layout-only) */
-const DEFAULTS: Required<Pick<RenderOptions, 'font' | 'padding' | 'nodeSpacing' | 'layerSpacing'>> = {
+const DEFAULTS = {
   font: 'Inter',
   padding: 40,
   nodeSpacing: 28,
   layerSpacing: 48,
-}
+  mergeEdges: true,
+  thoroughness: 3,
+} as const
 
 /** Convert Mermaid direction to ELK direction */
 function directionToElk(dir: MermaidGraph['direction']): string {
@@ -96,8 +99,7 @@ function estimateNodeSize(id: string, label: string, shape: string): { width: nu
   }
 
   if (shape === 'state-start' || shape === 'state-end') {
-    width = 28
-    height = 28
+    return { width: 28, height: 28 }
   }
 
   width = Math.max(width, 60)
@@ -195,8 +197,19 @@ function mermaidToElk(
       'elk.direction': directionToElk(graph.direction),
       'elk.spacing.nodeNode': String(opts.nodeSpacing),
       'elk.layered.spacing.nodeNodeBetweenLayers': String(opts.layerSpacing),
+      'elk.spacing.edgeEdge': '12',
+      'elk.layered.spacing.edgeEdgeBetweenLayers': '12',
+      'elk.layered.spacing.edgeNodeBetweenLayers': '12',
       'elk.padding': `[top=${opts.padding},left=${opts.padding},bottom=${opts.padding},right=${opts.padding}]`,
       'elk.edgeRouting': 'ORTHOGONAL',
+      'elk.layered.nodePlacement.bk.fixedAlignment': 'BALANCED',
+      'elk.contentAlignment': 'H_CENTER V_CENTER',
+      'elk.layered.thoroughness': String(DEFAULTS.thoroughness),
+      'elk.layered.highDegreeNodes.treatment': 'true',
+      'elk.layered.highDegreeNodes.threshold': '8',
+      'elk.layered.compaction.postCompaction.strategy': 'LEFT_RIGHT_CONSTRAINT_LOCKING',
+      'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
+      'elk.layered.wrapping.strategy': 'OFF',
       // Use SEPARATE when subgraphs have direction overrides (enables proper direction handling)
       // Use INCLUDE_CHILDREN otherwise (simpler cross-hierarchy edge routing)
       'elk.hierarchyHandling': hasDirectionOverride ? 'SEPARATE' : 'INCLUDE_CHILDREN',
@@ -335,6 +348,11 @@ function subgraphToElk(
     'elk.algorithm': 'layered',
     'elk.padding': '[top=44,left=16,bottom=16,right=16]', // Top = headerHeight(28) + gap(16) to match bottom padding
     'elk.edgeRouting': 'ORTHOGONAL',
+    'elk.contentAlignment': 'H_CENTER V_CENTER',
+    'elk.spacing.edgeEdge': '12',
+    'elk.layered.spacing.edgeEdgeBetweenLayers': '12',
+    'elk.layered.spacing.edgeNodeBetweenLayers': '12',
+    'elk.layered.nodePlacement.bk.fixedAlignment': 'BALANCED',
     'elk.layered.spacing.nodeNodeBetweenLayers': String(opts.layerSpacing),
     'elk.spacing.nodeNode': String(opts.nodeSpacing),
   }
@@ -479,7 +497,8 @@ function flattenGroupBounds(groups: PositionedGroup[]): Array<{ x: number; y: nu
 
 function elkToPositioned(
   elkResult: ElkNode,
-  graph: MermaidGraph
+  graph: MermaidGraph,
+  mergeEdges: boolean = false
 ): PositionedGraph {
   const nodes: PositionedNode[] = []
   const edges: PositionedEdge[] = []
@@ -508,6 +527,17 @@ function elkToPositioned(
   // Edges are distributed to subgraphs for direction override to work,
   // so we need to collect them from all children with proper offsets
   extractEdgesRecursively(elkResult, graph, edges, 0, 0, margins)
+
+  // Snap same-layer nodes to the same position along the flow axis.
+  // ELK's orthogonal routing staggers nodes within a layer to create room for
+  // edge bends, but this looks bad. We fix it by aligning layers, then let
+  // edge bundling and clipping recalculate edge paths from corrected positions.
+  alignLayerNodes(nodes, edges, graph.direction)
+
+  // Bundle fan-out/fan-in edge paths into shared trunks when mergeEdges is enabled
+  if (mergeEdges) {
+    bundleEdgePaths(edges, nodes, groups, graph.direction)
+  }
 
   // Apply shape-aware edge clipping for non-rectangular shapes.
   // ELK treats all nodes as rectangles, so we need to clip edge endpoints
@@ -954,6 +984,390 @@ function resolveNodeStyle(
 }
 
 // ============================================================================
+// Layer alignment — snap same-layer nodes to a uniform position
+// ============================================================================
+
+/**
+ * ELK's orthogonal edge routing staggers nodes within the same layer to create
+ * space for edge bends. This post-processing step groups nodes into layers and
+ * snaps them to the same flow-axis coordinate (Y for TD/TB, X for LR/RL).
+ *
+ * Grouping uses proximity along the flow axis: within a layer, ELK's stagger
+ * is always less than layerSpacing (bounded by edge routing channels), while
+ * adjacent layers are separated by at least layerSpacing + nodeHeight.
+ * A threshold of 0.75 * layerSpacing cleanly separates these cases.
+ *
+ * Directly connected nodes (sharing an edge) are never merged into the same
+ * layer group as an additional safety check.
+ *
+ * Edge endpoints connected to shifted nodes are adjusted proportionally.
+ * Intermediate bend points are left unchanged — edge bundling or clipping
+ * will recalculate them afterwards.
+ */
+function alignLayerNodes(
+  nodes: PositionedNode[],
+  edges: PositionedEdge[],
+  direction: Direction
+): void {
+  if (nodes.length === 0) return
+
+  const isHorizontal = direction === 'LR' || direction === 'RL'
+
+  // Build set of directly-connected node pairs.
+  // Nodes connected by an edge must not be merged into the same layer.
+  const connectedPairs = new Set<string>()
+  for (const edge of edges) {
+    connectedPairs.add(`${edge.source}:${edge.target}`)
+    connectedPairs.add(`${edge.target}:${edge.source}`)
+  }
+
+  // ELK's stagger creates small gaps between adjacent nodes in the same layer
+  // (typically edgeEdge spacing = 12px per routing channel). Adjacent layers
+  // are separated by at least layerSpacing (48px). We use single-linkage
+  // clustering: a node joins the current layer if the gap from the previous
+  // node (in sorted order) is within threshold, AND it has no direct edge to
+  // any node already in the layer.
+  const THRESHOLD = DEFAULTS.layerSpacing * 0.6
+
+  // Sort nodes by flow-axis position
+  const sorted = [...nodes].sort((a, b) =>
+    isHorizontal ? a.x - b.x : a.y - b.y
+  )
+
+  const layers: PositionedNode[][] = []
+  let currentLayer: PositionedNode[] = [sorted[0]!]
+
+  for (let i = 1; i < sorted.length; i++) {
+    const pos = isHorizontal ? sorted[i]!.x : sorted[i]!.y
+    const prevPos = isHorizontal ? sorted[i - 1]!.x : sorted[i - 1]!.y
+    // Single-linkage: compare with previous node, not layer start
+    const gap = pos - prevPos
+    // Check if this node is connected to any node already in the current layer
+    const hasEdgeToLayer = currentLayer.some(n =>
+      connectedPairs.has(`${n.id}:${sorted[i]!.id}`)
+    )
+    if (gap <= THRESHOLD && !hasEdgeToLayer) {
+      currentLayer.push(sorted[i]!)
+    } else {
+      layers.push(currentLayer)
+      currentLayer = [sorted[i]!]
+    }
+  }
+  layers.push(currentLayer)
+
+  // Snap each layer's nodes to the layer's center position
+  const deltas = new Map<string, number>() // nodeId → shift amount
+
+  for (const layer of layers) {
+    if (layer.length <= 1) continue
+
+    const positions = layer.map(n => isHorizontal ? n.x : n.y)
+    const min = Math.min(...positions)
+    const max = Math.max(...positions)
+    if (max - min <= 1) continue // Already aligned
+
+    // Use the center of the range as the snap target
+    const target = (min + max) / 2
+
+    for (const node of layer) {
+      const oldPos = isHorizontal ? node.x : node.y
+      const delta = target - oldPos
+      if (Math.abs(delta) > 0.5) {
+        if (isHorizontal) {
+          node.x = target
+        } else {
+          node.y = target
+        }
+        deltas.set(node.id, delta)
+      }
+    }
+  }
+
+  if (deltas.size === 0) return
+
+  // Build node lookup for edge adjustment
+  const nodeMap = new Map(nodes.map(n => [n.id, n]))
+
+  // Adjust edge endpoints to match shifted node positions
+  for (const edge of edges) {
+    if (edge.points.length < 2) continue
+
+    const srcDelta = deltas.get(edge.source)
+    const tgtDelta = deltas.get(edge.target)
+
+    if (srcDelta != null) {
+      // Shift first point and any subsequent points in the initial vertical/horizontal run
+      const first = edge.points[0]!
+      if (isHorizontal) {
+        first.x += srcDelta
+        // Shift second point if it's part of a straight vertical exit
+        if (edge.points.length > 1 && edge.points[1]!.x === first.x - srcDelta) {
+          edge.points[1]!.x += srcDelta
+        }
+      } else {
+        first.y += srcDelta
+        if (edge.points.length > 1 && edge.points[1]!.y === first.y - srcDelta) {
+          edge.points[1]!.y += srcDelta
+        }
+      }
+    }
+
+    if (tgtDelta != null) {
+      const last = edge.points[edge.points.length - 1]!
+      if (isHorizontal) {
+        last.x += tgtDelta
+        if (edge.points.length > 1) {
+          const prev = edge.points[edge.points.length - 2]!
+          if (prev.x === last.x - tgtDelta) prev.x += tgtDelta
+        }
+      } else {
+        last.y += tgtDelta
+        if (edge.points.length > 1) {
+          const prev = edge.points[edge.points.length - 2]!
+          if (prev.y === last.y - tgtDelta) prev.y += tgtDelta
+        }
+      }
+    }
+  }
+}
+
+// ============================================================================
+// Edge bundling — merge fan-out / fan-in edge paths into shared trunks
+// ============================================================================
+
+/**
+ * Find all groups (outermost first) that geometrically contain the given point.
+ */
+function findGroupsContainingPoint(
+  x: number, y: number,
+  groups: PositionedGroup[]
+): PositionedGroup[] {
+  const result: PositionedGroup[] = []
+  for (const g of groups) {
+    if (x >= g.x && x <= g.x + g.width && y >= g.y && y <= g.y + g.height) {
+      result.push(g)
+      result.push(...findGroupsContainingPoint(x, y, g.children))
+    }
+  }
+  return result
+}
+
+/**
+ * If `junction` falls inside a group that doesn't contain the reference node,
+ * move it just outside the outermost such group boundary.
+ */
+function adjustJunctionForGroups(
+  junctionMain: number,  // the junction coordinate along the flow axis (Y for TD, X for LR)
+  refX: number,          // reference node center X (for finding its groups)
+  refY: number,          // reference node center Y
+  groups: PositionedGroup[],
+  direction: Direction
+): number {
+  const GAP = 12
+  const isLR = direction === 'LR'
+  const isRL = direction === 'RL'
+  const isBT = direction === 'BT'
+  const isHorizontal = isLR || isRL
+
+  // Groups containing the reference node
+  const refGroupIds = new Set(findGroupsContainingPoint(refX, refY, groups).map(g => g.id))
+
+  // Check where the junction point would be along the trunk
+  const probeX = isHorizontal ? junctionMain : refX
+  const probeY = isHorizontal ? refY : junctionMain
+  const junctionGroups = findGroupsContainingPoint(probeX, probeY, groups)
+
+  // Find outermost group containing the junction but NOT the reference node
+  const crossingGroup = junctionGroups.find(g => !refGroupIds.has(g.id))
+  if (!crossingGroup) return junctionMain
+
+  // Move junction just outside this group
+  if (isLR) return crossingGroup.x - GAP
+  if (isRL) return crossingGroup.x + crossingGroup.width + GAP
+  if (isBT) return crossingGroup.y + crossingGroup.height + GAP
+  return crossingGroup.y - GAP // TD
+}
+
+/**
+ * Bundle fan-out and fan-in edge paths so they share a common trunk segment.
+ *
+ * For fan-out (one source → N targets), all edges exit the source at the same
+ * point, travel along a shared trunk, then branch to their individual targets.
+ * The overlapping trunk segments render as a single visible line.
+ *
+ * Junction points are placed outside subgraph boundaries so branches split
+ * before entering a group, not inside it.
+ *
+ * Constraints: edges in a bundle must share the same style and have no labels.
+ * Self-loops and backward edges (against the graph direction) are excluded.
+ */
+function bundleEdgePaths(
+  edges: PositionedEdge[],
+  nodes: PositionedNode[],
+  groups: PositionedGroup[],
+  direction: Direction
+): void {
+  const nodeMap = new Map(nodes.map(n => [n.id, n]))
+  const processed = new Set<PositionedEdge>()
+
+  const isLR = direction === 'LR'
+  const isRL = direction === 'RL'
+  const isBT = direction === 'BT'
+  const isHorizontal = isLR || isRL
+
+  // --- Fan-out: group edges by shared source ---
+  const fanOutGroups = new Map<string, PositionedEdge[]>()
+  for (const edge of edges) {
+    if (edge.source === edge.target) continue
+    if (!fanOutGroups.has(edge.source)) fanOutGroups.set(edge.source, [])
+    fanOutGroups.get(edge.source)!.push(edge)
+  }
+
+  for (const [sourceId, group] of fanOutGroups) {
+    if (group.length < 2) continue
+
+    const style = group[0]!.style
+    if (group.some(e => e.label || e.style !== style)) continue
+
+    const source = nodeMap.get(sourceId)
+    if (!source) continue
+
+    // Only bundle edges going in the forward direction
+    const forward = group.filter(e => {
+      const t = nodeMap.get(e.target)
+      if (!t) return false
+      if (isLR) return t.x > source.x + source.width
+      if (isRL) return t.x + t.width < source.x
+      if (isBT) return t.y + t.height < source.y
+      return t.y > source.y + source.height // TD/TB
+    })
+    if (forward.length < 2) continue
+
+    const targets = forward.map(e => ({ edge: e, node: nodeMap.get(e.target)! }))
+    const srcCX = source.x + source.width / 2
+    const srcCY = source.y + source.height / 2
+
+    if (isHorizontal) {
+      const exitX = isLR ? source.x + source.width : source.x
+      const exitY = srcCY
+
+      const nearestX = isLR
+        ? Math.min(...targets.map(t => t.node.x))
+        : Math.max(...targets.map(t => t.node.x + t.node.width))
+      let junctionX = exitX + (nearestX - exitX) / 2
+      junctionX = adjustJunctionForGroups(junctionX, srcCX, srcCY, groups, direction)
+
+      for (const { edge, node: target } of targets) {
+        const entryX = isLR ? target.x : target.x + target.width
+        const entryY = target.y + target.height / 2
+        edge.points = [
+          { x: exitX, y: exitY },
+          { x: junctionX, y: exitY },
+          { x: junctionX, y: entryY },
+          { x: entryX, y: entryY },
+        ]
+        processed.add(edge)
+      }
+    } else {
+      const exitX = srcCX
+      const exitY = isBT ? source.y : source.y + source.height
+
+      const nearestY = isBT
+        ? Math.max(...targets.map(t => t.node.y + t.node.height))
+        : Math.min(...targets.map(t => t.node.y))
+      let junctionY = exitY + (nearestY - exitY) / 2
+      junctionY = adjustJunctionForGroups(junctionY, srcCX, srcCY, groups, direction)
+
+      for (const { edge, node: target } of targets) {
+        const entryX = target.x + target.width / 2
+        const entryY = isBT ? target.y + target.height : target.y
+        edge.points = [
+          { x: exitX, y: exitY },
+          { x: exitX, y: junctionY },
+          { x: entryX, y: junctionY },
+          { x: entryX, y: entryY },
+        ]
+        processed.add(edge)
+      }
+    }
+  }
+
+  // --- Fan-in: group edges by shared target (skip already-bundled edges) ---
+  const fanInGroups = new Map<string, PositionedEdge[]>()
+  for (const edge of edges) {
+    if (processed.has(edge) || edge.source === edge.target) continue
+    if (!fanInGroups.has(edge.target)) fanInGroups.set(edge.target, [])
+    fanInGroups.get(edge.target)!.push(edge)
+  }
+
+  for (const [targetId, group] of fanInGroups) {
+    if (group.length < 2) continue
+
+    const style = group[0]!.style
+    if (group.some(e => e.label || e.style !== style)) continue
+
+    const target = nodeMap.get(targetId)
+    if (!target) continue
+
+    const forward = group.filter(e => {
+      const s = nodeMap.get(e.source)
+      if (!s) return false
+      if (isLR) return s.x + s.width < target.x
+      if (isRL) return s.x > target.x + target.width
+      if (isBT) return s.y > target.y + target.height
+      return s.y + s.height < target.y // TD/TB
+    })
+    if (forward.length < 2) continue
+
+    const sources = forward.map(e => ({ edge: e, node: nodeMap.get(e.source)! }))
+    const tgtCX = target.x + target.width / 2
+    const tgtCY = target.y + target.height / 2
+
+    if (isHorizontal) {
+      const entryX = isLR ? target.x : target.x + target.width
+      const entryY = tgtCY
+
+      const farthestX = isLR
+        ? Math.max(...sources.map(s => s.node.x + s.node.width))
+        : Math.min(...sources.map(s => s.node.x))
+      let junctionX = farthestX + (entryX - farthestX) / 2
+      junctionX = adjustJunctionForGroups(junctionX, tgtCX, tgtCY, groups, direction)
+
+      for (const { edge, node: src } of sources) {
+        const exitX = isLR ? src.x + src.width : src.x
+        const exitY = src.y + src.height / 2
+        edge.points = [
+          { x: exitX, y: exitY },
+          { x: junctionX, y: exitY },
+          { x: junctionX, y: entryY },
+          { x: entryX, y: entryY },
+        ]
+      }
+    } else {
+      const entryX = tgtCX
+      const entryY = isBT ? target.y + target.height : target.y
+
+      const farthestY = isBT
+        ? Math.min(...sources.map(s => s.node.y))
+        : Math.max(...sources.map(s => s.node.y + s.node.height))
+      let junctionY = farthestY + (entryY - farthestY) / 2
+      junctionY = adjustJunctionForGroups(junctionY, tgtCX, tgtCY, groups, direction)
+
+      for (const { edge, node: src } of sources) {
+        const exitX = src.x + src.width / 2
+        const exitY = isBT ? src.y : src.y + src.height
+        edge.points = [
+          { x: exitX, y: exitY },
+          { x: exitX, y: junctionY },
+          { x: entryX, y: junctionY },
+          { x: entryX, y: entryY },
+        ]
+      }
+    }
+  }
+}
+
+// ============================================================================
 // Public API
 // ============================================================================
 
@@ -968,7 +1382,7 @@ export function layoutGraphSync(
   const opts = { ...DEFAULTS, ...options }
   const elkGraph = mermaidToElk(graph, opts)
   const result = elkLayoutSync(elkGraph)
-  return elkToPositioned(result, graph)
+  return elkToPositioned(result, graph, DEFAULTS.mergeEdges)
 }
 
 /**

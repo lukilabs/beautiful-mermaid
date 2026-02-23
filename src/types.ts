@@ -155,11 +155,4 @@ export interface RenderOptions {
   componentSpacing?: number
   /** Render with transparent background (no background style on SVG). Default: false */
   transparent?: boolean
-  /**
-   * Number of independent crossing minimization trials (1-7, default: 3).
-   * Each trial explores a different solution space with a different random seed.
-   * Higher values improve layout quality but increase computation time.
-   * ELK default is 7; we use 3 for a balance of quality vs performance.
-   */
-  thoroughness?: number
 }
