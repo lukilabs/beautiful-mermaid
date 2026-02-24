@@ -14,6 +14,7 @@ import type { SequenceDiagram, Block } from '../sequence/types.ts'
 import type { Canvas, AsciiConfig, RoleCanvas, CharRole, AsciiTheme, ColorMode } from './types.ts'
 import { mkCanvas, mkRoleCanvas, canvasToString, increaseSize, increaseRoleCanvasSize, setRole } from './canvas.ts'
 import { splitLines, maxLineWidth, lineCount } from './multiline-utils.ts'
+import { displayWidth, drawCJKText, CJK_PAD } from './cjk.ts'
 
 /** Classify a box-drawing character as 'border' or 'text'. */
 function classifyBoxChar(ch: string): CharRole {
@@ -198,7 +199,7 @@ export function renderSequenceAscii(text: string, config: AsciiConfig, colorMode
     const msg = diagram.messages[m]!
     if (msg.from === msg.to) {
       const fi = actorIdx.get(msg.from)!
-      const selfRight = llX[fi]! + 6 + 2 + msg.label.length
+      const selfRight = llX[fi]! + 6 + 2 + displayWidth(msg.label)
       totalW = Math.max(totalW, selfRight + 1)
     }
   }

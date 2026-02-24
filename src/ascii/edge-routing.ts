@@ -13,6 +13,7 @@ import {
 } from './types.ts'
 import { getPath, mergePath } from './pathfinder.ts'
 import { getEffectiveDirection, getNodeSubgraph } from './grid.ts'
+import { displayWidth } from './cjk.ts'
 
 // ============================================================================
 // Direction utilities
@@ -227,7 +228,7 @@ export function determinePath(graph: AsciiGraph, edge: AsciiEdge): void {
 export function determineLabelLine(graph: AsciiGraph, edge: AsciiEdge): void {
   if (edge.text.length === 0) return
 
-  const lenLabel = edge.text.length
+  const lenLabel = displayWidth(edge.text)
   const pathLen = edge.path.length
   const isVerticalFlow = graph.config.graphDirection === 'TD'
 

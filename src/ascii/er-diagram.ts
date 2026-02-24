@@ -15,6 +15,7 @@ import type { Canvas, AsciiConfig, RoleCanvas, CharRole, AsciiTheme, ColorMode }
 import { mkCanvas, mkRoleCanvas, canvasToString, increaseSize, increaseRoleCanvasSize, setRole } from './canvas.ts'
 import { drawMultiBox } from './draw.ts'
 import { splitLines } from './multiline-utils.ts'
+import { displayWidth, drawCJKText, CJK_PAD } from './cjk.ts'
 
 /** Classify a character from a box drawing as 'border' or 'text'. */
 function classifyBoxChar(ch: string): CharRole {

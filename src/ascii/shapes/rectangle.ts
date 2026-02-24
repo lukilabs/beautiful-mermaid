@@ -13,6 +13,7 @@ import { splitLines } from '../multiline-utils.ts'
 import type { ShapeRenderer, ShapeDimensions, ShapeRenderOptions } from './types.ts'
 import { dirEquals } from '../edge-routing.ts'
 import { type CornerChars, getCorners } from './corners.ts'
+import { displayWidth, drawCJKText, CJK_PAD } from '../cjk.ts'
 
 // ============================================================================
 // Shared dimension calculation
@@ -24,7 +25,7 @@ import { type CornerChars, getCorners } from './corners.ts'
  */
 export function getBoxDimensions(label: string, options: ShapeRenderOptions): ShapeDimensions {
   const lines = splitLines(label)
-  const maxLineWidth = Math.max(...lines.map(l => l.length), 0)
+  const maxLineWidth = Math.max(...lines.map(l => displayWidth(l)), 0)
   const lineCount = lines.length
 
   // Width: 2*padding + maxLineWidth + 2 border chars
@@ -108,14 +109,8 @@ export function renderBox(
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!
-    const textX = Math.floor(w / 2) - Math.ceil(line.length / 2) + 1
-    for (let j = 0; j < line.length; j++) {
-      const x = textX + j
-      const y = startY + i
-      if (x >= 0 && x < canvas.length && y >= 0 && y < canvas[0]!.length) {
-        canvas[x]![y] = line[j]!
-      }
-    }
+    const textX = Math.floor(w / 2) - Math.ceil(displayWidth(line) / 2) + 1
+    drawCJKText(canvas, textX, startY + i, line)
   }
 
   return canvas
