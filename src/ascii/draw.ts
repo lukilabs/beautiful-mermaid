@@ -21,7 +21,7 @@ import { gridToDrawingCoord, lineToDrawing } from './grid.ts'
 import { splitLines } from './multiline-utils.ts'
 import { getCorners } from './shapes/corners.ts'
 import { getShapeAttachmentPoint } from './shapes/index.ts'
-import { displayWidth, drawCJKText, CJK_PAD } from './cjk.ts'
+import { displayWidth, drawCJKText } from './cjk.ts'
 
 // ============================================================================
 // Node drawing — renders a node using shape-aware rendering

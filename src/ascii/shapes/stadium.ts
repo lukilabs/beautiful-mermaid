@@ -11,7 +11,7 @@ import { mkCanvas } from '../canvas.ts'
 import { splitLines } from '../multiline-utils.ts'
 import type { ShapeRenderer, ShapeDimensions, ShapeRenderOptions } from './types.ts'
 import { getBoxAttachmentPoint } from './rectangle.ts'
-import { displayWidth, drawCJKText, CJK_PAD } from '../cjk.ts'
+import { displayWidth, drawCJKText } from '../cjk.ts'
 
 /**
  * Stadium (pill) shape renderer.

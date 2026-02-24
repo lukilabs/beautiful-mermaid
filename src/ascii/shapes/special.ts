@@ -13,7 +13,7 @@ import type { ShapeRenderer, ShapeDimensions, ShapeRenderOptions } from './types
 import { dirEquals } from '../edge-routing.ts'
 import { getBoxDimensions, renderBox, getBoxAttachmentPoint } from './rectangle.ts'
 import { getCorners } from './corners.ts'
-import { displayWidth, drawCJKText, CJK_PAD } from '../cjk.ts'
+import { displayWidth, drawCJKText } from '../cjk.ts'
 
 // ============================================================================
 // Subroutine — keeps custom double-border rendering

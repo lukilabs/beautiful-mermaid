@@ -8,6 +8,7 @@
 
 import type { Canvas } from './types.ts'
 import { drawText } from './canvas.ts'
+import { displayWidth } from './cjk.ts'
 
 /**
  * Split a label into lines.
@@ -23,7 +24,7 @@ export function splitLines(label: string): string[] {
  */
 export function maxLineWidth(label: string): number {
   const lines = splitLines(label)
-  return Math.max(...lines.map(l => l.length), 0)
+  return Math.max(...lines.map(l => displayWidth(l)), 0)
 }
 
 /**
@@ -53,7 +54,7 @@ export function drawMultilineTextCentered(
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!
     // Center each line horizontally
-    const startX = cx - Math.floor(line.length / 2)
+    const startX = cx - Math.floor(displayWidth(line) / 2)
     // Force overwrite for node labels (they take priority)
     drawText(canvas, { x: startX, y: startY + i }, line, true)
   }

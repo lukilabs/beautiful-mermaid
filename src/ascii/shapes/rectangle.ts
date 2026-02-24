@@ -13,7 +13,7 @@ import { splitLines } from '../multiline-utils.ts'
 import type { ShapeRenderer, ShapeDimensions, ShapeRenderOptions } from './types.ts'
 import { dirEquals } from '../edge-routing.ts'
 import { type CornerChars, getCorners } from './corners.ts'
-import { displayWidth, drawCJKText, CJK_PAD } from '../cjk.ts'
+import { displayWidth, drawCJKText } from '../cjk.ts'
 
 // ============================================================================
 // Shared dimension calculation
