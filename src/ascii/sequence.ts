@@ -240,7 +240,7 @@ export function renderSequenceAscii(text: string, config: AsciiConfig, colorMode
       // Center this line within the box
       const line = lines[i]!
       const ls = left + 1 + boxPad + Math.floor((maxW - displayWidth(line)) / 2)
-      drawCJKText(canvas, ls, row, line, true)
+      drawCJKText(canvas, ls, row, line, true, rc, 'text')
     }
 
     // Bottom border
@@ -304,7 +304,7 @@ export function renderSequenceAscii(text: string, config: AsciiConfig, colorMode
       // Row 1: vertical on right side + label
       setC(fromX + loopW, y0 + 1, V, 'line')
       const labelX = fromX + loopW + 2
-      drawCJKText(canvas, labelX, y0 + 1, msg.label, true)
+      drawCJKText(canvas, labelX, y0 + 1, msg.label, true, rc, 'text')
 
       // Row 2: arrow-back + horizontal + bottom-right corner
       const arrowChar = isFilled ? (useAscii ? '<' : '◀') : (useAscii ? '<' : '◁')
@@ -325,7 +325,7 @@ export function renderSequenceAscii(text: string, config: AsciiConfig, colorMode
         const line = msgLines[lineIdx]!
         const labelStart = midX - Math.floor(displayWidth(line) / 2)
         const y = labelY + lineIdx
-        drawCJKText(canvas, labelStart, y, line, true)
+        drawCJKText(canvas, labelStart, y, line, true, rc, 'text')
       }
 
       // Draw arrow line
@@ -375,7 +375,7 @@ export function renderSequenceAscii(text: string, config: AsciiConfig, colorMode
 
     for (let lineIdx = 0; lineIdx < hdrLines.length && topY + lineIdx < botY; lineIdx++) {
       const line = hdrLines[lineIdx]!
-      drawCJKText(canvas, bLeft + 1, topY + lineIdx, line, true)
+      drawCJKText(canvas, bLeft + 1, topY + lineIdx, line, true, rc, 'text')
     }
 
     // Bottom border
@@ -401,7 +401,7 @@ export function renderSequenceAscii(text: string, config: AsciiConfig, colorMode
       const dLabel = block.dividers[d]!.label
       if (dLabel) {
         const dStr = `[${dLabel}]`
-        drawCJKText(canvas, bLeft + 1, dY, dStr, true)
+        drawCJKText(canvas, bLeft + 1, dY, dStr, true, rc, 'text')
       }
     }
   }
@@ -421,7 +421,7 @@ export function renderSequenceAscii(text: string, config: AsciiConfig, colorMode
       const ly = np.y + 1 + l
       setC(np.x, ly, V, 'border')
       setC(np.x + np.width - 1, ly, V, 'border')
-      drawCJKText(canvas, np.x + 2, ly, np.lines[l]!, true)
+      drawCJKText(canvas, np.x + 2, ly, np.lines[l]!, true, rc, 'text')
     }
     // Bottom border
     const by = np.y + np.height - 1

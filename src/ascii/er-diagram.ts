@@ -181,7 +181,7 @@ export function renderErAscii(text: string, config: AsciiConfig, colorMode?: Col
 
     let maxTextW = 0
     for (const section of sections) {
-      for (const line of section) maxTextW = Math.max(maxTextW, line.length)
+      for (const line of section) maxTextW = Math.max(maxTextW, displayWidth(line))
     }
     const boxW = maxTextW + 4 // 2 border + 2 padding
 
@@ -350,7 +350,7 @@ export function renderErAscii(text: string, config: AsciiConfig, colorMode?: Col
           // Ensure canvas is tall enough
           increaseSize(canvas, Math.max(labelStart + displayWidth(line), 1), Math.max(labelY + 1, 1))
           increaseRoleCanvasSize(rc, Math.max(labelStart + displayWidth(line), 1), Math.max(labelY + 1, 1))
-          drawCJKText(canvas, labelStart, labelY, line, true)
+          drawCJKText(canvas, labelStart, labelY, line, true, rc, 'text')
         }
       }
     } else {
@@ -415,7 +415,7 @@ export function renderErAscii(text: string, config: AsciiConfig, colorMode?: Col
           if (y >= 0) {
             increaseSize(canvas, labelX + displayWidth(line) + 1, y + 1)
             increaseRoleCanvasSize(rc, labelX + displayWidth(line) + 1, y + 1)
-            drawCJKText(canvas, labelX, y, line, true)
+            drawCJKText(canvas, labelX, y, line, true, rc, 'text')
           }
         }
       }

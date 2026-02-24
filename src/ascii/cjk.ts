@@ -8,7 +8,7 @@
 // Unicode ranges from src/text-metrics.ts isFullwidth() — kept in sync.
 // ============================================================================
 
-import type { Canvas } from './types.ts'
+import type { Canvas, RoleCanvas, CharRole } from './types.ts'
 
 /**
  * Sentinel character placed in the "right half" of a fullwidth character's
@@ -71,6 +71,8 @@ export function displayWidth(str: string): number {
  * @param y - Row index
  * @param text - Text to draw
  * @param forceOverwrite - If true, overwrite existing non-space characters
+ * @param roleCanvas - Optional role canvas for colored output
+ * @param role - Character role to assign (requires roleCanvas)
  */
 export function drawCJKText(
   canvas: Canvas,
@@ -78,21 +80,30 @@ export function drawCJKText(
   y: number,
   text: string,
   forceOverwrite = false,
+  roleCanvas?: RoleCanvas,
+  role?: CharRole,
 ): void {
   let offset = 0
   for (const ch of text) {
     const cx = x + offset
+    let written = false
     if (cx >= 0 && cx < canvas.length && y >= 0 && y < (canvas[0]?.length ?? 0)) {
       if (forceOverwrite || canvas[cx]![y] === ' ') {
         canvas[cx]![y] = ch
+        if (roleCanvas && role !== undefined && cx < roleCanvas.length && y < (roleCanvas[0]?.length ?? 0)) {
+          roleCanvas[cx]![y] = role
+        }
+        written = true
       }
     }
     offset++
     const code = ch.codePointAt(0)
     if (code !== undefined && isFullwidthChar(code)) {
-      const px = x + offset
-      if (px >= 0 && px < canvas.length && y >= 0 && y < (canvas[0]?.length ?? 0)) {
-        canvas[px]![y] = CJK_PAD
+      if (written) {
+        const px = x + offset
+        if (px >= 0 && px < canvas.length && y >= 0 && y < (canvas[0]?.length ?? 0)) {
+          canvas[px]![y] = CJK_PAD
+        }
       }
       offset++
     }

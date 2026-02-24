@@ -685,7 +685,7 @@ export function renderClassAscii(text: string, config: AsciiConfig, colorMode?: 
           increaseRoleCanvasSize(rc, Math.max(labelEnd, 1), Math.max(y + 1, 1))
         }
         // Clear the area first (overwrite line characters) then draw the padded label
-        drawCJKText(canvas, labelStart, y, paddedLine, true)
+        drawCJKText(canvas, labelStart, y, paddedLine, true, rc, 'text')
       }
     }
   }
