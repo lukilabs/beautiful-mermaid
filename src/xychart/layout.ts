@@ -41,12 +41,11 @@ const XY = {
 
 /**
  * Lay out a parsed XY chart by computing pixel coordinates.
- * Async for API consistency with other diagram layout functions.
  */
-export async function layoutXYChart(
+export function layoutXYChart(
   chart: XYChart,
   _options: RenderOptions = {}
-): Promise<PositionedXYChart> {
+): PositionedXYChart {
   if (chart.horizontal) return layoutHorizontal(chart)
   return layoutVertical(chart)
 }

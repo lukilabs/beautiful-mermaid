@@ -141,7 +141,7 @@ export function renderMermaidSVG(
     }
     case 'xychart': {
       const chart = parseXYChart(lines)
-      const positioned = await layoutXYChart(chart, options)
+      const positioned = layoutXYChart(chart, options)
       return renderXYChartSvg(positioned, colors, font, transparent, options.interactive ?? false)
     }
     case 'flowchart':

@@ -16,7 +16,7 @@ export interface Sample {
   source: string
   /** Optional category tag for grouping in the Table of Contents */
   category?: string
-  options?: { bg?: string; fg?: string; line?: string; accent?: string; muted?: string; surface?: string; border?: string; font?: string; padding?: number; transparent?: boolean }
+  options?: { bg?: string; fg?: string; line?: string; accent?: string; muted?: string; surface?: string; border?: string; font?: string; padding?: number; transparent?: boolean; interactive?: boolean }
 }
 
 export const samples: Sample[] = [
@@ -1168,6 +1168,7 @@ export const samples: Sample[] = [
     title "Product Sales"
     x-axis [Widgets, Gadgets, Gizmos, Doodads, Thingamajigs]
     bar [150, 230, 180, 95, 310]`,
+    options: { interactive: true },
   },
   {
     title: 'XY: Line Chart',
@@ -1177,6 +1178,7 @@ export const samples: Sample[] = [
     title "Revenue Growth"
     x-axis [2019, 2020, 2021, 2022, 2023]
     line [500, 620, 780, 950, 1200]`,
+    options: { interactive: true },
   },
   {
     title: 'XY: Bar and Line Overlay',
@@ -1188,6 +1190,7 @@ export const samples: Sample[] = [
     y-axis "Revenue (USD)" 0 --> 10000
     bar [5000, 6200, 7800, 4500, 9200, 8100]
     line [5000, 6200, 7800, 4500, 9200, 8100]`,
+    options: { interactive: true },
   },
   {
     title: 'XY: Horizontal Bars',
@@ -1197,6 +1200,7 @@ export const samples: Sample[] = [
     title "Language Popularity"
     x-axis [Python, JavaScript, Java, Go, Rust]
     bar [30, 25, 20, 12, 8]`,
+    options: { interactive: true },
   },
   {
     title: 'XY: Multiple Bar Series',
@@ -1207,6 +1211,7 @@ export const samples: Sample[] = [
     x-axis [Q1, Q2, Q3, Q4]
     bar [200, 250, 300, 280]
     bar [230, 280, 320, 350]`,
+    options: { interactive: true },
   },
   {
     title: 'XY: Dual Lines',
@@ -1217,6 +1222,7 @@ export const samples: Sample[] = [
     x-axis [Q1, Q2, Q3, Q4]
     line [100, 200, 300, 400]
     line [90, 210, 280, 420]`,
+    options: { interactive: true },
   },
   {
     title: 'XY: Numeric X-Axis',
@@ -1226,6 +1232,7 @@ export const samples: Sample[] = [
     title "Distribution Curve"
     x-axis 0 --> 100
     line [5, 15, 35, 60, 80, 95, 80, 60, 35, 15, 5]`,
+    options: { interactive: true },
   },
   {
     title: 'XY: 12-Month Dataset',
@@ -1237,6 +1244,7 @@ export const samples: Sample[] = [
     y-axis "Users" 0 --> 30000
     bar [12000, 13500, 15200, 16800, 18500, 20100, 19800, 21500, 23000, 24200, 25800, 28000]
     line [12000, 13500, 15200, 16800, 18500, 20100, 19800, 21500, 23000, 24200, 25800, 28000]`,
+    options: { interactive: true },
   },
   {
     title: 'XY: Horizontal Combined',
@@ -1247,6 +1255,7 @@ export const samples: Sample[] = [
     x-axis [Eng, Sales, Marketing, Ops, HR]
     bar [500, 350, 200, 150, 100]
     line [480, 380, 180, 160, 95]`,
+    options: { interactive: true },
   },
   {
     title: 'XY: Sprint Burndown',
@@ -1258,5 +1267,6 @@ export const samples: Sample[] = [
     y-axis "Story Points" 0 --> 80
     line [72, 65, 58, 50, 45, 38, 30, 22, 12, 0]
     line [72, 65, 58, 50, 43, 36, 29, 22, 14, 0]`,
+    options: { interactive: true },
   },
 ]
