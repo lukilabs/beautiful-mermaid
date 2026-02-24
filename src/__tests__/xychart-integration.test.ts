@@ -103,7 +103,7 @@ describe('xychart – interactive tooltips', () => {
     expect(svg).toContain('opacity: 0')
     expect(svg).toContain('.xychart-bar-group:hover .xychart-tip')
     expect(svg).toContain('.xychart-dot-group:hover .xychart-tip')
-    expect(svg).toContain('transition: opacity')
+    // Tooltips appear instantly (no transition)
   })
 
   it('does not include hover CSS when not interactive', async () => {

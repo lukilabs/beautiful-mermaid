@@ -37,7 +37,7 @@ const CHART_FONT = {
   legendWeight: 400,
   dotRadius: 5,
   lineWidth: 2.5,
-  barRadius: 4,
+  barRadius: 8,
 } as const
 
 const TIP = {
@@ -49,7 +49,6 @@ const TIP = {
   rx: 6,
   minY: 4,
   pointerSize: 5,
-  legendDot: 6,
 } as const
 
 /**
@@ -72,8 +71,10 @@ export function renderXYChartSvg(
   const maxLinePoints = Math.max(...chart.lines.map(l => l.points.length), 0)
   const sparse = maxLinePoints > 0 && maxLinePoints <= 12
 
-  // Chart-specific styles
-  parts.push(chartStyles(chart, interactive, sparse))
+  // Chart-specific styles + gradient defs
+  const { style: chartCss, defs: chartDefs } = chartStyles(chart, interactive, sparse)
+  parts.push(chartCss)
+  if (chartDefs) parts.push(chartDefs)
 
   // 1. Grid lines (subtle horizontal/vertical lines spanning the plot area)
   for (const g of chart.gridLines) {
@@ -82,26 +83,27 @@ export function renderXYChartSvg(
     )
   }
 
-  // 2. Bars — rendered as paths with rounded top corners, flat at baseline
+  // 2. Bars — always render bar paths inline (before lines for correct z-order)
+  //    Interactive: also build overlay groups with transparent hit-areas + tooltips (deferred to step 9)
+  const barOverlay: string[] = []
   for (const bar of chart.bars) {
     const dataAttrs = ` data-value="${bar.value}"${bar.label ? ` data-label="${escapeXml(bar.label)}"` : ''}`
     const barPath = chart.horizontal
       ? roundedRightBarPath(bar.x, bar.y, bar.width, bar.height, CHART_FONT.barRadius)
       : roundedTopBarPath(bar.x, bar.y, bar.width, bar.height, CHART_FONT.barRadius)
+    parts.push(
+      `<path d="${barPath}" class="xychart-bar xychart-bar-${bar.seriesIndex}"${dataAttrs}/>`
+    )
     if (interactive) {
       const tipText = formatTipValue(bar.value)
       const tipTitle = bar.label ? `${bar.label}: ${tipText}` : tipText
       const tip = tooltipAbove(bar.x + bar.width / 2, bar.y, tipText)
-      parts.push(
+      barOverlay.push(
         `<g class="xychart-bar-group">` +
-        `<path d="${barPath}" class="xychart-bar xychart-bar-${bar.seriesIndex}"${dataAttrs}/>` +
+        `<rect x="${r(bar.x)}" y="${r(bar.y)}" width="${r(bar.width)}" height="${r(bar.height)}" fill="transparent"/>` +
         `<title>${escapeXml(tipTitle)}</title>` +
         tip +
         `</g>`
-      )
-    } else {
-      parts.push(
-        `<path d="${barPath}" class="xychart-bar xychart-bar-${bar.seriesIndex}"${dataAttrs}/>`
       )
     }
   }
@@ -114,8 +116,15 @@ export function renderXYChartSvg(
     parts.push(`<path d="${d}" class="xychart-line xychart-line-${line.seriesIndex}"/>`)
   }
 
-  // 4. Dots — grouped by x-position so multi-series columns share one tooltip
+  // 4. Dots — grouped by x-position; interactive groups deferred to overlay
+  const dotOverlay: string[] = []
   if (interactive || sparse) {
+    // Build legend label lookup: line seriesIndex → "Line 1", "Line 2", etc.
+    const lineLegendLabels = new Map<number, string>()
+    for (const item of chart.legend) {
+      if (item.type === 'line') lineLegendLabels.set(item.seriesIndex, item.label)
+    }
+
     type DotEntry = { x: number; y: number; value: number; label?: string; seriesIndex: number }
     const columns = new Map<string, DotEntry[]>()
 
@@ -132,12 +141,14 @@ export function renderXYChartSvg(
       const label = entries[0].label || ''
 
       if (interactive && entries.length > 1) {
-        // Multi-series column: combined hover group with stacked tooltip
         const topY = Math.min(...entries.map(e => e.y))
         const botY = Math.max(...entries.map(e => e.y))
         const hitPad = CHART_FONT.dotRadius * 3
         const hitArea = `<rect x="${r(cx - hitPad)}" y="${r(topY - hitPad)}" width="${r(hitPad * 2)}" height="${r(botY - topY + hitPad * 2)}" fill="transparent" class="xychart-hit"/>`
-        const tipEntries = entries.map(e => ({ text: formatTipValue(e.value), seriesIndex: e.seriesIndex }))
+        const tipEntries = entries.map(e => ({
+          text: formatTipValue(e.value),
+          legendLabel: lineLegendLabels.get(e.seriesIndex) || `Line ${e.seriesIndex + 1}`,
+        }))
         const tip = multiTooltipAbove(cx, topY - CHART_FONT.dotRadius, label, tipEntries)
         const valStrs = tipEntries.map(e => e.text)
         const titleText = label ? `${label}: ${valStrs.join(' · ')}` : valStrs.join(' · ')
@@ -148,10 +159,9 @@ export function renderXYChartSvg(
           group += `<circle cx="${r(e.x)}" cy="${r(e.y)}" r="${CHART_FONT.dotRadius}" class="xychart-dot xychart-line-${e.seriesIndex}"${dataAttrs}/>`
         }
         group += `<title>${escapeXml(titleText)}</title>${tip}</g>`
-        parts.push(group)
+        dotOverlay.push(group)
 
       } else if (interactive) {
-        // Single-series column
         const e = entries[0]
         const dataAttrs = ` data-value="${e.value}"${e.label ? ` data-label="${escapeXml(e.label)}"` : ''}`
         const tipText = formatTipValue(e.value)
@@ -160,14 +170,14 @@ export function renderXYChartSvg(
         const hitArea = sparse
           ? `<circle cx="${r(cx)}" cy="${r(e.y)}" r="${CHART_FONT.dotRadius * 3}" fill="transparent" class="xychart-hit"/>`
           : ''
-        parts.push(
+        dotOverlay.push(
           `<g class="xychart-dot-group">${hitArea}` +
           `<circle cx="${r(e.x)}" cy="${r(e.y)}" r="${CHART_FONT.dotRadius}" class="xychart-dot xychart-line-${e.seriesIndex}"${dataAttrs}/>` +
           `<title>${escapeXml(tipTitle)}</title>${tip}</g>`
         )
 
       } else {
-        // Sparse, not interactive: static visible dots
+        // Sparse, not interactive: static dots render inline
         for (const e of entries) {
           const dataAttrs = ` data-value="${e.value}"${e.label ? ` data-label="${escapeXml(e.label)}"` : ''}`
           parts.push(
@@ -246,6 +256,10 @@ export function renderXYChartSvg(
     )
   }
 
+  // 9. Interactive overlay — rendered last so tooltips are always on top
+  for (const g of barOverlay) parts.push(g)
+  for (const g of dotOverlay) parts.push(g)
+
   parts.push('</svg>')
   return parts.join('\n')
 }
@@ -254,25 +268,62 @@ export function renderXYChartSvg(
 // Chart-specific CSS styles
 // ============================================================================
 
-function chartStyles(chart: PositionedXYChart, interactive: boolean, sparse: boolean): string {
+function chartStyles(chart: PositionedXYChart, interactive: boolean, sparse: boolean): { style: string; defs: string } {
   const barSeriesCount = new Set(chart.bars.map(b => b.seriesIndex)).size
   const lineSeriesCount = new Set(chart.lines.map(l => l.seriesIndex)).size
+  const horiz = chart.horizontal === true
 
   const seriesRules: string[] = []
+  const gradients: string[] = []
 
-  // --- Bar series colors: accent outline + subtle fill (like ER entity boxes) ---
+  // Gradient direction: stroke fades from tip→baseline, fill fades from baseline→tip
+  const strokeDir = horiz ? 'x1="1" y1="0" x2="0" y2="0"' : 'x1="0" y1="0" x2="0" y2="1"'
+  const fillDir = horiz ? 'x1="0" y1="0" x2="1" y2="0"' : 'x1="0" y1="1" x2="0" y2="0"'
+
+  // --- Bar series colors: accent outline + subtle fill with gradients ---
   for (let i = 0; i < barSeriesCount; i++) {
+    let strokeTop: string, strokeBot: string, fillBot: string, fillTop: string
+
     if (barSeriesCount <= 1 && lineSeriesCount === 0) {
-      // Bar-only chart: accent stroke, subtle accent fill
-      seriesRules.push(`  .xychart-bar-${i} { stroke: var(--_arrow); fill: color-mix(in srgb, var(--_arrow) 12%, var(--bg)); }`)
+      // Bar-only: stroke 35%→32%, fill 10%→7%
+      strokeTop = 'color-mix(in srgb, var(--_arrow) 35%, var(--bg))'
+      strokeBot = 'color-mix(in srgb, var(--_arrow) 32%, var(--bg))'
+      fillBot = 'color-mix(in srgb, var(--_arrow) 10%, var(--bg))'
+      fillTop = 'color-mix(in srgb, var(--_arrow) 7%, var(--bg))'
     } else if (barSeriesCount <= 1) {
-      // Mixed chart: muted solid stroke + very subtle fill
-      seriesRules.push(`  .xychart-bar-${i} { stroke: color-mix(in srgb, var(--_arrow) 45%, var(--bg)); fill: color-mix(in srgb, var(--_arrow) 8%, var(--bg)); }`)
+      // Mixed: stroke 22%→19%, fill 7%→4%
+      strokeTop = 'color-mix(in srgb, var(--_arrow) 22%, var(--bg))'
+      strokeBot = 'color-mix(in srgb, var(--_arrow) 19%, var(--bg))'
+      fillBot = 'color-mix(in srgb, var(--_arrow) 7%, var(--bg))'
+      fillTop = 'color-mix(in srgb, var(--_arrow) 4%, var(--bg))'
     } else {
       const color = lineSeriesCount > 0 ? BAR_THEME_MIX[i % BAR_THEME_MIX.length] : BAR_BOLD_MIX[i % BAR_BOLD_MIX.length]
-      const strokeMix = lineSeriesCount > 0 ? `color-mix(in srgb, ${color} 55%, var(--bg))` : color
-      seriesRules.push(`  .xychart-bar-${i} { stroke: ${strokeMix}; fill: color-mix(in srgb, ${color} 12%, var(--bg)); }`)
+      const pctTop = lineSeriesCount > 0 ? 22 : 35
+      const pctBot = lineSeriesCount > 0 ? 19 : 32
+      const fillPctBot = lineSeriesCount > 0 ? 16 : 18
+      const fillPctTop = lineSeriesCount > 0 ? 10 : 12
+      strokeTop = `color-mix(in srgb, ${color} ${pctTop}%, var(--bg))`
+      strokeBot = `color-mix(in srgb, ${color} ${pctBot}%, var(--bg))`
+      fillBot = `color-mix(in srgb, ${color} ${fillPctBot}%, var(--bg))`
+      fillTop = `color-mix(in srgb, ${color} ${fillPctTop}%, var(--bg))`
     }
+
+    // Stroke gradient: strong at tip, faded at baseline
+    gradients.push(
+      `<linearGradient id="bar-s-${i}" ${strokeDir}>` +
+      `<stop offset="0%" style="stop-color:${strokeTop}"/>` +
+      `<stop offset="100%" style="stop-color:${strokeBot}"/>` +
+      `</linearGradient>`
+    )
+    // Fill gradient: strong at baseline, faded at tip
+    gradients.push(
+      `<linearGradient id="bar-f-${i}" ${fillDir}>` +
+      `<stop offset="0%" style="stop-color:${fillBot}"/>` +
+      `<stop offset="100%" style="stop-color:${fillTop}"/>` +
+      `</linearGradient>`
+    )
+
+    seriesRules.push(`  .xychart-bar-${i} { stroke: url(#bar-s-${i}); fill: url(#bar-f-${i}); }`)
   }
 
   // --- Line series colors ---
@@ -288,15 +339,14 @@ function chartStyles(chart: PositionedXYChart, interactive: boolean, sparse: boo
   }
 
   const tipRules = interactive ? `
-  .xychart-tip { opacity: 0; pointer-events: none; transition: opacity 0.15s ease; }
+  .xychart-tip { opacity: 0; pointer-events: none; }
   .xychart-tip-bg { fill: var(--_text); filter: drop-shadow(0 1px 3px color-mix(in srgb, var(--fg) 20%, transparent)); }
   .xychart-tip-text { fill: var(--bg); font-size: ${TIP.fontSize}px; font-weight: ${TIP.fontWeight}; }
   .xychart-tip-ptr { fill: var(--_text); }
   .xychart-bar-group:hover .xychart-tip,
-  .xychart-dot-group:hover .xychart-tip { opacity: 1; }
-  .xychart-bar-group:hover .xychart-bar { filter: brightness(0.92); transition: filter 0.15s ease; }` : ''
+  .xychart-dot-group:hover .xychart-tip { opacity: 1; }` : ''
 
-  return `<style>
+  const style = `<style>
   .xychart-grid { stroke: var(--_inner-stroke); stroke-width: 0.75; opacity: 0.4; }
   .xychart-bar { stroke-width: 1.5; }
   .xychart-line { fill: none; stroke-width: ${CHART_FONT.lineWidth}; stroke-linecap: round; stroke-linejoin: round; }
@@ -307,6 +357,10 @@ function chartStyles(chart: PositionedXYChart, interactive: boolean, sparse: boo
   .xychart-title { fill: var(--_text); }
 ${seriesRules.join('\n')}${tipRules}
 </style>`
+
+  const defs = gradients.length > 0 ? `<defs>${gradients.join('')}</defs>` : ''
+
+  return { style, defs }
 }
 
 // ============================================================================
@@ -473,17 +527,19 @@ function smoothCurvePath(points: Array<{ x: number; y: number }>): string {
 // ============================================================================
 
 /**
- * Multi-value tooltip: category label on top, each series value below with a colored legend dot.
+ * Multi-value tooltip: category label on top, each series value below with legend text label.
  */
-function multiTooltipAbove(cx: number, topY: number, label: string, entries: Array<{ text: string; seriesIndex: number }>): string {
+function multiTooltipAbove(cx: number, topY: number, label: string, entries: Array<{ text: string; legendLabel: string }>): string {
   const lineH = 20
   const padY = 6
-  const dotR = TIP.legendDot
-  const dotGap = 6
-  const labelW = estimateTextWidth(label, TIP.fontSize, 600)
-  const maxValW = Math.max(...entries.map(e => estimateTextWidth(e.text, TIP.fontSize, TIP.fontWeight)))
-  const valRowW = dotR * 2 + dotGap + maxValW
-  const bgW = Math.max(labelW, valRowW) + TIP.padX * 2
+  const labelGap = 10
+  const headingW = estimateTextWidth(label, TIP.fontSize, 600)
+  const maxRowW = Math.max(...entries.map(e => {
+    const legendW = estimateTextWidth(e.legendLabel, TIP.fontSize, TIP.fontWeight)
+    const valW = estimateTextWidth(e.text, TIP.fontSize, TIP.fontWeight)
+    return legendW + labelGap + valW
+  }))
+  const bgW = Math.max(headingW, maxRowW) + TIP.padX * 2
   const bgH = padY + lineH + entries.length * lineH + padY
 
   const tipY = Math.max(TIP.minY, topY - TIP.offsetY - bgH - TIP.pointerSize)
@@ -501,14 +557,13 @@ function multiTooltipAbove(cx: number, topY: number, label: string, entries: Arr
   let textY = tipY + padY + lineH / 2
   svg += `<text x="${r(cx)}" y="${r(textY)}" text-anchor="middle" font-weight="600" font-size="${TIP.fontSize}" dy="${TEXT_BASELINE_SHIFT}" class="xychart-tip xychart-tip-text">${escapeXml(label)}</text>`
 
-  // Value lines with colored legend dot
-  const rowLeft = cx - valRowW / 2
+  // Value lines: legend label left-aligned, value right-aligned
+  const rowLeft = bgX + TIP.padX
+  const rowRight = bgX + bgW - TIP.padX
   for (const entry of entries) {
     textY += lineH
-    // Legend dot (uses the series color via class)
-    svg += `<circle cx="${r(rowLeft + dotR)}" cy="${r(textY)}" r="${dotR}" class="xychart-tip xychart-line-${entry.seriesIndex}" style="stroke:none"/>`
-    // Value text
-    svg += `<text x="${r(rowLeft + dotR * 2 + dotGap)}" y="${r(textY)}" text-anchor="start" font-size="${TIP.fontSize}" font-weight="${TIP.fontWeight}" dy="${TEXT_BASELINE_SHIFT}" class="xychart-tip xychart-tip-text">${escapeXml(entry.text)}</text>`
+    svg += `<text x="${r(rowLeft)}" y="${r(textY)}" text-anchor="start" font-size="${TIP.fontSize}" font-weight="${TIP.fontWeight}" dy="${TEXT_BASELINE_SHIFT}" class="xychart-tip xychart-tip-text">${escapeXml(entry.legendLabel)}</text>`
+    svg += `<text x="${r(rowRight)}" y="${r(textY)}" text-anchor="end" font-size="${TIP.fontSize}" font-weight="${TIP.fontWeight}" dy="${TEXT_BASELINE_SHIFT}" class="xychart-tip xychart-tip-text">${escapeXml(entry.text)}</text>`
   }
 
   return svg
