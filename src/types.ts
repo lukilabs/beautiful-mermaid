@@ -159,4 +159,6 @@ export interface RenderOptions {
   componentSpacing?: number
   /** Render with transparent background (no background style on SVG). Default: false */
   transparent?: boolean
+  /** Enable hover tooltips on chart data points (xychart only). Default: false */
+  interactive?: boolean
 }

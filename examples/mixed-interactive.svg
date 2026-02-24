@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 710 410" width="710" height="410" style="--bg:#FFFFFF;--fg:#27272A;background:var(--bg)">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap');
+  text { font-family: 'Inter', system-ui, sans-serif; }
+  svg {
+    /* Derived from --bg and --fg (overridable via --line, --accent, etc.) */
+    --_text:          var(--fg);
+    --_text-sec:      var(--muted, color-mix(in srgb, var(--fg) 60%, var(--bg)));
+    --_text-muted:    var(--muted, color-mix(in srgb, var(--fg) 40%, var(--bg)));
+    --_text-faint:    color-mix(in srgb, var(--fg) 25%, var(--bg));
+    --_line:          var(--line, color-mix(in srgb, var(--fg) 30%, var(--bg)));
+    --_arrow:         var(--accent, color-mix(in srgb, var(--fg) 50%, var(--bg)));
+    --_node-fill:     var(--surface, color-mix(in srgb, var(--fg) 3%, var(--bg)));
+    --_node-stroke:   var(--border, color-mix(in srgb, var(--fg) 20%, var(--bg)));
+    --_group-fill:    var(--bg);
+    --_group-hdr:     color-mix(in srgb, var(--fg) 5%, var(--bg));
+    --_inner-stroke:  color-mix(in srgb, var(--fg) 12%, var(--bg));
+    --_key-badge:     color-mix(in srgb, var(--fg) 10%, var(--bg));
+  }
+</style>
+<style>
+  .xychart-grid { stroke: var(--_inner-stroke); stroke-width: 1; }
+  .xychart-bar { rx: 2; }
+  .xychart-line { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .xychart-dot { stroke: var(--bg); stroke-width: 1.5; }
+  .xychart-axis { stroke: var(--_line); stroke-width: 1; }
+  .xychart-label { fill: var(--_text-muted); }
+  .xychart-axis-title { fill: var(--_text-sec); }
+  .xychart-title { fill: var(--_text); }
+  .xychart-bar-0 { fill: color-mix(in srgb, var(--_arrow) 70%, var(--bg)); stroke: var(--_arrow); stroke-width: 0.5; }
+  path.xychart-line-0, line.xychart-line-0 { stroke: #ef4444; }
+  circle.xychart-line-0 { fill: #ef4444; }
+  .xychart-tip { opacity: 0; pointer-events: none; transition: opacity 0.15s ease; }
+  .xychart-tip-bg { fill: var(--_text); }
+  .xychart-tip-text { fill: var(--bg); font-size: 11px; font-weight: 500; }
+  .xychart-bar-group:hover .xychart-tip,
+  .xychart-dot-group:hover .xychart-tip { opacity: 1; }
+  .xychart-bar-group:hover .xychart-bar { filter: brightness(1.1); }
+  .xychart-dot-group:hover .xychart-dot { r: 5; transition: r 0.15s ease; }
+</style>
+<line x1="94" y1="366" x2="694" y2="366" class="xychart-grid"/>
+<line x1="94" y1="291" x2="694" y2="291" class="xychart-grid"/>
+<line x1="94" y1="216" x2="694" y2="216" class="xychart-grid"/>
+<line x1="94" y1="141" x2="694" y2="141" class="xychart-grid"/>
+<line x1="94" y1="66" x2="694" y2="66" class="xychart-grid"/>
+<g class="xychart-bar-group"><rect x="106" y="291" width="96" height="75" rx="2" class="xychart-bar xychart-bar-0" data-value="50" data-label="Jan"/><title>Jan: 50</title><rect x="140" y="267" width="28.1" height="18" rx="4" class="xychart-tip xychart-tip-bg"/><text x="154" y="276" text-anchor="middle" dy="0.35em" class="xychart-tip xychart-tip-text">50</text></g>
+<g class="xychart-bar-group"><rect x="226" y="246" width="96" height="120" rx="2" class="xychart-bar xychart-bar-0" data-value="80" data-label="Feb"/><title>Feb: 80</title><rect x="260" y="222" width="28.1" height="18" rx="4" class="xychart-tip xychart-tip-bg"/><text x="274" y="231" text-anchor="middle" dy="0.35em" class="xychart-tip xychart-tip-text">80</text></g>
+<g class="xychart-bar-group"><rect x="346" y="186" width="96" height="180" rx="2" class="xychart-bar xychart-bar-0" data-value="120" data-label="Mar"/><title>Mar: 120</title><rect x="376.9" y="162" width="34.2" height="18" rx="4" class="xychart-tip xychart-tip-bg"/><text x="394" y="171" text-anchor="middle" dy="0.35em" class="xychart-tip xychart-tip-text">120</text></g>
+<g class="xychart-bar-group"><rect x="466" y="231" width="96" height="135" rx="2" class="xychart-bar xychart-bar-0" data-value="90" data-label="Apr"/><title>Apr: 90</title><rect x="500" y="207" width="28.1" height="18" rx="4" class="xychart-tip xychart-tip-bg"/><text x="514" y="216" text-anchor="middle" dy="0.35em" class="xychart-tip xychart-tip-text">90</text></g>
+<g class="xychart-bar-group"><rect x="586" y="141" width="96" height="225" rx="2" class="xychart-bar xychart-bar-0" data-value="150" data-label="May"/><title>May: 150</title><rect x="616.9" y="117" width="34.2" height="18" rx="4" class="xychart-tip xychart-tip-bg"/><text x="634" y="126" text-anchor="middle" dy="0.35em" class="xychart-tip xychart-tip-text">150</text></g>
+<path d="M154,306 L274,216 L394,201 L514,238.5 L634,126" class="xychart-line xychart-line-0"/>
+<g class="xychart-dot-group"><circle cx="154" cy="306" r="3" class="xychart-dot xychart-line-0" data-value="40" data-label="Jan"/><title>Jan: 40</title><rect x="140" y="279" width="28.1" height="18" rx="4" class="xychart-tip xychart-tip-bg"/><text x="154" y="288" text-anchor="middle" dy="0.35em" class="xychart-tip xychart-tip-text">40</text></g>
+<g class="xychart-dot-group"><circle cx="274" cy="216" r="3" class="xychart-dot xychart-line-0" data-value="100" data-label="Feb"/><title>Feb: 100</title><rect x="256.9" y="189" width="34.2" height="18" rx="4" class="xychart-tip xychart-tip-bg"/><text x="274" y="198" text-anchor="middle" dy="0.35em" class="xychart-tip xychart-tip-text">100</text></g>
+<g class="xychart-dot-group"><circle cx="394" cy="201" r="3" class="xychart-dot xychart-line-0" data-value="110" data-label="Mar"/><title>Mar: 110</title><rect x="376.9" y="174" width="34.2" height="18" rx="4" class="xychart-tip xychart-tip-bg"/><text x="394" y="183" text-anchor="middle" dy="0.35em" class="xychart-tip xychart-tip-text">110</text></g>
+<g class="xychart-dot-group"><circle cx="514" cy="238.5" r="3" class="xychart-dot xychart-line-0" data-value="85" data-label="Apr"/><title>Apr: 85</title><rect x="500" y="211.5" width="28.1" height="18" rx="4" class="xychart-tip xychart-tip-bg"/><text x="514" y="220.5" text-anchor="middle" dy="0.35em" class="xychart-tip xychart-tip-text">85</text></g>
+<g class="xychart-dot-group"><circle cx="634" cy="126" r="3" class="xychart-dot xychart-line-0" data-value="160" data-label="May"/><title>May: 160</title><rect x="616.9" y="99" width="34.2" height="18" rx="4" class="xychart-tip xychart-tip-bg"/><text x="634" y="108" text-anchor="middle" dy="0.35em" class="xychart-tip xychart-tip-text">160</text></g>
+<line x1="94" y1="366" x2="694" y2="366" class="xychart-axis"/>
+<line x1="94" y1="66" x2="94" y2="366" class="xychart-axis"/>
+<line x1="154" y1="366" x2="154" y2="371" class="xychart-axis"/>
+<line x1="274" y1="366" x2="274" y2="371" class="xychart-axis"/>
+<line x1="394" y1="366" x2="394" y2="371" class="xychart-axis"/>
+<line x1="514" y1="366" x2="514" y2="371" class="xychart-axis"/>
+<line x1="634" y1="366" x2="634" y2="371" class="xychart-axis"/>
+<line x1="94" y1="366" x2="89" y2="366" class="xychart-axis"/>
+<line x1="94" y1="291" x2="89" y2="291" class="xychart-axis"/>
+<line x1="94" y1="216" x2="89" y2="216" class="xychart-axis"/>
+<line x1="94" y1="141" x2="89" y2="141" class="xychart-axis"/>
+<line x1="94" y1="66" x2="89" y2="66" class="xychart-axis"/>
+<text x="154" y="384" text-anchor="middle" font-size="12" font-weight="400" dy="0.35em" class="xychart-label">Jan</text>
+<text x="274" y="384" text-anchor="middle" font-size="12" font-weight="400" dy="0.35em" class="xychart-label">Feb</text>
+<text x="394" y="384" text-anchor="middle" font-size="12" font-weight="400" dy="0.35em" class="xychart-label">Mar</text>
+<text x="514" y="384" text-anchor="middle" font-size="12" font-weight="400" dy="0.35em" class="xychart-label">Apr</text>
+<text x="634" y="384" text-anchor="middle" font-size="12" font-weight="400" dy="0.35em" class="xychart-label">May</text>
+<text x="86" y="366" text-anchor="end" font-size="12" font-weight="400" dy="0.35em" class="xychart-label">0</text>
+<text x="86" y="291" text-anchor="end" font-size="12" font-weight="400" dy="0.35em" class="xychart-label">50</text>
+<text x="86" y="216" text-anchor="end" font-size="12" font-weight="400" dy="0.35em" class="xychart-label">100</text>
+<text x="86" y="141" text-anchor="end" font-size="12" font-weight="400" dy="0.35em" class="xychart-label">150</text>
+<text x="86" y="66" text-anchor="end" font-size="12" font-weight="400" dy="0.35em" class="xychart-label">200</text>
+<text x="20" y="216" text-anchor="middle" transform="rotate(-90,20,216)" font-size="12" font-weight="500" dy="0.35em" class="xychart-axis-title">Amount</text>
+<text x="355" y="30" text-anchor="middle" font-size="14" font-weight="600" dy="0.35em" class="xychart-title">Sales vs Target</text>
+<rect x="266.68" y="49" width="40" height="12" rx="1" class="xychart-bar xychart-bar-0"/>
+<text x="312.68" y="55" text-anchor="start" font-size="12" font-weight="400" dy="0.35em" class="xychart-label">Bar 1</text>
+<line x1="359.88" y1="55" x2="399.88" y2="55" stroke-width="2" stroke-linecap="round" class="xychart-legend-line xychart-line-0"/><circle cx="379.88" cy="55" r="3" class="xychart-dot xychart-line-0"/>
+<text x="405.88" y="55" text-anchor="start" font-size="12" font-weight="400" dy="0.35em" class="xychart-label">Line 1</text>
+</svg>

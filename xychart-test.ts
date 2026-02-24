@@ -1014,7 +1014,7 @@ ${sampleCards}
   // ============================================================================
   function renderAllSvgs(themeKey) {
     var theme = themeKey ? THEMES[themeKey] : null;
-    var opts = theme ? { bg: theme.bg, fg: theme.fg } : {};
+    var opts = theme ? { bg: theme.bg, fg: theme.fg, interactive: true } : { interactive: true };
     if (theme) {
       if (theme.line) opts.line = theme.line;
       if (theme.accent) opts.accent = theme.accent;

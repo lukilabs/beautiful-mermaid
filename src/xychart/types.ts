@@ -121,13 +121,15 @@ export interface PositionedBar {
   height: number
   /** Original data value */
   value: number
+  /** Category label for this bar (e.g. "Jan") */
+  label?: string
   /** Series index (for coloring multiple bar series) */
   seriesIndex: number
 }
 
 export interface PositionedLine {
   /** Polyline points */
-  points: Array<{ x: number; y: number }>
+  points: Array<{ x: number; y: number; value: number; label?: string }>
   /** Series index (for coloring multiple line series) */
   seriesIndex: number
 }

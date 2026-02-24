@@ -108,11 +108,14 @@ function layoutVertical(chart: XYChart): PositionedXYChart {
     x1: left, y1: yScale(v), x2: left + plotW, y2: yScale(v),
   }))
 
+  // Category labels for data attributes
+  const catLabels = getCategoryLabels(chart, dataCount)
+
   // Bars
-  const bars = layoutBars(chart, xScale, yScale, bandWidth, yRange.min)
+  const bars = layoutBars(chart, xScale, yScale, bandWidth, yRange.min, catLabels)
 
   // Lines
-  const lines = layoutLines(chart, xScale, yScale)
+  const lines = layoutLines(chart, xScale, yScale, catLabels)
 
   // Legend
   const legendY = XY.padding + (hasTitle ? XY.titleHeight : 0) + XY.legendHeight / 2
@@ -228,6 +231,7 @@ function layoutHorizontal(chart: XYChart): PositionedXYChart {
           width: Math.abs(valX - baseX),
           height: singleBarH,
           value: s.data[i],
+          label: catLabels[i],
           seriesIndex: bIdx,
         })
       }
@@ -240,7 +244,7 @@ function layoutHorizontal(chart: XYChart): PositionedXYChart {
   let lineIdx = 0
   for (const s of chart.series) {
     if (s.type !== 'line') continue
-    const points = s.data.map((v, i) => ({ x: valueScale(v), y: catScale(i) }))
+    const points = s.data.map((v, i) => ({ x: valueScale(v), y: catScale(i), value: v, label: catLabels[i] }))
     lines.push({ points, seriesIndex: lineIdx })
     lineIdx++
   }
@@ -306,7 +310,7 @@ function buildXTicks(chart: XYChart, xScale: (i: number) => number, axisY: numbe
 
 function layoutBars(
   chart: XYChart, xScale: (i: number) => number, yScale: (v: number) => number,
-  bandWidth: number, yMin: number,
+  bandWidth: number, yMin: number, catLabels: string[],
 ): PositionedBar[] {
   const barSeries = chart.series.filter(s => s.type === 'bar')
   const barCount = barSeries.length
@@ -330,6 +334,7 @@ function layoutBars(
         width: singleBarW,
         height: Math.abs(baseY - valY),
         value: s.data[i],
+        label: catLabels[i],
         seriesIndex: bIdx,
       })
     }
@@ -338,12 +343,12 @@ function layoutBars(
   return bars
 }
 
-function layoutLines(chart: XYChart, xScale: (i: number) => number, yScale: (v: number) => number): PositionedLine[] {
+function layoutLines(chart: XYChart, xScale: (i: number) => number, yScale: (v: number) => number, catLabels: string[]): PositionedLine[] {
   const lines: PositionedLine[] = []
   let lineIdx = 0
   for (const s of chart.series) {
     if (s.type !== 'line') continue
-    const points = s.data.map((v, i) => ({ x: xScale(i), y: yScale(v) }))
+    const points = s.data.map((v, i) => ({ x: xScale(i), y: yScale(v), value: v, label: catLabels[i] }))
     lines.push({ points, seriesIndex: lineIdx })
     lineIdx++
   }

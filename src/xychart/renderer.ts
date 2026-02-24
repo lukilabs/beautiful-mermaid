@@ -1,7 +1,7 @@
 import type { PositionedXYChart } from './types.ts'
 import type { DiagramColors } from '../theme.ts'
 import { svgOpenTag, buildStyleBlock } from '../theme.ts'
-import { TEXT_BASELINE_SHIFT } from '../styles.ts'
+import { TEXT_BASELINE_SHIFT, estimateTextWidth } from '../styles.ts'
 
 // ============================================================================
 // XY Chart SVG renderer
@@ -32,6 +32,16 @@ const CHART_FONT = {
   lineWidth: 2,
 } as const
 
+const TIP = {
+  fontSize: 11,
+  fontWeight: 500,
+  height: 18,
+  padX: 8,
+  offsetY: 6,
+  rx: 4,
+  minY: 4,
+} as const
+
 /**
  * Render a positioned XY chart as an SVG string.
  */
@@ -39,7 +49,8 @@ export function renderXYChartSvg(
   chart: PositionedXYChart,
   colors: DiagramColors,
   font: string = 'Inter',
-  transparent: boolean = false
+  transparent: boolean = false,
+  interactive: boolean = false,
 ): string {
   const parts: string[] = []
 
@@ -48,7 +59,7 @@ export function renderXYChartSvg(
   parts.push(buildStyleBlock(font, false))
 
   // Chart-specific styles
-  parts.push(chartStyles(chart))
+  parts.push(chartStyles(chart, interactive))
 
   // 1. Grid lines
   for (const g of chart.gridLines) {
@@ -59,9 +70,23 @@ export function renderXYChartSvg(
 
   // 2. Bars
   for (const bar of chart.bars) {
-    parts.push(
-      `<rect x="${bar.x}" y="${bar.y}" width="${bar.width}" height="${bar.height}" rx="2" class="xychart-bar xychart-bar-${bar.seriesIndex}"/>`
-    )
+    const dataAttrs = ` data-value="${bar.value}"${bar.label ? ` data-label="${escapeXml(bar.label)}"` : ''}`
+    if (interactive) {
+      const tipText = formatTipValue(bar.value)
+      const tipTitle = bar.label ? `${bar.label}: ${tipText}` : tipText
+      const tip = tooltipAbove(bar.x + bar.width / 2, bar.y, tipText)
+      parts.push(
+        `<g class="xychart-bar-group">` +
+        `<rect x="${bar.x}" y="${bar.y}" width="${bar.width}" height="${bar.height}" rx="2" class="xychart-bar xychart-bar-${bar.seriesIndex}"${dataAttrs}/>` +
+        `<title>${escapeXml(tipTitle)}</title>` +
+        tip +
+        `</g>`
+      )
+    } else {
+      parts.push(
+        `<rect x="${bar.x}" y="${bar.y}" width="${bar.width}" height="${bar.height}" rx="2" class="xychart-bar xychart-bar-${bar.seriesIndex}"${dataAttrs}/>`
+      )
+    }
   }
 
   // 3. Lines + dots
@@ -70,7 +95,23 @@ export function renderXYChartSvg(
     const d = line.points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ')
     parts.push(`<path d="${d}" class="xychart-line xychart-line-${line.seriesIndex}"/>`)
     for (const p of line.points) {
-      parts.push(`<circle cx="${p.x}" cy="${p.y}" r="${CHART_FONT.dotRadius}" class="xychart-dot xychart-line-${line.seriesIndex}"/>`)
+      const dataAttrs = ` data-value="${p.value}"${p.label ? ` data-label="${escapeXml(p.label)}"` : ''}`
+      if (interactive) {
+        const tipText = formatTipValue(p.value)
+        const tipTitle = p.label ? `${p.label}: ${tipText}` : tipText
+        const tip = tooltipAbove(p.x, p.y - CHART_FONT.dotRadius, tipText)
+        parts.push(
+          `<g class="xychart-dot-group">` +
+          `<circle cx="${p.x}" cy="${p.y}" r="${CHART_FONT.dotRadius}" class="xychart-dot xychart-line-${line.seriesIndex}"${dataAttrs}/>` +
+          `<title>${escapeXml(tipTitle)}</title>` +
+          tip +
+          `</g>`
+        )
+      } else {
+        parts.push(
+          `<circle cx="${p.x}" cy="${p.y}" r="${CHART_FONT.dotRadius}" class="xychart-dot xychart-line-${line.seriesIndex}"${dataAttrs}/>`
+        )
+      }
     }
   }
 
@@ -166,7 +207,7 @@ export function renderXYChartSvg(
 // Chart-specific CSS styles
 // ============================================================================
 
-function chartStyles(chart: PositionedXYChart): string {
+function chartStyles(chart: PositionedXYChart, interactive: boolean): string {
   // Count unique bar and line series
   const barSeriesCount = new Set(chart.bars.map(b => b.seriesIndex)).size
   const lineSeriesCount = new Set(chart.lines.map(l => l.seriesIndex)).size
@@ -195,6 +236,15 @@ function chartStyles(chart: PositionedXYChart): string {
     }
   }
 
+  const tipRules = interactive ? `
+  .xychart-tip { opacity: 0; pointer-events: none; transition: opacity 0.15s ease; }
+  .xychart-tip-bg { fill: var(--_text); }
+  .xychart-tip-text { fill: var(--bg); font-size: ${TIP.fontSize}px; font-weight: ${TIP.fontWeight}; }
+  .xychart-bar-group:hover .xychart-tip,
+  .xychart-dot-group:hover .xychart-tip { opacity: 1; }
+  .xychart-bar-group:hover .xychart-bar { filter: brightness(1.1); }
+  .xychart-dot-group:hover .xychart-dot { r: 5; transition: r 0.15s ease; }` : ''
+
   return `<style>
   .xychart-grid { stroke: var(--_inner-stroke); stroke-width: 1; }
   .xychart-bar { rx: 2; }
@@ -204,7 +254,7 @@ function chartStyles(chart: PositionedXYChart): string {
   .xychart-label { fill: var(--_text-muted); }
   .xychart-axis-title { fill: var(--_text-sec); }
   .xychart-title { fill: var(--_text); }
-${seriesRules.join('\n')}
+${seriesRules.join('\n')}${tipRules}
 </style>`
 }
 
@@ -234,6 +284,34 @@ const LINE_PALETTE = [
   '#3b82f6', // blue
   '#84cc16', // lime
 ]
+
+/**
+ * Generate tooltip SVG elements (background rect + text) positioned above a point.
+ */
+function tooltipAbove(cx: number, topY: number, text: string): string {
+  const textW = estimateTextWidth(text, TIP.fontSize, TIP.fontWeight)
+  const bgW = textW + TIP.padX * 2
+  const bgH = TIP.height
+  const tipY = Math.max(TIP.minY, topY - TIP.offsetY - bgH)
+  const bgX = cx - bgW / 2
+  const textX = cx
+  const textY = tipY + bgH / 2
+  return (
+    `<rect x="${r(bgX)}" y="${r(tipY)}" width="${r(bgW)}" height="${bgH}" rx="${TIP.rx}" class="xychart-tip xychart-tip-bg"/>` +
+    `<text x="${r(textX)}" y="${r(textY)}" text-anchor="middle" dy="${TEXT_BASELINE_SHIFT}" class="xychart-tip xychart-tip-text">${escapeXml(text)}</text>`
+  )
+}
+
+/** Format a numeric value for tooltip display */
+function formatTipValue(v: number): string {
+  if (Number.isInteger(v)) return String(v)
+  return v.toFixed(Math.abs(v) < 10 ? 1 : 0)
+}
+
+/** Round to 1 decimal place for cleaner SVG output */
+function r(n: number): string {
+  return String(Math.round(n * 10) / 10)
+}
 
 function escapeXml(text: string): string {
   return text
