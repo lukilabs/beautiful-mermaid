@@ -14,10 +14,11 @@ import type { Canvas, RoleCanvas, CharRole } from './types.ts'
  * Sentinel character placed in the "right half" of a fullwidth character's
  * canvas cell. Stripped by `canvasToString()` before output.
  *
- * Uses zero-width space (U+200B) — invisible in terminal output even if
- * stripping is accidentally skipped.
+ * Uses a Private Use Area character (U+E000) to avoid collisions with
+ * real user text. If stripping is accidentally skipped, the character
+ * renders as a visible box — making the bug immediately obvious.
  */
-export const CJK_PAD = '\u200B'
+export const CJK_PAD = '\uE000'
 
 /**
  * Check if a character occupies two columns in a monospace terminal.
