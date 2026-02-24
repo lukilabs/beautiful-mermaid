@@ -36,20 +36,31 @@ describe('xychart – data attributes', () => {
     expect(svg).toContain('data-label="Apr"')
   })
 
-  it('emits data-value and data-label on line dots', async () => {
-    const svg = await renderMermaid(LINE_CHART)
+  it('emits data-value and data-label on line dots (interactive)', async () => {
+    // Line dots are only rendered when interactive: true
+    const svg = await renderMermaid(LINE_CHART, { interactive: true })
     expect(svg).toContain('data-value="100"')
     expect(svg).toContain('data-value="400"')
     expect(svg).toContain('data-label="Jan"')
     expect(svg).toContain('data-label="Mar"')
   })
 
+  it('shows dots on sparse line charts even without interactive', async () => {
+    // Sparse charts (≤12 points) render dots as visual markers
+    const svg = await renderMermaid(LINE_CHART)
+    expect(svg).toContain('<circle')
+    expect(svg).toContain('data-value="100"')
+    // But no tooltips without interactive
+    expect(svg).not.toContain('xychart-tip-bg')
+    expect(svg).not.toContain('xychart-dot-group')
+  })
+
   it('emits data attributes on mixed chart elements', async () => {
-    const svg = await renderMermaid(MIXED_CHART)
+    const svg = await renderMermaid(MIXED_CHART, { interactive: true })
     // Bars
     expect(svg).toContain('data-value="50"')
     expect(svg).toContain('data-value="120"')
-    // Line dots
+    // Line dots (only when interactive)
     expect(svg).toContain('data-value="40"')
     expect(svg).toContain('data-value="110"')
     // Labels on both

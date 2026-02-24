@@ -15,26 +15,27 @@ import { estimateTextWidth } from '../styles.ts'
 /** Layout constants — aligned with Chart.js default proportions */
 const XY = {
   plotWidth: 600,
-  plotHeight: 300,
-  padding: 16,
-  titleFontSize: 14,
+  plotHeight: 340,
+  padding: 22,
+  titleFontSize: 18,
   titleFontWeight: 600,
-  titleHeight: 28,
-  axisLabelFontSize: 12,
+  titleHeight: 42,
+  axisLabelFontSize: 14,
   axisLabelFontWeight: 400,
-  axisTitleFontSize: 12,
+  axisTitleFontSize: 15,
   axisTitleFontWeight: 500,
-  xLabelHeight: 28,
-  yLabelWidth: 50,
-  axisTitlePad: 20,
-  tickLength: 5,
+  xLabelHeight: 38,
+  yLabelWidth: 58,
+  axisTitlePad: 30,
+  tickLength: 4,
   barPadRatio: 0.2,
-  barGroupGap: 2,
-  legendFontSize: 12,
+  barGroupGap: 0,
+  maxBarWidth: 40,
+  legendFontSize: 14,
   legendFontWeight: 400,
-  legendHeight: 22,
-  legendSwatchW: 40,
-  legendSwatchH: 12,
+  legendHeight: 28,
+  legendSwatchW: 14,
+  legendSwatchH: 14,
   legendGap: 6,
   legendItemGap: 16,
 } as const
@@ -215,12 +216,16 @@ function layoutHorizontal(chart: XYChart): PositionedXYChart {
   const bars: PositionedBar[] = []
   if (barCount > 0) {
     const usable = bandHeight * (1 - XY.barPadRatio)
-    const singleBarH = barCount > 1 ? (usable - (barCount - 1) * XY.barGroupGap) / barCount : usable
+    const rawBarH = barCount > 1 ? (usable - (barCount - 1) * XY.barGroupGap) / barCount : usable
+    const singleBarH = Math.min(rawBarH, XY.maxBarWidth)
+    const groupH = barCount > 1
+      ? singleBarH * barCount + XY.barGroupGap * (barCount - 1)
+      : singleBarH
     let bIdx = 0
     for (const s of barSeries) {
       for (let i = 0; i < s.data.length; i++) {
         const cy = catScale(i)
-        const groupTop = cy - usable / 2
+        const groupTop = cy - groupH / 2
         const by = groupTop + bIdx * (singleBarH + XY.barGroupGap)
         const valX = valueScale(Math.max(s.data[i], yRange.min))
         const baseX = valueScale(Math.max(0, yRange.min))
@@ -269,7 +274,7 @@ function layoutHorizontal(chart: XYChart): PositionedXYChart {
   const legendY = XY.padding + (hasTitle ? XY.titleHeight : 0) + XY.legendHeight / 2
   const legend = hasLegend ? buildLegendItems(chart, totalW / 2, legendY) : []
 
-  return { width: totalW, height: totalH, title: titleObj, xAxis: xAxisObj, yAxis: yAxisObj, plotArea, bars, lines, gridLines, legend }
+  return { width: totalW, height: totalH, horizontal: true, title: titleObj, xAxis: xAxisObj, yAxis: yAxisObj, plotArea, bars, lines, gridLines, legend }
 }
 
 // ============================================================================
@@ -316,14 +321,18 @@ function layoutBars(
   if (barCount === 0) return []
 
   const usable = bandWidth * (1 - XY.barPadRatio)
-  const singleBarW = barCount > 1 ? (usable - (barCount - 1) * XY.barGroupGap) / barCount : usable
+  const rawBarW = barCount > 1 ? (usable - (barCount - 1) * XY.barGroupGap) / barCount : usable
+  const singleBarW = Math.min(rawBarW, XY.maxBarWidth)
+  const groupW = barCount > 1
+    ? singleBarW * barCount + XY.barGroupGap * (barCount - 1)
+    : singleBarW
   const bars: PositionedBar[] = []
 
   let bIdx = 0
   for (const s of barSeries) {
     for (let i = 0; i < s.data.length; i++) {
       const cx = xScale(i)
-      const groupLeft = cx - usable / 2
+      const groupLeft = cx - groupW / 2
       const bx = groupLeft + bIdx * (singleBarW + XY.barGroupGap)
       const valY = yScale(s.data[i])
       const baseY = yScale(Math.max(0, yMin))

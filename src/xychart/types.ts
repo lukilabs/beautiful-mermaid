@@ -45,6 +45,8 @@ export interface XYChartSeries {
 export interface PositionedXYChart {
   width: number
   height: number
+  /** Whether this is a horizontal (rotated) chart */
+  horizontal?: boolean
   /** Title text and position (if present) */
   title?: PositionedTitle
   /** Positioned x-axis with tick marks and labels */
