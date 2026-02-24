@@ -392,6 +392,49 @@ renderMermaidASCII(diagram, {
 
 ---
 
+## MCP Server (AI Agent Integration)
+
+beautiful-mermaid includes a built-in [MCP](https://modelcontextprotocol.io/) server, allowing AI agents to render diagrams directly.
+
+### Setup
+
+Add to your MCP configuration (Claude Desktop, Cursor, Windsurf, etc.):
+
+```json
+{
+  "mcpServers": {
+    "beautiful-mermaid": {
+      "command": "npx",
+      "args": ["-y", "beautiful-mermaid", "--mcp"]
+    }
+  }
+}
+```
+
+Or with Bun:
+
+```json
+{
+  "mcpServers": {
+    "beautiful-mermaid": {
+      "command": "bunx",
+      "args": ["beautiful-mermaid", "--mcp"]
+    }
+  }
+}
+```
+
+### Available Tools
+
+| Tool | Description |
+|------|-------------|
+| `render_svg` | Render Mermaid text → SVG string (with theme support) |
+| `render_ascii` | Render Mermaid text → ASCII/Unicode art |
+| `list_themes` | List all built-in themes |
+| `parse` | Parse Mermaid text → structured graph JSON |
+
+---
+
 ## API Reference
 
 ### `renderMermaidSVG(text, options?): string`

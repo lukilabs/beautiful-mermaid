@@ -31,16 +31,22 @@
     "theming"
   ],
   "author": "Craft Docs",
-  "files": ["src/", "LICENSE", "README.md"],
+  "bin": {
+    "beautiful-mermaid": "./dist/mcp.js"
+  },
+  "files": ["src/", "dist/mcp.js", "LICENSE", "README.md"],
   "scripts": {
     "test": "bun test src/__tests__/",
     "samples": "bun run index.ts",
     "dev": "bun run dev.ts",
     "bench": "bun run bench.ts",
     "build": "bun run index.ts && mkdir -p dist && mv index.html dist/ && cp -r public/* dist/",
+    "build:mcp": "bun build src/mcp.ts --target=node --outfile=dist/mcp.js",
+    "prepublishOnly": "bun run build:mcp",
     "deploy": "bun run build && wrangler pages deploy dist --project-name craft-agents-mermaid"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.0",
     "elkjs": "^0.11.0",
     "entities": "^7.0.1"
   },
