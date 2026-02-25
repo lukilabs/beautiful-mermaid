@@ -1173,11 +1173,11 @@ export const samples: Sample[] = [
   {
     title: 'XY: Line Chart',
     category: 'XY Chart',
-    description: 'Line chart showing revenue growth over quarters.',
+    description: 'Line chart showing revenue growth over years.',
     source: `xychart-beta
     title "Revenue Growth"
-    x-axis [2019, 2020, 2021, 2022, 2023]
-    line [500, 620, 780, 950, 1200]`,
+    x-axis [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025]
+    line [320, 420, 540, 680, 820, 950, 1080, 1200]`,
     options: { interactive: true },
   },
   {
@@ -1186,10 +1186,10 @@ export const samples: Sample[] = [
     description: 'Bars with a line overlay and both axis titles.',
     source: `xychart-beta
     title "Monthly Revenue"
-    x-axis "Month" [Jan, Feb, Mar, Apr, May, Jun]
+    x-axis "Month" [Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec]
     y-axis "Revenue (USD)" 0 --> 10000
-    bar [5000, 6200, 7800, 4500, 9200, 8100]
-    line [5000, 6200, 7800, 4500, 9200, 8100]`,
+    bar [4200, 5000, 5800, 6200, 5500, 7000, 7800, 7200, 8400, 8100, 9000, 9200]
+    line [4200, 5000, 5800, 6200, 5500, 7000, 7800, 7200, 8400, 8100, 9000, 9200]`,
     options: { interactive: true },
   },
   {
@@ -1219,9 +1219,9 @@ export const samples: Sample[] = [
     description: 'Two lines comparing planned vs actual values.',
     source: `xychart-beta
     title "Planned vs Actual"
-    x-axis [Q1, Q2, Q3, Q4]
-    line [100, 200, 300, 400]
-    line [90, 210, 280, 420]`,
+    x-axis [Jan, Feb, Mar, Apr, May, Jun, Jul, Aug]
+    line [100, 145, 190, 240, 280, 320, 360, 400]
+    line [90, 130, 185, 235, 275, 340, 380, 420]`,
     options: { interactive: true },
   },
   {
@@ -1231,7 +1231,7 @@ export const samples: Sample[] = [
     source: `xychart-beta
     title "Distribution Curve"
     x-axis 0 --> 100
-    line [5, 15, 35, 60, 80, 95, 80, 60, 35, 15, 5]`,
+    line [4, 7, 13, 21, 31, 43, 58, 71, 84, 91, 95, 91, 84, 71, 58, 43, 31, 21, 13, 7, 4]`,
     options: { interactive: true },
   },
   {
@@ -1252,9 +1252,9 @@ export const samples: Sample[] = [
     description: 'Horizontal chart with both bars and a trend line.',
     source: `xychart-beta horizontal
     title "Budget vs Actual"
-    x-axis [Eng, Sales, Marketing, Ops, HR]
-    bar [500, 350, 200, 150, 100]
-    line [480, 380, 180, 160, 95]`,
+    x-axis [Eng, Sales, Marketing, Product, Ops, HR, Finance, Legal]
+    bar [500, 350, 250, 200, 150, 120, 100, 80]
+    line [480, 380, 230, 180, 160, 110, 95, 75]`,
     options: { interactive: true },
   },
   {

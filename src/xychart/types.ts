@@ -73,8 +73,10 @@ export interface LegendItem {
   y: number
   /** Series type determines swatch shape (rect for bar, line+dot for line) */
   type: 'bar' | 'line'
-  /** Series index within its type (for color matching) */
+  /** Series index within its type (for layout grouping) */
   seriesIndex: number
+  /** Global color index across all series (for unified color assignment) */
+  colorIndex: number
 }
 
 export interface PositionedTitle {
@@ -125,15 +127,19 @@ export interface PositionedBar {
   value: number
   /** Category label for this bar (e.g. "Jan") */
   label?: string
-  /** Series index (for coloring multiple bar series) */
+  /** Series index within bar type (for layout grouping) */
   seriesIndex: number
+  /** Global color index across all series */
+  colorIndex: number
 }
 
 export interface PositionedLine {
   /** Polyline points */
   points: Array<{ x: number; y: number; value: number; label?: string }>
-  /** Series index (for coloring multiple line series) */
+  /** Series index within line type (for layout grouping) */
   seriesIndex: number
+  /** Global color index across all series */
+  colorIndex: number
 }
 
 export interface GridLine {

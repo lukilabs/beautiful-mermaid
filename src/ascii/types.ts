@@ -224,6 +224,10 @@ export interface AsciiTheme {
   line: string
   /** Arrowhead color (▲▼◄► or ^v<>) */
   arrow: string
+  /** Theme accent color (optional, used by xycharts for series 0) */
+  accent?: string
+  /** Background color (optional, used by xycharts for dark-mode-aware shading) */
+  bg?: string
   /** Corner character color (optional, defaults to line) */
   corner?: string
   /** Junction character color (optional, defaults to border) */

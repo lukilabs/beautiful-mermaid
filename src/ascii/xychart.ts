@@ -7,12 +7,15 @@
 //
 // Bar charts: █ (Unicode) or # (ASCII) block characters.
 // Line charts: continuous staircase routing with rounded corners (╭╮╰╯│─).
+//
+// Multi-series support: each series gets a distinct color from a palette.
 // ============================================================================
 
 import { parseXYChart } from '../xychart/parser.ts'
 import type { XYChart } from '../xychart/types.ts'
 import type { AsciiConfig, AsciiTheme, ColorMode, CharRole, Canvas, RoleCanvas } from './types.ts'
-import { colorizeLine } from './ansi.ts'
+import { colorizeText } from './ansi.ts'
+import { getSeriesColor, CHART_ACCENT_FALLBACK } from '../xychart/colors.ts'
 
 // ============================================================================
 // Constants
@@ -50,6 +53,33 @@ const ASC = {
   cornerBL: '+',
   cornerBR: '+',
 } as const
+
+// ============================================================================
+// Multi-series color support
+// ============================================================================
+
+/** Per-cell hex color override canvas. Parallel to RoleCanvas. */
+type HexCanvas = (string | null)[][]
+
+/** Generate an array of hex colors, one per series. */
+function getSeriesColors(total: number, theme: AsciiTheme): string[] {
+  const accent = theme.accent ?? CHART_ACCENT_FALLBACK
+  if (total <= 1) return [accent]
+  return Array.from({ length: total }, (_, i) => getSeriesColor(i, accent, theme.bg))
+}
+
+/** Map a CharRole to its hex color from the theme (for canvasToString fallback). */
+function roleToHex(role: CharRole, theme: AsciiTheme): string {
+  switch (role) {
+    case 'text': return theme.fg
+    case 'border': return theme.border
+    case 'line': return theme.line
+    case 'arrow': return theme.arrow
+    case 'corner': return theme.corner ?? theme.line
+    case 'junction': return theme.junction ?? theme.border
+    default: return theme.fg
+  }
+}
 
 // ============================================================================
 // Public API
@@ -110,6 +140,10 @@ function renderVertical(
   // Create canvas
   const canvas = createCanvas(totalW, totalH)
   const roles = createRoleCanvas(totalW, totalH)
+  const hexColors = createHexCanvas(totalW, totalH)
+
+  // Series colors
+  const seriesColors = getSeriesColors(chart.series.length, theme)
 
   // Scales
   const valueToRow = (v: number): number => {
@@ -126,7 +160,7 @@ function renderVertical(
   // 2. Legend
   if (hasLegend) {
     const legendRow = hasTitle ? 1 : 0
-    drawLegend(canvas, roles, chart, legendRow, totalW, ch)
+    drawLegend(canvas, roles, hexColors, chart, legendRow, totalW, ch, seriesColors)
   }
 
   // 3. Y-axis line + ticks + labels
@@ -180,29 +214,34 @@ function renderVertical(
     }
   }
 
-  // 7. Bars
-  const barSeries = chart.series.filter(s => s.type === 'bar')
-  if (barSeries.length > 0) {
-    const barCount = barSeries.length
+  // 7. Bars — track global series index for per-series colors
+  const barEntries: { data: number[]; globalIdx: number }[] = []
+  for (let si = 0; si < chart.series.length; si++) {
+    if (chart.series[si].type === 'bar') barEntries.push({ data: chart.series[si].data, globalIdx: si })
+  }
+
+  if (barEntries.length > 0) {
+    const barCount = barEntries.length
     const usable = Math.max(1, bandW - 2)
     const singleBarW = Math.max(1, Math.min(Math.floor(usable / barCount), 8))
     const groupW = singleBarW * barCount + (barCount - 1)
     const baseRow = valueToRow(Math.max(0, yRange.min))
 
-    for (let bIdx = 0; bIdx < barSeries.length; bIdx++) {
-      const series = barSeries[bIdx]
-      for (let i = 0; i < series.data.length; i++) {
+    for (let bIdx = 0; bIdx < barEntries.length; bIdx++) {
+      const entry = barEntries[bIdx]
+      const hexColor = seriesColors[entry.globalIdx]
+      for (let i = 0; i < entry.data.length; i++) {
         const cx = bandCenter(i)
         const groupLeft = cx - Math.floor(groupW / 2)
         const bx = groupLeft + bIdx * (singleBarW + 1)
-        const valRow = valueToRow(series.data[i])
+        const valRow = valueToRow(entry.data[i])
         const fromRow = Math.min(baseRow, valRow)
         const toRow = Math.max(baseRow, valRow)
 
         for (let row = fromRow; row <= toRow; row++) {
           const displayRow = plotTop + (plotH - 1 - row)
           for (let c = bx; c < bx + singleBarW; c++) {
-            set(canvas, roles, displayRow, c, ch.bar, 'arrow')
+            set(canvas, roles, displayRow, c, ch.bar, 'arrow', hexColors, hexColor)
           }
         }
       }
@@ -210,13 +249,18 @@ function renderVertical(
   }
 
   // 8. Lines (staircase routing with rounded corners)
-  const lineSeries = chart.series.filter(s => s.type === 'line')
-  for (const series of lineSeries) {
-    if (series.data.length === 0) continue
-    drawStaircaseLine(canvas, roles, series.data, bandCenter, valueToRow, plotTop, plotH, plotLeft, bandW * dataCount, ch)
+  const lineEntries: { data: number[]; globalIdx: number }[] = []
+  for (let si = 0; si < chart.series.length; si++) {
+    if (chart.series[si].type === 'line') lineEntries.push({ data: chart.series[si].data, globalIdx: si })
   }
 
-  return canvasToString(canvas, roles, colorMode, theme)
+  for (const entry of lineEntries) {
+    if (entry.data.length === 0) continue
+    const hexColor = seriesColors[entry.globalIdx]
+    drawStaircaseLine(canvas, roles, entry.data, bandCenter, valueToRow, plotTop, plotH, plotLeft, bandW * dataCount, ch, hexColors, hexColor)
+  }
+
+  return canvasToString(canvas, roles, hexColors, colorMode, theme)
 }
 
 // ============================================================================
@@ -252,6 +296,10 @@ function renderHorizontal(
 
   const canvas = createCanvas(totalW, totalH)
   const roles = createRoleCanvas(totalW, totalH)
+  const hexColors = createHexCanvas(totalW, totalH)
+
+  // Series colors
+  const seriesColors = getSeriesColors(chart.series.length, theme)
 
   // Value scale (horizontal)
   const valueToCol = (v: number): number => {
@@ -268,7 +316,7 @@ function renderHorizontal(
   // Legend
   if (hasLegend) {
     const legendRow = hasTitle ? 1 : 0
-    drawLegend(canvas, roles, chart, legendRow, totalW, ch)
+    drawLegend(canvas, roles, hexColors, chart, legendRow, totalW, ch, seriesColors)
   }
 
   // Y-axis (category axis on left)
@@ -313,42 +361,51 @@ function renderHorizontal(
     }
   }
 
-  // Bars (horizontal)
-  const barSeries = chart.series.filter(s => s.type === 'bar')
-  if (barSeries.length > 0) {
-    const barCount = barSeries.length
-    const usable = Math.max(1, bandH - 1)
-    const singleBarH = Math.max(1, Math.min(Math.floor(usable / barCount), 3))
+  // Bars (horizontal) — with per-series colors
+  const barEntries: { data: number[]; globalIdx: number }[] = []
+  for (let si = 0; si < chart.series.length; si++) {
+    if (chart.series[si].type === 'bar') barEntries.push({ data: chart.series[si].data, globalIdx: si })
+  }
+
+  if (barEntries.length > 0) {
+    const barCount = barEntries.length
+    const singleBarH = 1
     const groupH = singleBarH * barCount + (barCount - 1)
     const baseCol = valueToCol(Math.max(0, yRange.min))
 
-    for (let bIdx = 0; bIdx < barSeries.length; bIdx++) {
-      const series = barSeries[bIdx]
-      for (let i = 0; i < series.data.length; i++) {
+    for (let bIdx = 0; bIdx < barEntries.length; bIdx++) {
+      const entry = barEntries[bIdx]
+      const hexColor = seriesColors[entry.globalIdx]
+      for (let i = 0; i < entry.data.length; i++) {
         const my = bandMid(i)
         const groupTop = my - Math.floor(groupH / 2)
         const by = groupTop + bIdx * (singleBarH + 1)
-        const valCol = valueToCol(series.data[i])
+        const valCol = valueToCol(entry.data[i])
         const fromCol = Math.min(baseCol, valCol)
         const toCol = Math.max(baseCol, valCol)
 
         for (let r = by; r < by + singleBarH; r++) {
           for (let c = fromCol; c <= toCol; c++) {
-            set(canvas, roles, r, c, ch.bar, 'arrow')
+            set(canvas, roles, r, c, ch.bar, 'arrow', hexColors, hexColor)
           }
         }
       }
     }
   }
 
-  // Lines (horizontal staircase: value on x, category on y)
-  const lineSeries = chart.series.filter(s => s.type === 'line')
-  for (const series of lineSeries) {
-    if (series.data.length === 0) continue
-    drawHorizontalStaircaseLine(canvas, roles, series.data, bandMid, valueToCol, plotTop, plotH, plotLeft, plotW, ch)
+  // Lines (horizontal staircase: value on x, category on y) — with per-series colors
+  const lineEntries: { data: number[]; globalIdx: number }[] = []
+  for (let si = 0; si < chart.series.length; si++) {
+    if (chart.series[si].type === 'line') lineEntries.push({ data: chart.series[si].data, globalIdx: si })
   }
 
-  return canvasToString(canvas, roles, colorMode, theme)
+  for (const entry of lineEntries) {
+    if (entry.data.length === 0) continue
+    const hexColor = seriesColors[entry.globalIdx]
+    drawHorizontalStaircaseLine(canvas, roles, entry.data, bandMid, valueToCol, plotTop, plotH, plotLeft, plotW, ch, hexColors, hexColor)
+  }
+
+  return canvasToString(canvas, roles, hexColors, colorMode, theme)
 }
 
 // ============================================================================
@@ -371,6 +428,8 @@ function drawStaircaseLine(
   plotLeft: number,
   plotTotalW: number,
   ch: typeof UNI | typeof ASC,
+  hexCanvas?: HexCanvas,
+  hexColor?: string | null,
 ): void {
   if (data.length === 0) return
 
@@ -383,7 +442,7 @@ function drawStaircaseLine(
   const drawAt = (col: number, row: number, char: string) => {
     const displayRow = plotTop + (plotH - 1 - row)
     if (displayRow >= 0 && col >= plotLeft && col < plotLeft + plotTotalW) {
-      set(canvas, roles, displayRow, col, char, 'arrow')
+      set(canvas, roles, displayRow, col, char, 'arrow', hexCanvas, hexColor)
     }
   }
 
@@ -481,6 +540,8 @@ function drawHorizontalStaircaseLine(
   plotLeft: number,
   plotW: number,
   ch: typeof UNI | typeof ASC,
+  hexCanvas?: HexCanvas,
+  hexColor?: string | null,
 ): void {
   if (data.length === 0) return
 
@@ -491,7 +552,7 @@ function drawHorizontalStaircaseLine(
 
   const drawAt = (row: number, col: number, char: string) => {
     if (row >= plotTop && row < plotTop + plotH && col >= plotLeft && col < plotLeft + plotW) {
-      set(canvas, roles, row, col, char, 'arrow')
+      set(canvas, roles, row, col, char, 'arrow', hexCanvas, hexColor)
     }
   }
 
@@ -553,31 +614,56 @@ function drawHorizontalStaircaseLine(
 }
 
 // ============================================================================
-// Legend
+// Legend — shows series symbols with per-series colors
 // ============================================================================
 
 function drawLegend(
   canvas: Canvas,
   roles: RoleCanvas,
+  hexCanvas: HexCanvas,
   chart: XYChart,
   row: number,
   totalW: number,
   ch: typeof UNI | typeof ASC,
+  seriesColors: string[],
 ): void {
-  const items: string[] = []
+  // Build legend items with global series indices
+  type LegendItem = { symbol: string; label: string; globalIdx: number }
+  const items: LegendItem[] = []
   let barIdx = 0, lineIdx = 0
-  for (const s of chart.series) {
+  for (let si = 0; si < chart.series.length; si++) {
+    const s = chart.series[si]
     if (s.type === 'bar') {
-      items.push(`${ch.bar} Bar ${barIdx + 1}`)
+      items.push({ symbol: ch.bar, label: `Bar ${barIdx + 1}`, globalIdx: si })
       barIdx++
     } else {
-      items.push(`${ch.hLine} Line ${lineIdx + 1}`)
+      items.push({ symbol: ch.hLine, label: `Line ${lineIdx + 1}`, globalIdx: si })
       lineIdx++
     }
   }
-  const legendText = items.join('  ')
-  const startCol = Math.floor(totalW / 2 - legendText.length / 2)
-  writeText(canvas, roles, row, Math.max(0, startCol), legendText, 'text')
+
+  // Calculate total legend width: "symbol space label  symbol space label ..."
+  let totalLen = 0
+  for (let i = 0; i < items.length; i++) {
+    if (i > 0) totalLen += 2 // gap between items
+    totalLen += 1 + 1 + items[i].label.length // symbol + space + label
+  }
+
+  const startCol = Math.max(0, Math.floor(totalW / 2 - totalLen / 2))
+  let col = startCol
+
+  for (let i = 0; i < items.length; i++) {
+    if (i > 0) col += 2 // gap
+    const item = items[i]
+    // Symbol with series-specific color
+    set(canvas, roles, row, col, item.symbol, 'arrow', hexCanvas, seriesColors[item.globalIdx])
+    col += 1
+    // Space (already ' ' from canvas init)
+    col += 1
+    // Label text
+    writeText(canvas, roles, row, col, item.label, 'text')
+    col += item.label.length
+  }
 }
 
 // ============================================================================
@@ -592,10 +678,19 @@ function createRoleCanvas(width: number, height: number): RoleCanvas {
   return Array.from({ length: width }, () => Array.from<CharRole | null>({ length: height }).fill(null))
 }
 
-function set(canvas: Canvas, roles: RoleCanvas, row: number, col: number, char: string, role: CharRole): void {
+function createHexCanvas(width: number, height: number): HexCanvas {
+  return Array.from({ length: width }, () => Array.from<string | null>({ length: height }).fill(null))
+}
+
+function set(
+  canvas: Canvas, roles: RoleCanvas, row: number, col: number,
+  char: string, role: CharRole,
+  hexCanvas?: HexCanvas, hex?: string | null,
+): void {
   if (col >= 0 && col < canvas.length && row >= 0 && row < canvas[0].length) {
     canvas[col][row] = char
     roles[col][row] = role
+    if (hexCanvas && hex) hexCanvas[col][row] = hex
   }
 }
 
@@ -612,9 +707,14 @@ function writeText(canvas: Canvas, roles: RoleCanvas, row: number, startCol: num
   }
 }
 
+// ============================================================================
+// Canvas → string (with per-cell hex color support)
+// ============================================================================
+
 function canvasToString(
   canvas: Canvas,
   roles: RoleCanvas,
+  hexCanvas: HexCanvas,
   colorMode: ColorMode,
   theme: AsciiTheme,
 ): string {
@@ -626,9 +726,11 @@ function canvasToString(
   for (let row = 0; row < height; row++) {
     const chars: string[] = []
     const rowRoles: (CharRole | null)[] = []
+    const rowHex: (string | null)[] = []
     for (let col = 0; col < width; col++) {
       chars.push(canvas[col][row])
       rowRoles.push(roles[col][row])
+      rowHex.push(hexCanvas[col][row])
     }
     // Trim trailing spaces
     let end = chars.length - 1
@@ -636,7 +738,13 @@ function canvasToString(
     if (end < 0) {
       lines.push('')
     } else {
-      lines.push(colorizeLine(chars.slice(0, end + 1), rowRoles.slice(0, end + 1), theme, colorMode))
+      lines.push(colorizeRow(
+        chars.slice(0, end + 1),
+        rowRoles.slice(0, end + 1),
+        rowHex.slice(0, end + 1),
+        theme,
+        colorMode,
+      ))
     }
   }
 
@@ -646,6 +754,61 @@ function canvasToString(
   }
 
   return lines.join('\n')
+}
+
+/**
+ * Colorize a row of characters, using hex color overrides where available
+ * and falling back to role-based theme colors otherwise.
+ * Groups consecutive same-color characters for efficient escape sequences.
+ */
+function colorizeRow(
+  chars: string[],
+  roles: (CharRole | null)[],
+  hexOverrides: (string | null)[],
+  theme: AsciiTheme,
+  mode: ColorMode,
+): string {
+  if (mode === 'none') return chars.join('')
+
+  let result = ''
+  let currentColor: string | null = null
+  let buffer = ''
+
+  for (let i = 0; i < chars.length; i++) {
+    const char = chars[i]!
+
+    if (char === ' ') {
+      // Flush buffer before whitespace
+      if (buffer.length > 0) {
+        result += currentColor ? colorizeText(buffer, currentColor, mode) : buffer
+        buffer = ''
+        currentColor = null
+      }
+      result += ' '
+      continue
+    }
+
+    // Effective color: hex override > role-based > null
+    const color = hexOverrides[i] ?? (roles[i] ? roleToHex(roles[i]!, theme) : null)
+
+    if (color === currentColor) {
+      buffer += char
+    } else {
+      // Flush previous group
+      if (buffer.length > 0) {
+        result += currentColor ? colorizeText(buffer, currentColor, mode) : buffer
+      }
+      buffer = char
+      currentColor = color
+    }
+  }
+
+  // Flush remaining
+  if (buffer.length > 0) {
+    result += currentColor ? colorizeText(buffer, currentColor, mode) : buffer
+  }
+
+  return result
 }
 
 // ============================================================================

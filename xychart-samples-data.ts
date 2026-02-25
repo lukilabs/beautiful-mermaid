@@ -119,11 +119,11 @@ export const xychartSamples: Sample[] = [
   {
     title: 'Simple Line Chart',
     category: 'Basic Line Charts',
-    description: 'A minimal line chart with four data points.',
+    description: 'A line chart showing a gentle upward trend with natural variation.',
     source: `xychart-beta
     title "Simple Trend"
-    x-axis [Q1, Q2, Q3, Q4]
-    line [100, 150, 130, 180]`,
+    x-axis [Jan, Feb, Mar, Apr, May, Jun, Jul, Aug]
+    line [100, 118, 148, 140, 150, 162, 155, 180]`,
   },
   {
     title: 'Upward Trend',
@@ -177,8 +177,8 @@ export const xychartSamples: Sample[] = [
     description: 'Line chart with a dramatic spike in the middle.',
     source: `xychart-beta
     title "Traffic Spike"
-    x-axis [6am, 8am, 10am, 12pm, 2pm, 4pm, 6pm]
-    line [200, 350, 1200, 4500, 2800, 900, 300]`,
+    x-axis [6am, 7am, 8am, 9am, 10am, 11am, 12pm, 1pm, 2pm, 3pm, 4pm, 5pm, 6pm]
+    line [200, 250, 350, 650, 1200, 2800, 4500, 3800, 2800, 1600, 900, 500, 300]`,
   },
   {
     title: 'V-Shape Recovery',
@@ -186,8 +186,8 @@ export const xychartSamples: Sample[] = [
     description: 'Line chart showing a sharp decline followed by recovery.',
     source: `xychart-beta
     title "Stock Price Recovery"
-    x-axis [Jan, Feb, Mar, Apr, May, Jun]
-    line [100, 72, 45, 38, 65, 95]`,
+    x-axis [Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct]
+    line [100, 85, 65, 48, 38, 40, 52, 68, 82, 95]`,
   },
   {
     title: 'Step Pattern',
@@ -204,9 +204,9 @@ export const xychartSamples: Sample[] = [
     description: 'Two line series plotted on the same chart.',
     source: `xychart-beta
     title "Planned vs Actual"
-    x-axis [Q1, Q2, Q3, Q4]
-    line [100, 200, 300, 400]
-    line [90, 210, 280, 420]`,
+    x-axis [Jan, Feb, Mar, Apr, May, Jun, Jul, Aug]
+    line [100, 145, 190, 240, 280, 320, 360, 400]
+    line [90, 130, 185, 235, 275, 340, 380, 420]`,
   },
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -219,10 +219,10 @@ export const xychartSamples: Sample[] = [
     description: 'Bars with a line overlaid showing the same data as a trend.',
     source: `xychart-beta
     title "Monthly Revenue"
-    x-axis [Jan, Feb, Mar, Apr, May, Jun]
+    x-axis [Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec]
     y-axis "Revenue (USD)" 0 --> 10000
-    bar [5000, 6200, 7800, 4500, 9200, 8100]
-    line [5000, 6200, 7800, 4500, 9200, 8100]`,
+    bar [4200, 5000, 5800, 6200, 5500, 7000, 7800, 7200, 8400, 8100, 9000, 9200]
+    line [4200, 5000, 5800, 6200, 5500, 7000, 7800, 7200, 8400, 8100, 9000, 9200]`,
   },
   {
     title: 'Bar with Trend Line',
@@ -230,9 +230,9 @@ export const xychartSamples: Sample[] = [
     description: 'Bars showing actual values with a line showing the moving average trend.',
     source: `xychart-beta
     title "Sales with Trend"
-    x-axis [Jan, Feb, Mar, Apr, May, Jun]
-    bar [300, 450, 280, 520, 390, 610]
-    line [300, 375, 343, 388, 388, 425]`,
+    x-axis [Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec]
+    bar [300, 380, 280, 450, 350, 520, 420, 550, 480, 610, 530, 680]
+    line [300, 330, 320, 353, 352, 395, 390, 420, 418, 460, 458, 498]`,
   },
   {
     title: 'Bar with Target Line',
@@ -240,10 +240,10 @@ export const xychartSamples: Sample[] = [
     description: 'Bars showing actual performance with a flat target line.',
     source: `xychart-beta
     title "Performance vs Target"
-    x-axis [Jan, Feb, Mar, Apr, May, Jun]
+    x-axis [Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec]
     y-axis "Units" 0 --> 600
-    bar [320, 410, 380, 520, 290, 480]
-    line [400, 400, 400, 400, 400, 400]`,
+    bar [320, 380, 410, 350, 380, 520, 290, 440, 480, 510, 450, 530]
+    line [400, 400, 400, 400, 400, 400, 400, 400, 400, 400, 400, 400]`,
   },
   {
     title: 'Revenue and Profit',
@@ -251,9 +251,9 @@ export const xychartSamples: Sample[] = [
     description: 'Bars for revenue with a line for profit margin.',
     source: `xychart-beta
     title "Revenue and Profit"
-    x-axis [Q1, Q2, Q3, Q4]
-    bar [5000, 6500, 7200, 8100]
-    line [1200, 1800, 2100, 2600]`,
+    x-axis [23Q1, 23Q2, 23Q3, 23Q4, 24Q1, 24Q2, 24Q3, 24Q4]
+    bar [4200, 4800, 5500, 6200, 6800, 7200, 7600, 8100]
+    line [1000, 1200, 1450, 1700, 1900, 2100, 2350, 2600]`,
   },
   {
     title: 'Dual Dataset Overlay',
@@ -261,10 +261,10 @@ export const xychartSamples: Sample[] = [
     description: 'Two bars and one line series for multi-metric comparison.',
     source: `xychart-beta
     title "Orders, Returns, and Net"
-    x-axis [Jan, Feb, Mar, Apr, May]
-    bar [200, 250, 300, 280, 350]
-    bar [20, 30, 25, 35, 28]
-    line [180, 220, 275, 245, 322]`,
+    x-axis [Jan, Feb, Mar, Apr, May, Jun, Jul, Aug]
+    bar [200, 230, 260, 300, 280, 310, 340, 350]
+    bar [20, 25, 28, 30, 35, 28, 25, 22]
+    line [180, 205, 232, 270, 245, 282, 315, 328]`,
   },
   {
     title: 'Costs vs Revenue',
@@ -272,9 +272,9 @@ export const xychartSamples: Sample[] = [
     description: 'Bars for costs with a line showing revenue growth.',
     source: `xychart-beta
     title "Costs vs Revenue"
-    x-axis [2020, 2021, 2022, 2023, 2024]
-    bar [400, 420, 450, 440, 460]
-    line [350, 480, 620, 780, 950]`,
+    x-axis [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025]
+    bar [350, 370, 400, 420, 450, 440, 460, 470]
+    line [220, 280, 350, 480, 620, 780, 950, 1100]`,
   },
   {
     title: 'Bar with Two Lines',
@@ -282,10 +282,10 @@ export const xychartSamples: Sample[] = [
     description: 'Bars with two overlaid line series for comparison.',
     source: `xychart-beta
     title "Actual, Forecast, Target"
-    x-axis [Jan, Feb, Mar, Apr, May, Jun]
-    bar [100, 120, 115, 140, 135, 160]
-    line [95, 110, 120, 130, 140, 150]
-    line [120, 120, 120, 120, 120, 120]`,
+    x-axis [Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec]
+    bar [100, 110, 115, 125, 130, 140, 135, 145, 150, 155, 158, 165]
+    line [95, 105, 115, 125, 130, 138, 142, 148, 152, 158, 162, 168]
+    line [130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130]`,
   },
   {
     title: 'Stacked Context',
@@ -293,10 +293,10 @@ export const xychartSamples: Sample[] = [
     description: 'Multiple bar series with a line showing the total.',
     source: `xychart-beta
     title "Channel Performance"
-    x-axis [Jan, Feb, Mar, Apr]
-    bar [100, 120, 140, 160]
-    bar [80, 90, 100, 110]
-    line [180, 210, 240, 270]`,
+    x-axis [Jan, Feb, Mar, Apr, May, Jun, Jul, Aug]
+    bar [100, 108, 118, 130, 140, 148, 155, 165]
+    bar [80, 84, 88, 95, 100, 105, 108, 115]
+    line [180, 192, 206, 225, 240, 253, 263, 280]`,
   },
   {
     title: 'Cumulative Line Over Bars',
@@ -304,9 +304,9 @@ export const xychartSamples: Sample[] = [
     description: 'Monthly bars with a cumulative line showing running total.',
     source: `xychart-beta
     title "Monthly and Cumulative Sales"
-    x-axis [Jan, Feb, Mar, Apr, May, Jun]
-    bar [100, 150, 120, 180, 200, 170]
-    line [100, 250, 370, 550, 750, 920]`,
+    x-axis [Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec]
+    bar [80, 100, 120, 150, 140, 170, 180, 160, 190, 200, 210, 220]
+    line [80, 180, 300, 450, 590, 760, 940, 1100, 1290, 1490, 1700, 1920]`,
   },
   {
     title: 'Conversion Funnel',
@@ -314,9 +314,9 @@ export const xychartSamples: Sample[] = [
     description: 'Bars for stage counts with a line showing conversion rate.',
     source: `xychart-beta
     title "Funnel Analysis"
-    x-axis [Visitors, Signups, Activated, Paid, Retained]
-    bar [10000, 3000, 1500, 800, 500]
-    line [10000, 3000, 1500, 800, 500]`,
+    x-axis [Visitors, Leads, Signups, Activated, Engaged, Paid, Retained]
+    bar [10000, 5500, 3000, 1800, 1200, 800, 500]
+    line [10000, 5500, 3000, 1800, 1200, 800, 500]`,
   },
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -339,7 +339,7 @@ export const xychartSamples: Sample[] = [
     source: `xychart-beta
     title "Distribution Curve"
     x-axis 0 --> 100
-    line [5, 15, 35, 60, 80, 95, 80, 60, 35, 15, 5]`,
+    line [4, 7, 13, 21, 31, 43, 58, 71, 84, 91, 95, 91, 84, 71, 58, 43, 31, 21, 13, 7, 4]`,
   },
   {
     title: 'Y-Axis with Label and Range',
@@ -347,9 +347,9 @@ export const xychartSamples: Sample[] = [
     description: 'Y-axis with a title and explicit min/max range.',
     source: `xychart-beta
     title "Temperature Log"
-    x-axis [6am, 9am, 12pm, 3pm, 6pm, 9pm]
+    x-axis [6am, 8am, 10am, 12pm, 2pm, 4pm, 6pm, 8pm]
     y-axis "Temp (F)" 50 --> 100
-    line [58, 65, 78, 85, 76, 62]`,
+    line [55, 60, 70, 80, 85, 80, 72, 62]`,
   },
   {
     title: 'Y-Axis Range Without Label',
@@ -357,9 +357,9 @@ export const xychartSamples: Sample[] = [
     description: 'Y-axis with range but no title.',
     source: `xychart-beta
     title "Sensor Readings"
-    x-axis [T1, T2, T3, T4, T5]
+    x-axis [T1, T2, T3, T4, T5, T6, T7, T8]
     y-axis 0 --> 500
-    line [120, 250, 380, 310, 190]`,
+    line [120, 180, 270, 360, 380, 340, 260, 190]`,
   },
   {
     title: 'X-Axis with Title',
@@ -377,9 +377,9 @@ export const xychartSamples: Sample[] = [
     description: 'Both x-axis and y-axis have descriptive titles.',
     source: `xychart-beta
     title "Experiment Results"
-    x-axis "Trial Number" [1, 2, 3, 4, 5, 6]
+    x-axis "Trial Number" [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     y-axis "Measurement (mm)" 0 --> 50
-    line [12, 18, 25, 22, 31, 28]`,
+    line [12, 15, 19, 24, 22, 26, 30, 28, 32, 35]`,
   },
   {
     title: 'Long Category Labels',
@@ -443,9 +443,9 @@ export const xychartSamples: Sample[] = [
     description: 'Y-axis configured as percentage from 0 to 100.',
     source: `xychart-beta
     title "Completion Rate"
-    x-axis [Week 1, Week 2, Week 3, Week 4, Week 5]
+    x-axis [W1, W2, W3, W4, W5, W6, W7, W8]
     y-axis "Percent" 0 --> 100
-    line [15, 35, 58, 78, 95]`,
+    line [5, 12, 28, 50, 72, 85, 93, 97]`,
   },
   {
     title: 'Numeric X-Axis with Bars',
@@ -495,8 +495,8 @@ export const xychartSamples: Sample[] = [
     description: 'Line chart in horizontal orientation.',
     source: `xychart-beta horizontal
     title "Response Time Trend"
-    x-axis [v1.0, v1.1, v1.2, v1.3, v1.4]
-    line [450, 380, 320, 280, 210]`,
+    x-axis [v1.0, v1.1, v1.2, v1.3, v1.4, v1.5, v1.6, v1.7]
+    line [450, 410, 370, 330, 290, 260, 235, 210]`,
   },
   {
     title: 'Horizontal Combined',
@@ -504,9 +504,9 @@ export const xychartSamples: Sample[] = [
     description: 'Horizontal chart with both bars and a line.',
     source: `xychart-beta horizontal
     title "Budget vs Actual"
-    x-axis [Eng, Sales, Marketing, Ops, HR]
-    bar [500, 350, 200, 150, 100]
-    line [480, 380, 180, 160, 95]`,
+    x-axis [Eng, Sales, Marketing, Product, Ops, HR, Finance, Legal]
+    bar [500, 350, 250, 200, 150, 120, 100, 80]
+    line [480, 380, 230, 180, 160, 110, 95, 75]`,
   },
   {
     title: 'Horizontal Ranking',
@@ -552,9 +552,9 @@ export const xychartSamples: Sample[] = [
     description: 'Horizontal chart with two line series.',
     source: `xychart-beta horizontal
     title "Planned vs Actual Delivery"
-    x-axis [Feature A, Feature B, Feature C, Feature D]
-    line [10, 15, 20, 25]
-    line [12, 14, 22, 23]`,
+    x-axis [F1, F2, F3, F4, F5, F6, F7, F8]
+    line [10, 12, 15, 17, 20, 22, 24, 25]
+    line [12, 13, 14, 18, 22, 21, 23, 24]`,
   },
   {
     title: 'Horizontal Long Labels',
@@ -837,8 +837,8 @@ export const xychartSamples: Sample[] = [
     description: 'Values that decrease to zero.',
     source: `xychart-beta
     title "Declining Interest"
-    x-axis [Week 1, Week 2, Week 3, Week 4, Week 5]
-    line [100, 60, 25, 8, 0]`,
+    x-axis [W1, W2, W3, W4, W5, W6, W7, W8]
+    line [100, 78, 55, 35, 20, 10, 4, 0]`,
   },
   {
     title: 'Ascending from Zero',

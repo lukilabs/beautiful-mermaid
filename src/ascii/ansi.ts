@@ -58,6 +58,8 @@ export function diagramColorsToAsciiTheme(colors: DiagramColors): AsciiTheme {
     border,
     line,
     arrow:    colors.accent ?? mixColors(colors.fg, colors.bg, MIX.arrow),
+    accent:   colors.accent,
+    bg:       colors.bg,
     corner:   line,
     junction: border,
   }
@@ -424,4 +426,22 @@ function colorizeLineHtml(
 
   flush()
   return result
+}
+
+/**
+ * Colorize a text string with a direct hex color.
+ * Used by renderers that need per-cell color control (e.g. multi-series xychart).
+ * Handles all output modes: ANSI (16/256/truecolor) and HTML.
+ */
+export function colorizeText(text: string, hex: string, mode: ColorMode): string {
+  if (mode === 'none' || text.length === 0) return text
+  if (mode === 'html') return htmlSpan(hex, text)
+  let code: string
+  switch (mode) {
+    case 'truecolor': code = truecolorFg(hex); break
+    case 'ansi256': code = ansi256Fg(hex); break
+    case 'ansi16': code = ansi16Fg(hex); break
+    default: return text
+  }
+  return `${code}${text}${RESET}`
 }
