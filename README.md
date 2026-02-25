@@ -37,7 +37,7 @@ The ASCII rendering engine is based on [mermaid-ascii](https://github.com/Alexan
 
 ## Features
 
-- **5 diagram types** — Flowcharts, State, Sequence, Class, and ER diagrams
+- **6 diagram types** — Flowcharts, State, Sequence, Class, ER, and XY Charts (bar, line, combined)
 - **Dual output** — SVG for rich UIs, ASCII/Unicode for terminals
 - **Synchronous rendering** — No async, no flash. Works with React `useMemo()`
 - **15 built-in themes** — And dead simple to add your own
@@ -364,6 +364,72 @@ Index-specific styles override the default. Supported properties: `stroke`, `str
 
 Works in both flowcharts and state diagrams.
 
+### XY Charts
+
+Bar charts, line charts, and combinations — using Mermaid's `xychart-beta` syntax.
+
+**Bar chart:**
+
+```
+xychart-beta
+    title "Monthly Revenue"
+    x-axis [Jan, Feb, Mar, Apr, May, Jun]
+    y-axis "Revenue ($K)" 0 --> 500
+    bar [180, 250, 310, 280, 350, 420]
+```
+
+**Line chart:**
+
+```
+xychart-beta
+    title "User Growth"
+    x-axis [Jan, Feb, Mar, Apr, May, Jun]
+    line [1200, 1800, 2500, 3100, 3800, 4500]
+```
+
+**Combined bar + line:**
+
+```
+xychart-beta
+    title "Sales with Trend"
+    x-axis [Jan, Feb, Mar, Apr, May, Jun]
+    bar [300, 380, 280, 450, 350, 520]
+    line [300, 330, 320, 353, 352, 395]
+```
+
+**Horizontal orientation:**
+
+```
+xychart-beta horizontal
+    title "Language Popularity"
+    x-axis [Python, JavaScript, Java, Go, Rust]
+    bar [30, 25, 20, 12, 8]
+```
+
+**Axis configuration:**
+
+- Categorical x-axis: `x-axis [A, B, C]`
+- Numeric x-axis range: `x-axis 0 --> 100`
+- Axis titles: `x-axis "Category" [A, B, C]`
+- Y-axis range: `y-axis "Score" 0 --> 100`
+
+**Multi-series:** Add multiple `bar` and/or `line` declarations. Each series gets a distinct color from a monochromatic palette derived from the theme's accent color.
+
+### XY Chart Styling
+
+The chart renderer follows a clean, minimal design philosophy inspired by Apple and Craft:
+
+- **Dot grid** — A subtle dot pattern fills the plot area instead of traditional solid grid lines
+- **Rounded bars** — All bar corners are rounded for a modern, polished look
+- **Smooth curves** — Line series use natural cubic spline interpolation, producing mathematically smooth curves through all data points (not straight segments or staircase steps)
+- **Floating labels** — No visible axis lines or tick marks; labels float freely for a clutter-free aesthetic
+- **Drop-shadow lines** — Each line series has a subtle shadow beneath it for depth
+- **Monochromatic palette** — Series 0 uses the theme's accent color; additional series get darker/lighter shades of the same hue with subtle hue drift, adapting automatically to light or dark backgrounds
+- **Interactive tooltips** — When rendered with `interactive: true`, hovering over bars or data points shows value tooltips. Multi-line tooltips appear when multiple series share an x-position
+- **Sparse line dots** — Lines with 12 or fewer data points show data point dots by default for readability
+- **Full theme support** — All 15 built-in themes (and custom themes) apply to charts. The accent color drives the entire series color palette
+- **Live theme switching** — Chart series colors are CSS custom properties (`--xychart-color-N`), so theme changes apply instantly without re-rendering
+
 ---
 
 ## ASCII Output
@@ -411,6 +477,16 @@ renderMermaidASCII(diagram, {
 })
 ```
 
+### ASCII XY Charts
+
+XY charts render to ASCII with dedicated chart-drawing characters:
+
+- **Bar charts** — `█` blocks (Unicode) or `#` (ASCII mode)
+- **Line charts** — Staircase routing with rounded corners: `╭╮╰╯│─` (Unicode) or `+|-` (ASCII)
+- **Multi-series** — Each series gets a distinct ANSI color from the theme's accent palette
+- **Legends** — Automatically shown when multiple series are present
+- **Horizontal charts** — Fully supported with categories on the y-axis
+
 ---
 
 ## API Reference
@@ -441,6 +517,9 @@ Render a Mermaid diagram to SVG. Synchronous. Auto-detects diagram type.
 | `layerSpacing` | `number` | `40` | Vertical spacing between layers |
 | `componentSpacing` | `number` | `24` | Spacing between disconnected components |
 | `thoroughness` | `number` | `3` | Crossing minimization trials (1-7, higher = better but slower) |
+| `interactive` | `boolean` | `false` | Enable hover tooltips on XY chart bars and data points |
+
+**XY Charts:** Diagrams starting with `xychart-beta` are auto-detected — no separate function needed. The `accent` color option drives the chart series color palette.
 
 ### `renderMermaidSVGAsync(text, options?): Promise<string>`
 
