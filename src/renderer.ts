@@ -45,6 +45,16 @@ export function renderSvg(
   parts.push(buildStyleBlock(font, false))
   parts.push('<defs>')
   parts.push(arrowMarkerDefs())
+  // Per-color arrow markers for edges with custom stroke via linkStyle
+  const customStrokeColors = new Set<string>()
+  for (const edge of graph.edges) {
+    if (edge.inlineStyle?.stroke) {
+      customStrokeColors.add(edge.inlineStyle.stroke)
+    }
+  }
+  for (const color of customStrokeColors) {
+    parts.push(arrowMarkerDefsForColor(color))
+  }
   parts.push('</defs>')
 
   // 1. Subgraph backgrounds (group rectangles with header bands)
@@ -104,6 +114,34 @@ function arrowMarkerDefs(): string {
   )
 }
 
+/**
+ * Generate arrow markers tinted to a specific color (for linkStyle stroke overrides).
+ * IDs are suffixed with a sanitized color string to avoid collisions.
+ */
+function arrowMarkerDefsForColor(color: string): string {
+  const w = ARROW_HEAD.width
+  const h = ARROW_HEAD.height
+  const escaped = escapeAttr(color)
+  const arrowStyle = `fill="${escaped}" stroke="${escaped}" stroke-width="0.75" stroke-linejoin="round"`
+  const refX = w - 1
+  const suffix = markerSuffix(color)
+  return (
+    `  <marker id="arrowhead-${suffix}" markerWidth="${w}" markerHeight="${h}" refX="${refX}" refY="${h / 2}" orient="auto">` +
+    `\n    <polygon points="0 0, ${w} ${h / 2}, 0 ${h}" ${arrowStyle} />` +
+    `\n  </marker>` +
+    `\n  <marker id="arrowhead-start-${suffix}" markerWidth="${w}" markerHeight="${h}" refX="1" refY="${h / 2}" orient="auto-start-reverse">` +
+    `\n    <polygon points="${w} 0, 0 ${h / 2}, ${w} ${h}" ${arrowStyle} />` +
+    `\n  </marker>`
+  )
+}
+
+/** Sanitize a color value into a collision-free SVG ID suffix.
+ *  Non-alphanumeric chars are hex-encoded so distinct inputs never collapse
+ *  (e.g. "var(--line-1)" → "var28--line2d129", "var(--line1)" → "var28--line129"). */
+function markerSuffix(color: string): string {
+  return color.replace(/[^a-zA-Z0-9]/g, (ch) => ch.charCodeAt(0).toString(16))
+}
+
 // ============================================================================
 // Group rendering (subgraph backgrounds)
 // ============================================================================
@@ -161,12 +199,16 @@ function renderEdge(edge: PositionedEdge): string {
 
   const pathData = pointsToPolylinePath(edge.points)
   const dashArray = edge.style === 'dotted' ? ' stroke-dasharray="4 4"' : ''
-  const strokeWidth = edge.style === 'thick' ? STROKE_WIDTHS.connector * 2 : STROKE_WIDTHS.connector
+  const baseStrokeWidth = edge.style === 'thick' ? STROKE_WIDTHS.connector * 2 : STROKE_WIDTHS.connector
+  const strokeColor = escapeAttr(edge.inlineStyle?.stroke ?? 'var(--_line)')
+  const strokeWidth = escapeAttr(edge.inlineStyle?.['stroke-width'] ?? String(baseStrokeWidth))
 
   // Build marker attributes based on arrow direction flags
+  // Use color-specific markers when edge has a custom stroke from linkStyle
+  const suffix = edge.inlineStyle?.stroke ? `-${markerSuffix(edge.inlineStyle.stroke)}` : ''
   let markers = ''
-  if (edge.hasArrowEnd) markers += ' marker-end="url(#arrowhead)"'
-  if (edge.hasArrowStart) markers += ' marker-start="url(#arrowhead-start)"'
+  if (edge.hasArrowEnd) markers += ` marker-end="url(#arrowhead${suffix})"`
+  if (edge.hasArrowStart) markers += ` marker-start="url(#arrowhead-start${suffix})"`
 
   // Semantic data attributes for edge identification and inspection:
   // - class="edge": CSS targeting and type identification
@@ -187,7 +229,7 @@ function renderEdge(edge: PositionedEdge): string {
   }
 
   return (
-    `<polyline ${dataAttrs.join(' ')} points="${pathData}" fill="none" stroke="var(--_line)" ` +
+    `<polyline ${dataAttrs.join(' ')} points="${pathData}" fill="none" stroke="${strokeColor}" ` +
     `stroke-width="${strokeWidth}"${dashArray}${markers} />`
   )
 }

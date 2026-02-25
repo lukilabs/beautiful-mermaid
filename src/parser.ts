@@ -56,6 +56,7 @@ function parseFlowchart(lines: string[]): MermaidGraph {
     classDefs: new Map(),
     classAssignments: new Map(),
     nodeStyles: new Map(),
+    linkStyles: new Map(),
   }
 
   // Subgraph stack for nested subgraphs.
@@ -92,6 +93,24 @@ function parseFlowchart(lines: string[]): MermaidGraph {
       const props = parseStyleProps(styleMatch[2]!)
       for (const id of nodeIds) {
         graph.nodeStyles.set(id, { ...graph.nodeStyles.get(id), ...props })
+      }
+      continue
+    }
+
+    // --- linkStyle: `linkStyle 0 stroke:#f00` or `linkStyle default stroke:#f00` ---
+    const linkStyleMatch = line.match(/^linkStyle\s+(default|[\d,\s]+)\s+(.+)$/)
+    if (linkStyleMatch) {
+      const target = linkStyleMatch[1]!.trim()
+      const props = parseStyleProps(linkStyleMatch[2]!)
+      if (target === 'default') {
+        graph.linkStyles.set('default', { ...graph.linkStyles.get('default'), ...props })
+      } else {
+        const indices = target.split(',').map(s => parseInt(s.trim(), 10))
+        for (const idx of indices) {
+          if (!isNaN(idx)) {
+            graph.linkStyles.set(idx, { ...graph.linkStyles.get(idx), ...props })
+          }
+        }
       }
       continue
     }
@@ -169,6 +188,7 @@ function parseStateDiagram(lines: string[]): MermaidGraph {
     classDefs: new Map(),
     classAssignments: new Map(),
     nodeStyles: new Map(),
+    linkStyles: new Map(),
   }
 
   // Track composite state nesting (like subgraphs)
@@ -189,6 +209,24 @@ function parseStateDiagram(lines: string[]): MermaidGraph {
         compositeStack[compositeStack.length - 1]!.direction = dirMatch[1]!.toUpperCase() as Direction
       } else {
         graph.direction = dirMatch[1]!.toUpperCase() as Direction
+      }
+      continue
+    }
+
+    // --- linkStyle: `linkStyle 0 stroke:#f00` or `linkStyle default stroke:#f00` ---
+    const linkStyleMatch = line.match(/^linkStyle\s+(default|[\d,\s]+)\s+(.+)$/)
+    if (linkStyleMatch) {
+      const target = linkStyleMatch[1]!.trim()
+      const props = parseStyleProps(linkStyleMatch[2]!)
+      if (target === 'default') {
+        graph.linkStyles.set('default', { ...graph.linkStyles.get('default'), ...props })
+      } else {
+        const indices = target.split(',').map(s => parseInt(s.trim(), 10))
+        for (const idx of indices) {
+          if (!isNaN(idx)) {
+            graph.linkStyles.set(idx, { ...graph.linkStyles.get(idx), ...props })
+          }
+        }
       }
       continue
     }
@@ -324,8 +362,10 @@ function ensureStateNode(
 
 /** Parse "fill:#f00,stroke:#333" style property strings into a Record */
 function parseStyleProps(propsStr: string): Record<string, string> {
+  // Strip trailing semicolons — Mermaid tolerates them (e.g. `stroke:#f00;`)
+  const cleaned = propsStr.replace(/;\s*$/, '')
   const props: Record<string, string> = {}
-  for (const pair of propsStr.split(',')) {
+  for (const pair of cleaned.split(',')) {
     const colonIdx = pair.indexOf(':')
     if (colonIdx > 0) {
       const key = pair.slice(0, colonIdx).trim()

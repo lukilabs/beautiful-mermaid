@@ -12,6 +12,8 @@ export interface MermaidGraph {
   classAssignments: Map<string, string>
   /** Maps node IDs to inline styles (from `style X fill:#f00,stroke:#333`) */
   nodeStyles: Map<string, Record<string, string>>
+  /** Maps edge indices (or 'default') to inline styles from `linkStyle` directives */
+  linkStyles: Map<number | 'default', Record<string, string>>
 }
 
 export type Direction = 'TD' | 'TB' | 'LR' | 'BT' | 'RL'
@@ -98,6 +100,8 @@ export interface PositionedEdge {
   points: Point[]
   /** Layout-computed label center position (avoids label-label collisions) */
   labelPosition?: Point
+  /** Inline styles resolved from `linkStyle` directives — override theme defaults */
+  inlineStyle?: Record<string, string>
 }
 
 export interface Point {

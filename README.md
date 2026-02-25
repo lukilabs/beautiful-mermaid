@@ -343,6 +343,27 @@ erDiagram
   PRODUCT ||--o{ LINE_ITEM : "is in"
 ```
 
+### Inline Edge Styling
+
+Use `linkStyle` to override edge colors and stroke widths — just like [Mermaid's linkStyle](https://mermaid.js.org/syntax/flowchart.html#styling-links):
+
+```
+graph TD
+  A --> B --> C
+  linkStyle 0 stroke:#ff0000,stroke-width:2px
+  linkStyle default stroke:#888888
+```
+
+|             Syntax              |                 Effect                 |
+| ------------------------------- | -------------------------------------- |
+| `linkStyle 0 stroke:#f00`       | Style a single edge by index (0-based) |
+| `linkStyle 0,2 stroke:#f00`     | Style multiple edges at once           |
+| `linkStyle default stroke:#888` | Default style applied to all edges     |
+
+Index-specific styles override the default. Supported properties: `stroke`, `stroke-width`.
+
+Works in both flowcharts and state diagrams.
+
 ---
 
 ## ASCII Output

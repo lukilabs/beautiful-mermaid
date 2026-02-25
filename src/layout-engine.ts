@@ -784,6 +784,7 @@ function extractEdgesRecursively(
       hasArrowEnd: originalEdge.hasArrowEnd,
       points: orthogonalPoints,
       labelPosition,
+      inlineStyle: resolveEdgeStyle(edgeIndex, graph),
     })
   }
 }
@@ -978,6 +979,29 @@ function resolveNodeStyle(
   const nodeStyle = graph.nodeStyles.get(nodeId)
   if (nodeStyle) {
     result = result ? { ...result, ...nodeStyle } : { ...nodeStyle }
+  }
+
+  return result
+}
+
+/**
+ * Resolve inline styles for an edge from linkStyles map.
+ * Default link style is applied first, then index-specific overrides.
+ */
+function resolveEdgeStyle(
+  edgeIndex: number,
+  graph: MermaidGraph
+): Record<string, string> | undefined {
+  let result: Record<string, string> | undefined
+
+  const defaultStyle = graph.linkStyles.get('default')
+  if (defaultStyle) {
+    result = { ...defaultStyle }
+  }
+
+  const indexStyle = graph.linkStyles.get(edgeIndex)
+  if (indexStyle) {
+    result = result ? { ...result, ...indexStyle } : { ...indexStyle }
   }
 
   return result
