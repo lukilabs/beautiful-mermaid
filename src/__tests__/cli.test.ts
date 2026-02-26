@@ -9,7 +9,7 @@
  */
 import { describe, it, expect } from 'bun:test'
 import { parseArgs } from '../cli/parse-args.ts'
-import type { RenderArgs, SimpleCommand, CliArgs } from '../cli/parse-args.ts'
+import type { RenderArgs, SimpleCommand } from '../cli/parse-args.ts'
 
 // ============================================================================
 // render command — happy paths
@@ -137,6 +137,20 @@ describe('parseArgs – version', () => {
   })
 })
 
+describe('parseArgs – render with --output long form', () => {
+  it('parses --output the same as -o', () => {
+    const result = parseArgs(['render', 'diagram.mmd', '--svg', '--output', 'out.svg'])
+    expect(result).toEqual({
+      command: 'render',
+      input: 'diagram.mmd',
+      ascii: false,
+      svg: true,
+      output: 'out.svg',
+      theme: undefined,
+    } satisfies RenderArgs)
+  })
+})
+
 // ============================================================================
 // validation errors
 // ============================================================================
@@ -152,5 +166,25 @@ describe('parseArgs – errors', () => {
 
   it('throws on unknown command', () => {
     expect(() => parseArgs(['foobar'])).toThrow('Unknown command: foobar')
+  })
+
+  it('throws when -o is last argument with no value', () => {
+    expect(() => parseArgs(['render', 'diagram.mmd', '--svg', '-o'])).toThrow('-o requires a file path')
+  })
+
+  it('throws when --theme is last argument with no value', () => {
+    expect(() => parseArgs(['render', 'diagram.mmd', '--ascii', '--theme'])).toThrow(
+      '--theme requires a theme name',
+    )
+  })
+
+  it('throws on unknown flag in render sub-parser', () => {
+    expect(() => parseArgs(['render', 'diagram.mmd', '--ascii', '--bogus'])).toThrow('Unknown flag: --bogus')
+  })
+
+  it('throws on duplicate positional argument', () => {
+    expect(() => parseArgs(['render', 'diagram1.mmd', '--ascii', 'diagram2.mmd'])).toThrow(
+      'Unexpected argument: diagram2.mmd (input file already set to "diagram1.mmd")',
+    )
   })
 })

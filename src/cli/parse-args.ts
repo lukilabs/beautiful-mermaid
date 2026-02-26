@@ -85,19 +85,23 @@ function parseRender(args: string[]): RenderArgs {
     } else if (arg === '--svg') {
       svg = true
       i++
-    } else if (arg === '-o') {
+    } else if (arg === '-o' || arg === '--output') {
+      if (i + 1 >= args.length) throw new Error('-o requires a file path')
       output = args[i + 1]
       i += 2
     } else if (arg === '--theme') {
+      if (i + 1 >= args.length) throw new Error('--theme requires a theme name')
       theme = args[i + 1]
       i += 2
     } else if (!arg.startsWith('-')) {
       // Positional argument = input file
+      if (input !== undefined) {
+        throw new Error(`Unexpected argument: ${arg} (input file already set to "${input}")`)
+      }
       input = arg
       i++
     } else {
-      // Unknown flag — skip
-      i++
+      throw new Error(`Unknown flag: ${arg}`)
     }
   }
 
