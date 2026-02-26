@@ -1,8 +1,10 @@
+import { createRequire } from 'node:module'
 import { parseArgs } from './cli/parse-args.ts'
 import { runRender } from './cli/render.ts'
 import { THEMES } from './theme.ts'
 
-const VERSION = process.env.npm_package_version ?? 'dev'
+const require = createRequire(import.meta.url)
+const pkg = require('../package.json') as { version: string }
 
 async function main() {
   const argv = process.argv.slice(2)
@@ -21,7 +23,7 @@ async function main() {
       break
 
     case 'version':
-      console.log(`beautiful-mermaid ${VERSION}`)
+      console.log(`beautiful-mermaid ${pkg.version}`)
       break
 
     case 'themes':

@@ -15,36 +15,14 @@ import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { runRender } from '../cli/render.ts'
-import type { RenderArgs } from '../cli/parse-args.ts'
+import { createMockStdout, renderArgs } from './cli-test-helpers.ts'
 
 // ============================================================================
-// Helpers
+// Constants
 // ============================================================================
 
 const SIMPLE_FLOWCHART = `graph LR
   A --> B --> C`
-
-/** Collect all write() calls into a single string. */
-function createMockStdout(): { write: (s: string) => void; output: () => string } {
-  const chunks: string[] = []
-  return {
-    write: (s: string) => chunks.push(s),
-    output: () => chunks.join(''),
-  }
-}
-
-/** Build a RenderArgs for common test scenarios. */
-function renderArgs(overrides: Partial<RenderArgs> = {}): RenderArgs {
-  return {
-    command: 'render',
-    input: undefined,
-    ascii: false,
-    svg: false,
-    output: undefined,
-    theme: undefined,
-    ...overrides,
-  }
-}
 
 // ============================================================================
 // Temp directory lifecycle

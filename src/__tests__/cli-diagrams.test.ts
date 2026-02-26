@@ -12,7 +12,7 @@ import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { runRender } from '../cli/render.ts'
-import type { RenderArgs } from '../cli/parse-args.ts'
+import { createMockStdout, renderArgs } from './cli-test-helpers.ts'
 
 // ============================================================================
 // Diagram sources — one per supported type
@@ -57,32 +57,6 @@ const diagrams: Record<string, string> = {
   x-axis [jan, feb, mar, apr]
   y-axis "Revenue (k)" 0 --> 120
   bar [50, 60, 75, 90]`,
-}
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-/** Collect all write() calls into a single string. */
-function createMockStdout(): { write: (s: string) => void; output: () => string } {
-  const chunks: string[] = []
-  return {
-    write: (s: string) => chunks.push(s),
-    output: () => chunks.join(''),
-  }
-}
-
-/** Build a RenderArgs with sensible defaults. */
-function renderArgs(overrides: Partial<RenderArgs> = {}): RenderArgs {
-  return {
-    command: 'render',
-    input: undefined,
-    ascii: false,
-    svg: false,
-    output: undefined,
-    theme: undefined,
-    ...overrides,
-  }
 }
 
 // ============================================================================

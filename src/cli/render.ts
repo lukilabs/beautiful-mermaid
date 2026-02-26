@@ -91,7 +91,7 @@ export async function runRender(
       asciiOpts.theme = diagramColorsToAsciiTheme(themeColors)
     }
     const ascii = renderMermaidASCII(text, asciiOpts)
-    out.write(ascii)
+    out.write(ascii + '\n')
   }
 
   // --------------------------------------------------------------------------

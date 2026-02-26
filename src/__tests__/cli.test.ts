@@ -15,7 +15,7 @@ import type { RenderArgs, SimpleCommand } from '../cli/parse-args.ts'
 // render command — happy paths
 // ============================================================================
 
-describe('parseArgs – render with --ascii', () => {
+describe('parseArgs – render happy paths', () => {
   it('parses render <file> --ascii', () => {
     const result = parseArgs(['render', 'diagram.mmd', '--ascii'])
     expect(result).toEqual({
@@ -27,9 +27,7 @@ describe('parseArgs – render with --ascii', () => {
       theme: undefined,
     } satisfies RenderArgs)
   })
-})
 
-describe('parseArgs – render with --svg and -o', () => {
   it('parses render <file> --svg -o <path>', () => {
     const result = parseArgs(['render', 'diagram.mmd', '--svg', '-o', 'out.svg'])
     expect(result).toEqual({
@@ -41,9 +39,7 @@ describe('parseArgs – render with --svg and -o', () => {
       theme: undefined,
     } satisfies RenderArgs)
   })
-})
 
-describe('parseArgs – render with both --ascii and --svg', () => {
   it('parses render <file> --ascii --svg -o <path>', () => {
     const result = parseArgs(['render', 'diagram.mmd', '--ascii', '--svg', '-o', 'out.svg'])
     expect(result).toEqual({
@@ -55,9 +51,7 @@ describe('parseArgs – render with both --ascii and --svg', () => {
       theme: undefined,
     } satisfies RenderArgs)
   })
-})
 
-describe('parseArgs – render with --theme', () => {
   it('parses render <file> --svg -o out.svg --theme tokyo-night', () => {
     const result = parseArgs(['render', 'diagram.mmd', '--svg', '-o', 'out.svg', '--theme', 'tokyo-night'])
     expect(result).toEqual({
@@ -69,10 +63,8 @@ describe('parseArgs – render with --theme', () => {
       theme: 'tokyo-night',
     } satisfies RenderArgs)
   })
-})
 
-describe('parseArgs – render from stdin (no file argument)', () => {
-  it('parses render --ascii with no file', () => {
+  it('parses render --ascii with no file (stdin)', () => {
     const result = parseArgs(['render', '--ascii'])
     expect(result).toEqual({
       command: 'render',
@@ -84,7 +76,7 @@ describe('parseArgs – render from stdin (no file argument)', () => {
     } satisfies RenderArgs)
   })
 
-  it('parses render --svg -o out.svg with no file', () => {
+  it('parses render --svg -o out.svg with no file (stdin)', () => {
     const result = parseArgs(['render', '--svg', '-o', 'out.svg'])
     expect(result).toEqual({
       command: 'render',
@@ -95,49 +87,7 @@ describe('parseArgs – render from stdin (no file argument)', () => {
       theme: undefined,
     } satisfies RenderArgs)
   })
-})
 
-// ============================================================================
-// simple commands
-// ============================================================================
-
-describe('parseArgs – themes command', () => {
-  it('parses "themes"', () => {
-    const result = parseArgs(['themes'])
-    expect(result).toEqual({ command: 'themes' } satisfies SimpleCommand)
-  })
-})
-
-describe('parseArgs – help', () => {
-  it('returns help for --help', () => {
-    const result = parseArgs(['--help'])
-    expect(result).toEqual({ command: 'help' } satisfies SimpleCommand)
-  })
-
-  it('returns help for -h', () => {
-    const result = parseArgs(['-h'])
-    expect(result).toEqual({ command: 'help' } satisfies SimpleCommand)
-  })
-
-  it('returns help for empty args', () => {
-    const result = parseArgs([])
-    expect(result).toEqual({ command: 'help' } satisfies SimpleCommand)
-  })
-})
-
-describe('parseArgs – version', () => {
-  it('returns version for --version', () => {
-    const result = parseArgs(['--version'])
-    expect(result).toEqual({ command: 'version' } satisfies SimpleCommand)
-  })
-
-  it('returns version for -v', () => {
-    const result = parseArgs(['-v'])
-    expect(result).toEqual({ command: 'version' } satisfies SimpleCommand)
-  })
-})
-
-describe('parseArgs – render with --output long form', () => {
   it('parses --output the same as -o', () => {
     const result = parseArgs(['render', 'diagram.mmd', '--svg', '--output', 'out.svg'])
     expect(result).toEqual({
@@ -152,10 +102,46 @@ describe('parseArgs – render with --output long form', () => {
 })
 
 // ============================================================================
+// simple commands
+// ============================================================================
+
+describe('parseArgs – simple commands', () => {
+  it('parses "themes"', () => {
+    const result = parseArgs(['themes'])
+    expect(result).toEqual({ command: 'themes' } satisfies SimpleCommand)
+  })
+
+  it('returns help for --help', () => {
+    const result = parseArgs(['--help'])
+    expect(result).toEqual({ command: 'help' } satisfies SimpleCommand)
+  })
+
+  it('returns help for -h', () => {
+    const result = parseArgs(['-h'])
+    expect(result).toEqual({ command: 'help' } satisfies SimpleCommand)
+  })
+
+  it('returns help for empty args', () => {
+    const result = parseArgs([])
+    expect(result).toEqual({ command: 'help' } satisfies SimpleCommand)
+  })
+
+  it('returns version for --version', () => {
+    const result = parseArgs(['--version'])
+    expect(result).toEqual({ command: 'version' } satisfies SimpleCommand)
+  })
+
+  it('returns version for -v', () => {
+    const result = parseArgs(['-v'])
+    expect(result).toEqual({ command: 'version' } satisfies SimpleCommand)
+  })
+})
+
+// ============================================================================
 // validation errors
 // ============================================================================
 
-describe('parseArgs – errors', () => {
+describe('parseArgs – validation errors', () => {
   it('throws when render has --svg but no -o', () => {
     expect(() => parseArgs(['render', 'diagram.mmd', '--svg'])).toThrow('--svg requires -o <path>')
   })

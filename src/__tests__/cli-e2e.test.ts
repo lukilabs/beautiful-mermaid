@@ -65,25 +65,19 @@ afterEach(async () => {
 })
 
 // ============================================================================
-// --help prints usage
+// help and metadata
 // ============================================================================
 
-describe('CLI e2e – --help', () => {
-  it('prints usage containing "beautiful-mermaid" and "render"', async () => {
+describe('CLI e2e – help and metadata', () => {
+  it('--help prints usage containing "beautiful-mermaid" and "render"', async () => {
     const { stdout, exitCode } = await runCli(['--help'])
 
     expect(exitCode).toBe(0)
     expect(stdout).toContain('beautiful-mermaid')
     expect(stdout).toContain('render')
   })
-})
 
-// ============================================================================
-// themes lists available themes
-// ============================================================================
-
-describe('CLI e2e – themes command', () => {
-  it('lists available themes including tokyo-night and dracula', async () => {
+  it('themes command lists available themes including tokyo-night and dracula', async () => {
     const { stdout, exitCode } = await runCli(['themes'])
 
     expect(exitCode).toBe(0)
@@ -93,11 +87,11 @@ describe('CLI e2e – themes command', () => {
 })
 
 // ============================================================================
-// render --ascii prints diagram to stdout
+// render
 // ============================================================================
 
-describe('CLI e2e – render --ascii from file', () => {
-  it('renders ASCII diagram to stdout containing node labels', async () => {
+describe('CLI e2e – render', () => {
+  it('renders ASCII diagram from file to stdout containing node labels', async () => {
     const inputPath = join(tmpDir, 'diagram.mmd')
     await writeFile(inputPath, SIMPLE_FLOWCHART)
 
@@ -108,13 +102,7 @@ describe('CLI e2e – render --ascii from file', () => {
     expect(stdout).toContain('Middle')
     expect(stdout).toContain('End')
   })
-})
 
-// ============================================================================
-// render --ascii from stdin
-// ============================================================================
-
-describe('CLI e2e – render --ascii from stdin', () => {
   it('renders ASCII diagram piped via stdin', async () => {
     const { stdout, exitCode } = await runCli(
       ['render', '--ascii'],
@@ -125,13 +113,7 @@ describe('CLI e2e – render --ascii from stdin', () => {
     expect(stdout).toContain('Start')
     expect(stdout).toContain('End')
   })
-})
 
-// ============================================================================
-// render --svg -o writes SVG file
-// ============================================================================
-
-describe('CLI e2e – render --svg -o writes SVG file', () => {
   it('renders SVG and writes output file containing <svg', async () => {
     const inputPath = join(tmpDir, 'diagram.mmd')
     const outputPath = join(tmpDir, 'output.svg')
@@ -147,13 +129,7 @@ describe('CLI e2e – render --svg -o writes SVG file', () => {
     expect(svg).toContain('<svg')
     expect(svg).toContain('</svg>')
   })
-})
 
-// ============================================================================
-// render --ascii --svg -o produces both
-// ============================================================================
-
-describe('CLI e2e – render --ascii --svg -o produces both', () => {
   it('prints ASCII to stdout AND writes SVG to file', async () => {
     const inputPath = join(tmpDir, 'diagram.mmd')
     const outputPath = join(tmpDir, 'both.svg')
@@ -176,23 +152,17 @@ describe('CLI e2e – render --ascii --svg -o produces both', () => {
 })
 
 // ============================================================================
-// exits 1 on unknown command
+// error handling
 // ============================================================================
 
-describe('CLI e2e – unknown command', () => {
-  it('exits 1 and prints "Error" to stderr', async () => {
+describe('CLI e2e – error handling', () => {
+  it('exits 1 and prints "Error" to stderr on unknown command', async () => {
     const { exitCode, stderr } = await runCli(['badcommand'])
 
     expect(exitCode).toBe(1)
     expect(stderr).toContain('Error')
   })
-})
 
-// ============================================================================
-// exits 1 on invalid mermaid input
-// ============================================================================
-
-describe('CLI e2e – invalid mermaid input', () => {
   it('exits 1 when given a file with invalid mermaid syntax', async () => {
     const inputPath = join(tmpDir, 'bad.mmd')
     await writeFile(inputPath, 'this is not valid mermaid syntax at all')
