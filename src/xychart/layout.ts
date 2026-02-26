@@ -236,17 +236,17 @@ function layoutHorizontal(chart: XYChart): PositionedXYChart {
         const cy = catScale(i)
         const groupTop = cy - groupH / 2
         const by = groupTop + bIdx * (singleBarH + XY.barGroupGap)
-        const valX = valueScale(Math.max(s.data[i], yRange.min))
+        const valX = valueScale(Math.max(s.data[i]!, yRange.min))
         const baseX = valueScale(Math.max(0, yRange.min))
         bars.push({
           x: Math.min(baseX, valX),
           y: by,
           width: Math.abs(valX - baseX),
           height: singleBarH,
-          value: s.data[i],
-          label: catLabels[i],
+          value: s.data[i]!,
+          label: catLabels[i]!,
           seriesIndex: bIdx,
-          colorIndex: colorMap[seriesArrayIdx],
+          colorIndex: colorMap[seriesArrayIdx]!,
         })
       }
       bIdx++
@@ -260,8 +260,8 @@ function layoutHorizontal(chart: XYChart): PositionedXYChart {
   let lineSeriesIdx = 0
   for (const s of chart.series) {
     if (s.type !== 'line') { lineSeriesIdx++; continue }
-    const points = s.data.map((v, i) => ({ x: valueScale(v), y: catScale(i), value: v, label: catLabels[i] }))
-    lines.push({ points, seriesIndex: lineIdx, colorIndex: colorMap[lineSeriesIdx] })
+    const points = s.data.map((v, i) => ({ x: valueScale(v), y: catScale(i), value: v, label: catLabels[i]! }))
+    lines.push({ points, seriesIndex: lineIdx, colorIndex: colorMap[lineSeriesIdx]! })
     lineIdx++
     lineSeriesIdx++
   }
@@ -349,17 +349,17 @@ function layoutBars(
       const cx = xScale(i)
       const groupLeft = cx - groupW / 2
       const bx = groupLeft + bIdx * (singleBarW + XY.barGroupGap)
-      const valY = yScale(s.data[i])
+      const valY = yScale(s.data[i]!)
       const baseY = yScale(Math.max(0, yMin))
       bars.push({
         x: bx,
         y: Math.min(valY, baseY),
         width: singleBarW,
         height: Math.abs(baseY - valY),
-        value: s.data[i],
-        label: catLabels[i],
+        value: s.data[i]!,
+        label: catLabels[i]!,
         seriesIndex: bIdx,
-        colorIndex: colorMap[seriesArrayIdx],
+        colorIndex: colorMap[seriesArrayIdx]!,
       })
     }
     bIdx++
@@ -374,8 +374,8 @@ function layoutLines(chart: XYChart, xScale: (i: number) => number, yScale: (v: 
   let seriesArrayIdx = 0
   for (const s of chart.series) {
     if (s.type !== 'line') { seriesArrayIdx++; continue }
-    const points = s.data.map((v, i) => ({ x: xScale(i), y: yScale(v), value: v, label: catLabels[i] }))
-    lines.push({ points, seriesIndex: lineIdx, colorIndex: colorMap[seriesArrayIdx] })
+    const points = s.data.map((v, i) => ({ x: xScale(i), y: yScale(v), value: v, label: catLabels[i]! }))
+    lines.push({ points, seriesIndex: lineIdx, colorIndex: colorMap[seriesArrayIdx]! })
     lineIdx++
     seriesArrayIdx++
   }
@@ -416,9 +416,9 @@ function buildLegendItems(chart: XYChart, centerX: number, y: number, colorMap: 
   const items: LegendItem[] = []
   let barIdx = 0, lineIdx = 0
   for (let si = 0; si < chart.series.length; si++) {
-    const s = chart.series[si]
+    const s = chart.series[si]!
     const label = s.type === 'bar' ? `Bar ${barIdx + 1}` : `Line ${lineIdx + 1}`
-    items.push({ label, x: 0, y, type: s.type, seriesIndex: s.type === 'bar' ? barIdx : lineIdx, colorIndex: colorMap[si] })
+    items.push({ label, x: 0, y, type: s.type, seriesIndex: s.type === 'bar' ? barIdx : lineIdx, colorIndex: colorMap[si]! })
     if (s.type === 'bar') barIdx++
     else lineIdx++
   }
@@ -432,8 +432,8 @@ function buildLegendItems(chart: XYChart, centerX: number, y: number, colorMap: 
   let x = centerX - totalWidth / 2
 
   for (let i = 0; i < items.length; i++) {
-    items[i].x = x
-    x += itemWidths[i] + XY.legendItemGap
+    items[i]!.x = x
+    x += itemWidths[i]! + XY.legendItemGap
   }
 
   return items

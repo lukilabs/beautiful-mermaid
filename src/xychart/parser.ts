@@ -46,7 +46,7 @@ export function parseXYChart(lines: string[]): XYChart {
     const xCatMatch = line.match(/^x-axis\s+(?:"([^"]*)"\s*)?\[([^\]]+)\]/)
     if (xCatMatch) {
       if (xCatMatch[1]) xAxis.title = xCatMatch[1]
-      xAxis.categories = xCatMatch[2].split(',').map(s => s.trim())
+      xAxis.categories = xCatMatch[2]!.split(',').map(s => s.trim())
       continue
     }
 
@@ -54,7 +54,7 @@ export function parseXYChart(lines: string[]): XYChart {
     const xRangeMatch = line.match(/^x-axis\s+(?:"([^"]*)"\s+)?(-?\d+(?:\.\d+)?)\s*-->\s*(-?\d+(?:\.\d+)?)/)
     if (xRangeMatch) {
       if (xRangeMatch[1]) xAxis.title = xRangeMatch[1]
-      xAxis.range = { min: parseFloat(xRangeMatch[2]), max: parseFloat(xRangeMatch[3]) }
+      xAxis.range = { min: parseFloat(xRangeMatch[2]!), max: parseFloat(xRangeMatch[3]!) }
       continue
     }
 
@@ -62,7 +62,7 @@ export function parseXYChart(lines: string[]): XYChart {
     const yRangeMatch = line.match(/^y-axis\s+(?:"([^"]*)"\s+)?(-?\d+(?:\.\d+)?)\s*-->\s*(-?\d+(?:\.\d+)?)/)
     if (yRangeMatch) {
       if (yRangeMatch[1]) yAxis.title = yRangeMatch[1]
-      yAxis.range = { min: parseFloat(yRangeMatch[2]), max: parseFloat(yRangeMatch[3]) }
+      yAxis.range = { min: parseFloat(yRangeMatch[2]!), max: parseFloat(yRangeMatch[3]!) }
       continue
     }
 
@@ -76,14 +76,14 @@ export function parseXYChart(lines: string[]): XYChart {
     // bar [...]
     const barMatch = line.match(/^bar\s+\[([^\]]+)\]/)
     if (barMatch) {
-      series.push({ type: 'bar', data: parseNumericArray(barMatch[1]) })
+      series.push({ type: 'bar', data: parseNumericArray(barMatch[1]!) })
       continue
     }
 
     // line [...]
     const lineMatch = line.match(/^line\s+\[([^\]]+)\]/)
     if (lineMatch) {
-      series.push({ type: 'line', data: parseNumericArray(lineMatch[1]) })
+      series.push({ type: 'line', data: parseNumericArray(lineMatch[1]!) })
       continue
     }
   }

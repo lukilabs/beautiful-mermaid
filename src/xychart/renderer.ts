@@ -87,8 +87,8 @@ export function renderXYChartSvg(
   const yVals = chart.horizontal
     ? chart.yAxis.ticks.map(t => t.y)
     : chart.gridLines.map(g => g.y1)
-  const xBase = xTicks.length > 1 ? Math.abs(xTicks[1] - xTicks[0]) : plotArea.width / 6
-  const yBase = yVals.length > 1 ? Math.abs(yVals[1] - yVals[0]) : plotArea.height / 6
+  const xBase = xTicks.length > 1 ? Math.abs(xTicks[1]! - xTicks[0]!) : plotArea.width / 6
+  const yBase = yVals.length > 1 ? Math.abs(yVals[1]! - yVals[0]!) : plotArea.height / 6
   const xGap = xBase / Math.max(1, Math.round(xBase / 20))
   const yGap = yBase / Math.max(1, Math.round(yBase / 20))
   const xAnchor = xTicks[0] ?? plotArea.x
@@ -155,8 +155,8 @@ export function renderXYChartSvg(
     }
 
     for (const entries of columns.values()) {
-      const cx = entries[0].x
-      const label = entries[0].label || ''
+      const cx = entries[0]!.x
+      const label = entries[0]!.label || ''
 
       if (interactive && entries.length > 1) {
         const topY = Math.min(...entries.map(e => e.y))
@@ -180,7 +180,7 @@ export function renderXYChartSvg(
         dotOverlay.push(group)
 
       } else if (interactive) {
-        const e = entries[0]
+        const e = entries[0]!
         const dataAttrs = ` data-value="${e.value}"${e.label ? ` data-label="${escapeXml(e.label)}"` : ''}`
         const tipText = formatTipValue(e.value)
         const tipTitle = e.label ? `${e.label}: ${tipText}` : tipText
@@ -400,9 +400,9 @@ function roundedRightBarPath(x: number, y: number, w: number, h: number, radius:
 
 function smoothCurvePath(points: Array<{ x: number; y: number }>): string {
   if (points.length === 0) return ''
-  if (points.length === 1) return `M${r(points[0].x)},${r(points[0].y)}`
+  if (points.length === 1) return `M${r(points[0]!.x)},${r(points[0]!.y)}`
   if (points.length === 2) {
-    return `M${r(points[0].x)},${r(points[0].y)} L${r(points[1].x)},${r(points[1].y)}`
+    return `M${r(points[0]!.x)},${r(points[0]!.y)} L${r(points[1]!.x)},${r(points[1]!.y)}`
   }
 
   const n = points.length
@@ -411,51 +411,51 @@ function smoothCurvePath(points: Array<{ x: number; y: number }>): string {
   const h: number[] = []
   const delta: number[] = []
   for (let i = 0; i < n - 1; i++) {
-    h.push(points[i + 1].x - points[i].x)
-    delta.push(h[i] === 0 ? 0 : (points[i + 1].y - points[i].y) / h[i])
+    h.push(points[i + 1]!.x - points[i]!.x)
+    delta.push(h[i]! === 0 ? 0 : (points[i + 1]!.y - points[i]!.y) / h[i]!)
   }
 
   // 2. Solve tridiagonal system for second derivatives c[] (natural boundary: c[0] = c[n-1] = 0)
-  const c = new Array(n).fill(0)
+  const c = new Array<number>(n).fill(0)
   if (n > 2) {
     // Forward elimination
-    const cp = new Array(n).fill(0) // modified upper diagonal
-    const dp = new Array(n).fill(0) // modified right-hand side
+    const cp = new Array<number>(n).fill(0) // modified upper diagonal
+    const dp = new Array<number>(n).fill(0) // modified right-hand side
     for (let i = 1; i < n - 1; i++) {
-      const diag = 2 * (h[i - 1] + h[i])
-      const rhs = 3 * (delta[i] - delta[i - 1])
+      const diag = 2 * (h[i - 1]! + h[i]!)
+      const rhs = 3 * (delta[i]! - delta[i - 1]!)
       if (i === 1) {
-        cp[i] = h[i] / diag
+        cp[i] = h[i]! / diag
         dp[i] = rhs / diag
       } else {
-        const w = diag - h[i - 1] * cp[i - 1]
-        cp[i] = h[i] / w
-        dp[i] = (rhs - h[i - 1] * dp[i - 1]) / w
+        const w = diag - h[i - 1]! * cp[i - 1]!
+        cp[i] = h[i]! / w
+        dp[i] = (rhs - h[i - 1]! * dp[i - 1]!) / w
       }
     }
     // Back substitution
     for (let i = n - 2; i >= 1; i--) {
-      c[i] = dp[i] - cp[i] * c[i + 1]
+      c[i] = dp[i]! - cp[i]! * c[i + 1]!
     }
   }
 
   // 3. Compute first derivatives (slopes) at each knot
-  const slopes = new Array(n).fill(0)
+  const slopes = new Array<number>(n).fill(0)
   for (let i = 0; i < n - 1; i++) {
-    slopes[i] = delta[i] - h[i] * (2 * c[i] + c[i + 1]) / 3
+    slopes[i] = delta[i]! - h[i]! * (2 * c[i]! + c[i + 1]!) / 3
   }
   // Slope at last point: derivative of last segment at its end
-  slopes[n - 1] = delta[n - 2] + h[n - 2] * (c[n - 2]) / 3
+  slopes[n - 1] = delta[n - 2]! + h[n - 2]! * (c[n - 2]!) / 3
 
   // 4. Convert to cubic Bezier — control points strictly between endpoints in x
-  let path = `M${r(points[0].x)},${r(points[0].y)}`
+  let path = `M${r(points[0]!.x)},${r(points[0]!.y)}`
   for (let i = 0; i < n - 1; i++) {
-    const seg = h[i] / 3
-    const cp1x = points[i].x + seg
-    const cp1y = points[i].y + slopes[i] * seg
-    const cp2x = points[i + 1].x - seg
-    const cp2y = points[i + 1].y - slopes[i + 1] * seg
-    path += ` C${r(cp1x)},${r(cp1y)} ${r(cp2x)},${r(cp2y)} ${r(points[i + 1].x)},${r(points[i + 1].y)}`
+    const seg = h[i]! / 3
+    const cp1x = points[i]!.x + seg
+    const cp1y = points[i]!.y + slopes[i]! * seg
+    const cp2x = points[i + 1]!.x - seg
+    const cp2y = points[i + 1]!.y - slopes[i + 1]! * seg
+    path += ` C${r(cp1x)},${r(cp1y)} ${r(cp2x)},${r(cp2y)} ${r(points[i + 1]!.x)},${r(points[i + 1]!.y)}`
   }
 
   return path
