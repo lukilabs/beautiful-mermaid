@@ -36,6 +36,9 @@
     "theming"
   ],
   "author": "Craft Docs",
+  "bin": {
+    "beautiful-mermaid": "dist/cli.js"
+  },
   "files": ["src/", "dist/", "LICENSE", "README.md"],
   "scripts": {
     "test": "bun test src/__tests__/",
