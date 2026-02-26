@@ -86,10 +86,11 @@ export async function runRender(
   // 4. Render ASCII → stdout
   // --------------------------------------------------------------------------
   if (args.ascii) {
-    const asciiOpts: AsciiRenderOptions = { colorMode: 'auto' }
-    if (themeColors) {
-      asciiOpts.theme = diagramColorsToAsciiTheme(themeColors)
-    }
+    // Use plain text by default (respects terminal colors on any background).
+    // Only apply ANSI colors when the user explicitly passes --theme.
+    const asciiOpts: AsciiRenderOptions = themeColors
+      ? { colorMode: 'auto', theme: diagramColorsToAsciiTheme(themeColors) }
+      : { colorMode: 'none' }
     const ascii = renderMermaidASCII(text, asciiOpts)
     out.write(ascii + '\n')
   }
