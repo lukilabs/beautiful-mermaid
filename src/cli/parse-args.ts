@@ -1,0 +1,114 @@
+// ============================================================================
+// CLI argument parser — zero-dependency, hand-rolled from process.argv.
+//
+// Usage:  parseArgs(process.argv.slice(2))
+//
+// Commands:
+//   render <file> --ascii              ASCII to stdout
+//   render <file> --svg -o <out.svg>   SVG to file
+//   render --ascii                     stdin → ASCII
+//   themes                             list available themes
+//   --help / -h                        show help
+//   --version / -v                     show version
+// ============================================================================
+
+// ============================================================================
+// Types
+// ============================================================================
+
+export interface RenderArgs {
+  command: 'render'
+  input: string | undefined
+  ascii: boolean
+  svg: boolean
+  output: string | undefined
+  theme: string | undefined
+}
+
+export interface SimpleCommand {
+  command: 'themes' | 'help' | 'version'
+}
+
+export type CliArgs = RenderArgs | SimpleCommand
+
+// ============================================================================
+// Parser
+// ============================================================================
+
+export function parseArgs(argv: string[]): CliArgs {
+  // Empty args → help
+  if (argv.length === 0) {
+    return { command: 'help' }
+  }
+
+  const first = argv[0]!
+
+  // Top-level flags (before any command)
+  if (first === '--help' || first === '-h') {
+    return { command: 'help' }
+  }
+  if (first === '--version' || first === '-v') {
+    return { command: 'version' }
+  }
+
+  // Simple commands
+  if (first === 'themes') {
+    return { command: 'themes' }
+  }
+
+  // Render command
+  if (first === 'render') {
+    return parseRender(argv.slice(1))
+  }
+
+  throw new Error(`Unknown command: ${first}`)
+}
+
+// ============================================================================
+// render sub-parser
+// ============================================================================
+
+function parseRender(args: string[]): RenderArgs {
+  let input: string | undefined
+  let ascii = false
+  let svg = false
+  let output: string | undefined
+  let theme: string | undefined
+
+  let i = 0
+  while (i < args.length) {
+    const arg = args[i]!
+
+    if (arg === '--ascii') {
+      ascii = true
+      i++
+    } else if (arg === '--svg') {
+      svg = true
+      i++
+    } else if (arg === '-o') {
+      output = args[i + 1]
+      i += 2
+    } else if (arg === '--theme') {
+      theme = args[i + 1]
+      i += 2
+    } else if (!arg.startsWith('-')) {
+      // Positional argument = input file
+      input = arg
+      i++
+    } else {
+      // Unknown flag — skip
+      i++
+    }
+  }
+
+  // Validation
+  if (!ascii && !svg) {
+    throw new Error('Specify --ascii and/or --svg -o <path>')
+  }
+
+  if (svg && output === undefined) {
+    throw new Error('--svg requires -o <path>')
+  }
+
+  return { command: 'render', input, ascii, svg, output, theme }
+}
