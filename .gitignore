@@ -8,6 +8,9 @@ dist/
 # Generated files
 index.html
 
+# SpecMind analysis output (local only)
+.specmind/
+
 # IDE
 .idea/
 .vscode/
