@@ -232,7 +232,7 @@ function parseStateDiagram(lines: string[]): MermaidGraph {
     }
 
     // --- composite state start: `state CompositeState {` ---
-    const compositeMatch = line.match(/^state\s+(?:"([^"]+)"\s+as\s+)?(\w+)\s*\{$/)
+    const compositeMatch = line.match(/^state\s+(?:"([^"]+)"\s+as\s+)?([\w\p{L}]+)\s*\{$/u)
     if (compositeMatch) {
       const label = compositeMatch[1] ?? compositeMatch[2]!
       const id = compositeMatch[2]!
@@ -260,7 +260,7 @@ function parseStateDiagram(lines: string[]): MermaidGraph {
     }
 
     // --- state alias: `state "Description" as s1` (without brace) ---
-    const stateAliasMatch = line.match(/^state\s+"([^"]+)"\s+as\s+(\w+)\s*$/)
+    const stateAliasMatch = line.match(/^state\s+"([^"]+)"\s+as\s+([\w\p{L}]+)\s*$/u)
     if (stateAliasMatch) {
       const label = normalizeBrTags(stateAliasMatch[1]!)
       const id = stateAliasMatch[2]!
@@ -269,7 +269,7 @@ function parseStateDiagram(lines: string[]): MermaidGraph {
     }
 
     // --- transition: `s1 --> s2` or `s1 --> s2 : label` or `[*] --> s1` ---
-    const transitionMatch = line.match(/^(\[\*\]|[\w-]+)\s*(-->)\s*(\[\*\]|[\w-]+)(?:\s*:\s*(.+))?$/)
+    const transitionMatch = line.match(/^(\[\*\]|[\w\p{L}-]+)\s*(-->)\s*(\[\*\]|[\w\p{L}-]+)(?:\s*:\s*(.+))?$/u)
     if (transitionMatch) {
       let sourceId = transitionMatch[1]!
       let targetId = transitionMatch[3]!
@@ -307,7 +307,7 @@ function parseStateDiagram(lines: string[]): MermaidGraph {
     }
 
     // --- state description: `s1 : Description` ---
-    const stateDescMatch = line.match(/^([\w-]+)\s*:\s*(.+)$/)
+    const stateDescMatch = line.match(/^([\w\p{L}-]+)\s*:\s*(.+)$/u)
     if (stateDescMatch) {
       const id = stateDescMatch[1]!
       const label = normalizeBrTags(stateDescMatch[2]!.trim())
@@ -399,6 +399,14 @@ function parseStyleProps(propsStr: string): Record<string, string> {
 const ARROW_REGEX = /^(<)?(-->|-.->|==>|---|-\.-|===)(?:\|([^|]*)\|)?/
 
 /**
+ * Text-embedded label regex — matches "-- label -->", "-. label .->", "== label ==>" syntax.
+ * Tried as fallback when ARROW_REGEX doesn't match.
+ *
+ * Based on PR #36 by @liuxiaopai-ai (https://github.com/lukilabs/beautiful-mermaid/pull/36)
+ */
+const TEXT_ARROW_REGEX = /^(<)?(--|-\.|==)\s+(.+?)\s+(-->|---|\.\->|-\.\-|==>|===)/
+
+/**
  * Node shape patterns — ordered from most specific delimiters to least.
  * Multi-char delimiters must be tried before single-char to avoid false matches.
  */
@@ -455,17 +463,33 @@ function parseEdgeLine(
 
   // Parse arrow + node-group pairs until the line is exhausted
   while (remaining.length > 0) {
+    let hasArrowStart: boolean
+    let style: EdgeStyle
+    let hasArrowEnd: boolean
+    let edgeLabel: string | undefined
+
     const arrowMatch = remaining.match(ARROW_REGEX)
-    if (!arrowMatch) break
-
-    const hasArrowStart = Boolean(arrowMatch[1])
-    const arrowOp = arrowMatch[2]!
-    const rawEdgeLabel = arrowMatch[3]?.trim()
-    const edgeLabel = rawEdgeLabel ? normalizeBrTags(rawEdgeLabel) : undefined
-    remaining = remaining.slice(arrowMatch[0].length).trim()
-
-    const style = arrowStyleFromOp(arrowOp)
-    const hasArrowEnd = arrowOp.endsWith('>')
+    if (arrowMatch) {
+      hasArrowStart = Boolean(arrowMatch[1])
+      const arrowOp = arrowMatch[2]!
+      const rawEdgeLabel = arrowMatch[3]?.trim()
+      edgeLabel = rawEdgeLabel ? normalizeBrTags(rawEdgeLabel) : undefined
+      remaining = remaining.slice(arrowMatch[0].length).trim()
+      style = arrowStyleFromOp(arrowOp)
+      hasArrowEnd = arrowOp.endsWith('>')
+    } else {
+      // Fallback: text-embedded label syntax (-- Yes -->, -. Maybe .->, == Sure ==>)
+      const textMatch = remaining.match(TEXT_ARROW_REGEX)
+      if (!textMatch) break
+      hasArrowStart = Boolean(textMatch[1])
+      const rawLabel = textMatch[3]!.trim()
+      edgeLabel = rawLabel ? normalizeBrTags(rawLabel) : undefined
+      const openOp = textMatch[2]!
+      const closeOp = textMatch[4]!
+      remaining = remaining.slice(textMatch[0].length).trim()
+      style = textArrowStyleFromOps(openOp, closeOp)
+      hasArrowEnd = closeOp.endsWith('>')
+    }
 
     // Parse the next node group
     const nextGroup = consumeNodeGroup(remaining, graph, subgraphStack)
@@ -610,5 +634,12 @@ function arrowStyleFromOp(op: string): EdgeStyle {
   if (op === '==>') return 'thick'
   if (op === '===') return 'thick'
   // '-->'' and '---' are both solid
+  return 'solid'
+}
+
+/** Map text-embedded arrow open/close operators to edge style */
+function textArrowStyleFromOps(openOp: string, closeOp: string): EdgeStyle {
+  if (openOp === '-.' || closeOp === '.->' || closeOp === '-.-') return 'dotted'
+  if (openOp === '==' || closeOp === '==>' || closeOp === '===') return 'thick'
   return 'solid'
 }

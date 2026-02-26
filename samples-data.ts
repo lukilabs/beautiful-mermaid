@@ -122,6 +122,17 @@ export const samples: Sample[] = [
   C === D[Node 4]`,
   },
   {
+    title: 'Text-Embedded Labels',
+    category: 'Flowchart',
+    description: 'Using `-- label -->` syntax instead of `-->|label|` for edge labels.',
+    source: `flowchart TD
+  A(Start) --> B{Is it sunny?}
+  B -- Yes --> C[Go to the park]
+  B -- No --> D[Stay indoors]
+  C --> E[Finish]
+  D --> E`,
+  },
+  {
     title: 'Bidirectional Arrows',
     category: 'Flowchart',
     description: 'Arrows in both directions: `<-->`, `<-.->`, `<==>`.',
@@ -144,6 +155,39 @@ export const samples: Sample[] = [
     description: 'A long chain of nodes demonstrating edge chaining syntax.',
     source: `graph LR
   A[Step 1] --> B[Step 2] --> C[Step 3] --> D[Step 4] --> E[Step 5]`,
+  },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  FLOWCHART — Edge Styling (linkStyle)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  {
+    title: 'linkStyle: Color-Coded Edges',
+    category: 'Flowchart',
+    description: 'Using `linkStyle` to color specific edges by index (0-based).',
+    source: `graph TD
+  A[Start] --> B{Decision}
+  B -->|Yes| C[Accept]
+  B -->|No| D[Reject]
+  C --> E[Done]
+  D --> E
+  linkStyle 0 stroke:#7aa2f7,stroke-width:3px
+  linkStyle 1 stroke:#9ece6a,stroke-width:2px
+  linkStyle 2 stroke:#f7768e,stroke-width:2px
+  linkStyle default stroke:#565f89`,
+  },
+  {
+    title: 'linkStyle: Default + Override',
+    category: 'Flowchart',
+    description: 'Default edge style with index-specific overrides for critical paths.',
+    source: `graph LR
+  A[Request] --> B[Auth]
+  B --> C[Process]
+  C --> D[Response]
+  B --> E[Reject]
+  linkStyle default stroke:#6b7280,stroke-width:1px
+  linkStyle 0,1,2 stroke:#22c55e,stroke-width:2px
+  linkStyle 3 stroke:#ef4444,stroke-width:3px`,
   },
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -351,6 +395,19 @@ export const samples: Sample[] = [
   Reconnecting --> Closed : max_retries
   Disconnecting --> Closed : done
   Closed --> [*]`,
+  },
+
+  {
+    title: 'State: CJK State Names',
+    category: 'State',
+    description: 'State diagram using Chinese characters for state names.',
+    source: `stateDiagram-v2
+  [*] --> 空闲
+  空闲 --> 处理中 : 提交
+  处理中 --> 完成 : 成功
+  处理中 --> 错误 : 失败
+  错误 --> 空闲 : 重试
+  完成 --> [*]`,
   },
 
   // ══════════════════════════════════════════════════════════════════════════

@@ -329,6 +329,78 @@ describe('parseMermaid – bidirectional arrows', () => {
 })
 
 // ============================================================================
+// Text-embedded edge labels (fixes #32)
+// Based on PR #36 by @liuxiaopai-ai
+// ============================================================================
+
+describe('parseMermaid – text-embedded edge labels', () => {
+  it('parses solid arrow with text label: -- Yes -->', () => {
+    const g = parseMermaid('graph TD\n  A -- Yes --> B')
+    expect(g.edges).toHaveLength(1)
+    expect(g.edges[0]!.label).toBe('Yes')
+    expect(g.edges[0]!.style).toBe('solid')
+    expect(g.edges[0]!.hasArrowEnd).toBe(true)
+  })
+
+  it('parses solid line with text label: -- text ---', () => {
+    const g = parseMermaid('graph TD\n  A -- related --- B')
+    expect(g.edges[0]!.label).toBe('related')
+    expect(g.edges[0]!.style).toBe('solid')
+    expect(g.edges[0]!.hasArrowEnd).toBe(false)
+  })
+
+  it('parses dotted arrow with text label: -. Maybe .->', () => {
+    const g = parseMermaid('graph TD\n  A -. Maybe .-> B')
+    expect(g.edges[0]!.label).toBe('Maybe')
+    expect(g.edges[0]!.style).toBe('dotted')
+    expect(g.edges[0]!.hasArrowEnd).toBe(true)
+  })
+
+  it('parses thick arrow with text label: == Sure ==>', () => {
+    const g = parseMermaid('graph TD\n  A == Sure ==> B')
+    expect(g.edges[0]!.label).toBe('Sure')
+    expect(g.edges[0]!.style).toBe('thick')
+    expect(g.edges[0]!.hasArrowEnd).toBe(true)
+  })
+
+  it('parses multi-word text labels', () => {
+    const g = parseMermaid('graph TD\n  A -- This is a label --> B')
+    expect(g.edges[0]!.label).toBe('This is a label')
+  })
+
+  it('parses shaped nodes with text-embedded labels', () => {
+    const g = parseMermaid('graph TD\n  A[Start] -- Yes --> B(End)')
+    expect(g.edges[0]!.label).toBe('Yes')
+    expect(g.nodes.get('A')!.shape).toBe('rectangle')
+    expect(g.nodes.get('B')!.shape).toBe('rounded')
+  })
+
+  it('produces same result as pipe syntax (issue #32)', () => {
+    const pipe = parseMermaid(`graph TD
+      A --> B
+      B -->|Yes| C`)
+    const text = parseMermaid(`graph TD
+      A --> B
+      B -- Yes --> C`)
+    expect(pipe.edges[1]!.label).toBe(text.edges[1]!.label)
+    expect(pipe.edges[1]!.style).toBe(text.edges[1]!.style)
+    expect(pipe.edges[1]!.hasArrowEnd).toBe(text.edges[1]!.hasArrowEnd)
+  })
+
+  it('handles the exact issue #32 scenario', () => {
+    const g = parseMermaid(`flowchart TD
+      A(Start) --> B{Is it sunny?}
+      B -- Yes --> C[Go to the park]
+      B -- No --> D[Stay indoors]
+      C --> E[Finish]
+      D --> E`)
+    expect(g.edges).toHaveLength(5)
+    expect(g.edges[1]!.label).toBe('Yes')
+    expect(g.edges[2]!.label).toBe('No')
+  })
+})
+
+// ============================================================================
 // Parallel links with & (Batch 2.6)
 // ============================================================================
 
@@ -726,6 +798,43 @@ describe('parseMermaid – state diagrams', () => {
         parse --> validate
       }`)
     expect(g.subgraphs[0]!.direction).toBe('LR')
+  })
+
+  it('parses CJK (Chinese) state names in transitions', () => {
+    const g = parseMermaid(`stateDiagram-v2
+      [*] --> 空闲
+      空闲 --> 完成`)
+    expect(g.edges).toHaveLength(2)
+    expect(g.edges[0]!.target).toBe('空闲')
+    expect(g.edges[1]!.source).toBe('空闲')
+    expect(g.edges[1]!.target).toBe('完成')
+    expect(g.nodes.get('空闲')!.shape).toBe('rounded')
+  })
+
+  it('parses CJK state names with transition labels', () => {
+    const g = parseMermaid(`stateDiagram-v2
+      空闲 --> 处理中 : 提交`)
+    expect(g.edges[0]!.source).toBe('空闲')
+    expect(g.edges[0]!.target).toBe('处理中')
+    expect(g.edges[0]!.label).toBe('提交')
+  })
+
+  it('parses CJK state descriptions', () => {
+    const g = parseMermaid(`stateDiagram-v2
+      空闲 : 等待输入
+      空闲 --> 完成`)
+    expect(g.nodes.get('空闲')!.label).toBe('等待输入')
+  })
+
+  it('parses Japanese state names', () => {
+    const g = parseMermaid(`stateDiagram-v2
+      [*] --> 待機
+      待機 --> 処理中 : 開始
+      処理中 --> 完了`)
+    expect(g.edges).toHaveLength(3)
+    expect(g.nodes.has('待機')).toBe(true)
+    expect(g.nodes.has('処理中')).toBe(true)
+    expect(g.nodes.has('完了')).toBe(true)
   })
 
   it('handles full state diagram with start/end and composites', () => {
