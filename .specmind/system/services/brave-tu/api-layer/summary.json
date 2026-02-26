@@ -1,0 +1,13 @@
+{
+  "layer": "api",
+  "totalFiles": 0,
+  "totalChunks": 0,
+  "chunkManifest": [],
+  "summary": {
+    "totalFiles": 0,
+    "totalEndpoints": 0,
+    "frameworks": [],
+    "methods": {}
+  },
+  "crossLayerDependencies": []
+}

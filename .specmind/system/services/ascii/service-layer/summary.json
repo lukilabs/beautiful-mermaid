@@ -1,0 +1,104 @@
+{
+  "layer": "service",
+  "totalFiles": 25,
+  "totalChunks": 11,
+  "chunkManifest": [
+    {
+      "chunkIndex": 0,
+      "fileCount": 1,
+      "files": [
+        "/Users/jseet/Dropbox/Development/Other/beautiful-mermaid/.claude/worktrees/brave-tu/src/ascii/ansi.ts"
+      ]
+    },
+    {
+      "chunkIndex": 1,
+      "fileCount": 1,
+      "files": [
+        "/Users/jseet/Dropbox/Development/Other/beautiful-mermaid/.claude/worktrees/brave-tu/src/ascii/canvas.ts"
+      ]
+    },
+    {
+      "chunkIndex": 2,
+      "fileCount": 1,
+      "files": [
+        "/Users/jseet/Dropbox/Development/Other/beautiful-mermaid/.claude/worktrees/brave-tu/src/ascii/class-diagram.ts"
+      ]
+    },
+    {
+      "chunkIndex": 3,
+      "fileCount": 2,
+      "files": [
+        "/Users/jseet/Dropbox/Development/Other/beautiful-mermaid/.claude/worktrees/brave-tu/src/ascii/converter.ts",
+        "/Users/jseet/Dropbox/Development/Other/beautiful-mermaid/.claude/worktrees/brave-tu/src/ascii/edge-bundling.ts"
+      ]
+    },
+    {
+      "chunkIndex": 4,
+      "fileCount": 1,
+      "files": [
+        "/Users/jseet/Dropbox/Development/Other/beautiful-mermaid/.claude/worktrees/brave-tu/src/ascii/edge-routing.ts"
+      ]
+    },
+    {
+      "chunkIndex": 5,
+      "fileCount": 1,
+      "files": [
+        "/Users/jseet/Dropbox/Development/Other/beautiful-mermaid/.claude/worktrees/brave-tu/src/ascii/er-diagram.ts"
+      ]
+    },
+    {
+      "chunkIndex": 6,
+      "fileCount": 1,
+      "files": [
+        "/Users/jseet/Dropbox/Development/Other/beautiful-mermaid/.claude/worktrees/brave-tu/src/ascii/grid.ts"
+      ]
+    },
+    {
+      "chunkIndex": 7,
+      "fileCount": 3,
+      "files": [
+        "/Users/jseet/Dropbox/Development/Other/beautiful-mermaid/.claude/worktrees/brave-tu/src/ascii/index.ts",
+        "/Users/jseet/Dropbox/Development/Other/beautiful-mermaid/.claude/worktrees/brave-tu/src/ascii/multiline-utils.ts",
+        "/Users/jseet/Dropbox/Development/Other/beautiful-mermaid/.claude/worktrees/brave-tu/src/ascii/pathfinder.ts"
+      ]
+    },
+    {
+      "chunkIndex": 8,
+      "fileCount": 4,
+      "files": [
+        "/Users/jseet/Dropbox/Development/Other/beautiful-mermaid/.claude/worktrees/brave-tu/src/ascii/sequence.ts",
+        "/Users/jseet/Dropbox/Development/Other/beautiful-mermaid/.claude/worktrees/brave-tu/src/ascii/shapes/circle.ts",
+        "/Users/jseet/Dropbox/Development/Other/beautiful-mermaid/.claude/worktrees/brave-tu/src/ascii/shapes/corners.ts",
+        "/Users/jseet/Dropbox/Development/Other/beautiful-mermaid/.claude/worktrees/brave-tu/src/ascii/shapes/diamond.ts"
+      ]
+    },
+    {
+      "chunkIndex": 9,
+      "fileCount": 7,
+      "files": [
+        "/Users/jseet/Dropbox/Development/Other/beautiful-mermaid/.claude/worktrees/brave-tu/src/ascii/shapes/hexagon.ts",
+        "/Users/jseet/Dropbox/Development/Other/beautiful-mermaid/.claude/worktrees/brave-tu/src/ascii/shapes/index.ts",
+        "/Users/jseet/Dropbox/Development/Other/beautiful-mermaid/.claude/worktrees/brave-tu/src/ascii/shapes/rectangle.ts",
+        "/Users/jseet/Dropbox/Development/Other/beautiful-mermaid/.claude/worktrees/brave-tu/src/ascii/shapes/rounded.ts",
+        "/Users/jseet/Dropbox/Development/Other/beautiful-mermaid/.claude/worktrees/brave-tu/src/ascii/shapes/special.ts",
+        "/Users/jseet/Dropbox/Development/Other/beautiful-mermaid/.claude/worktrees/brave-tu/src/ascii/shapes/stadium.ts",
+        "/Users/jseet/Dropbox/Development/Other/beautiful-mermaid/.claude/worktrees/brave-tu/src/ascii/shapes/state.ts"
+      ]
+    },
+    {
+      "chunkIndex": 10,
+      "fileCount": 3,
+      "files": [
+        "/Users/jseet/Dropbox/Development/Other/beautiful-mermaid/.claude/worktrees/brave-tu/src/ascii/shapes/types.ts",
+        "/Users/jseet/Dropbox/Development/Other/beautiful-mermaid/.claude/worktrees/brave-tu/src/ascii/types.ts",
+        "/Users/jseet/Dropbox/Development/Other/beautiful-mermaid/.claude/worktrees/brave-tu/src/ascii/validate.ts"
+      ]
+    }
+  ],
+  "summary": {
+    "totalFiles": 25,
+    "totalFunctions": 200,
+    "totalClasses": 31
+  },
+  "crossLayerDependencies": []
+}

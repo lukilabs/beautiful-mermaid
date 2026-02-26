@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "lib": ["ESNext", "DOM"],
+    "noEmit": true
+  },
+  "include": [
+    "editor/**/*",
+    "build-editor.ts",
+    "dev-editor.ts"
+  ]
+}

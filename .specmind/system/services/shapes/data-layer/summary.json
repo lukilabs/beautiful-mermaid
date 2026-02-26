@@ -1,0 +1,16 @@
+{
+  "layer": "data",
+  "totalFiles": 0,
+  "totalChunks": 0,
+  "chunkManifest": [],
+  "summary": {
+    "totalFiles": 0,
+    "totalModels": 0,
+    "totalEntities": 0,
+    "totalQueries": 0,
+    "databaseTypes": [],
+    "orms": []
+  },
+  "crossLayerDependencies": [],
+  "databases": {}
+}

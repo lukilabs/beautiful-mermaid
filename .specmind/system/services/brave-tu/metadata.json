@@ -1,0 +1,14 @@
+{
+  "name": "brave-tu",
+  "rootPath": "/Users/jseet/Dropbox/Development/Other/beautiful-mermaid/.claude/worktrees/brave-tu/src",
+  "entryPoint": "/Users/jseet/Dropbox/Development/Other/beautiful-mermaid/.claude/worktrees/brave-tu/src/index.ts",
+  "type": "library",
+  "filesAnalyzed": 68,
+  "layers": [
+    "data",
+    "api",
+    "service",
+    "external"
+  ],
+  "crossLayerDependencies": {}
+}

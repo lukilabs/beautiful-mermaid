@@ -1,0 +1,492 @@
+# beautiful-mermaid System Architecture
+
+## Overview
+
+**beautiful-mermaid** (v1.0.2) is a pure TypeScript library that renders Mermaid diagram syntax to styled SVG strings or ASCII art. It is framework-agnostic with zero DOM dependencies, making it suitable for use in Node.js, Bun, and browser environments. It supports flowcharts, state diagrams, sequence diagrams, class diagrams, and ER diagrams.
+
+Key characteristics:
+- **Zero DOM**: No `document`, `window`, or browser globals required
+- **Synchronous + Async**: Both `renderMermaidSVG()` and `renderMermaidSVGAsync()` APIs
+- **Fully Themeable**: CSS custom properties system; integrates with Shiki themes via `fromShikiTheme()`
+- **Dual Output**: SVG rendering (production) and ASCII art rendering (terminals, tests)
+- **ELK-powered layout**: Uses `elkjs` for automatic graph layout with a `FakeWorker` bypass (no async delay)
+
+---
+
+## System Architecture
+
+```mermaid
+---
+config:
+  layout: elk
+---
+flowchart TB
+  subgraph Library["beautiful-mermaid Library"]
+    Entry["renderMermaidSVG()\nrenderMermaidASCII()"]
+    Router["detectDiagramType()"]
+
+    subgraph SVG["SVG Pipeline"]
+      FlowPipe["Flowchart\nparseMermaid → layoutGraphSync → renderSvg"]
+      SeqPipe["Sequence\nparseSequenceDiagram → layoutSequenceDiagram → renderSequenceSvg"]
+      ClassPipe["Class\nparseClassDiagram → layoutClassDiagramSync → renderClassSvg"]
+      ErPipe["ER\nparseErDiagram → layoutErDiagramSync → renderErSvg"]
+    end
+
+    subgraph ASCII["ASCII Pipeline"]
+      AsciiEntry["renderMermaidASCII()"]
+      AsciiConvert["convertToAsciiGraph()"]
+      AsciiRender["ASCII Renderers\nflowchart / sequence / class / er"]
+      Shapes["Shape Registry\ncircle / diamond / hexagon / stadium / ..."]
+    end
+
+    Theme["Theme System\nDiagramColors / THEMES / fromShikiTheme()"]
+    Utils["Utilities\nmultiline-utils / text-metrics / styles / shape-clipping"]
+  end
+
+  ELK[("elkjs\nLayout Engine")]
+
+  Entry --> Router
+  Router --> FlowPipe
+  Router --> SeqPipe
+  Router --> ClassPipe
+  Router --> ErPipe
+  FlowPipe --> ELK
+  ClassPipe --> ELK
+  ErPipe --> ELK
+  Entry --> AsciiEntry
+  AsciiEntry --> AsciiConvert
+  AsciiConvert --> AsciiRender
+  AsciiRender --> Shapes
+  FlowPipe --> Theme
+  SeqPipe --> Theme
+  ClassPipe --> Theme
+  ErPipe --> Theme
+  FlowPipe --> Utils
+  SeqPipe --> Utils
+```
+
+### Services
+
+| Module | Type | Purpose |
+|---|---|---|
+| **brave-tu** (src/) | library | Core library — parsers, layout, SVG renderers, public API |
+| **ascii** (src/ascii/) | library | ASCII art rendering engine for all diagram types |
+| **shapes** (src/ascii/shapes/) | library | Shape renderers used by the ASCII engine |
+
+### Data Stores
+
+None. The library is stateless except for the ELK.js singleton (lazy-initialized, cached in `src/elk-instance.ts`).
+
+### External Integrations
+
+| Integration | Purpose |
+|---|---|
+| **elkjs** ^0.11.0 | Automatic graph layout for flowchart, class, and ER diagrams |
+| **entities** ^7.0.1 | XML entity decoding (`decodeXML`) to handle entities from markdown parsers |
+| **shiki** (optional devDep) | Provides `ThemeRegistrationResolved` interface for `fromShikiTheme()` |
+
+### Communication Patterns
+
+All modules communicate via direct TypeScript function calls (no HTTP, IPC, or message passing). The data flows are:
+
+1. **Mermaid text → Parse → Typed diagram** (e.g., `MermaidGraph`, `ClassDiagram`, `SequenceDiagram`, `ErDiagram`)
+2. **Typed diagram → Layout → Positioned diagram** (e.g., `PositionedGraph`, `PositionedSequenceDiagram`)
+3. **Positioned diagram → Render → SVG string** or **→ ASCII string**
+
+Cross-module import counts (detected by analyzer):
+- `brave-tu → ascii`: 6 references
+- `ascii → brave-tu`: 11 references (ASCII engine imports types from main library)
+
+---
+
+## Cross-Service Flows
+
+### SVG Rendering Flow
+
+#### Summary
+Takes raw Mermaid text, detects the diagram type, routes through the appropriate parse → layout → render pipeline, and returns a self-contained SVG string.
+
+#### Participants
+- `src/index.ts` (public API)
+- `src/parser.ts` / `src/class/parser.ts` / `src/er/parser.ts` / `src/sequence/parser.ts`
+- `src/layout.ts` / `src/class/layout.ts` / `src/er/layout.ts` / `src/sequence/layout.ts`
+- `src/renderer.ts` / `src/class/renderer.ts` / `src/er/renderer.ts` / `src/sequence/renderer.ts`
+- `elkjs` (external)
+
+#### Key Operations
+
+```mermaid
+sequenceDiagram
+  participant User
+  participant API as src/index.ts
+  participant Parser
+  participant Layout
+  participant Renderer
+  participant ELK as elkjs
+
+  User->>API: renderMermaidSVG(text, options?)
+  API->>API: decodeXML(text)
+  API->>API: detectDiagramType(text)
+  API->>Parser: parseMermaid(text) [or parseClassDiagram/parseSequenceDiagram/parseErDiagram]
+  Parser-->>API: TypedDiagram (MermaidGraph | ClassDiagram | SequenceDiagram | ErDiagram)
+  API->>Layout: layoutGraphSync(diagram, options) [or variant]
+  Layout->>ELK: elkLayout(graph)
+  ELK-->>Layout: positioned coordinates
+  Layout-->>API: PositionedDiagram
+  API->>Renderer: renderSvg(positioned, colors, font, transparent) [or variant]
+  Renderer-->>API: SVG string
+  API-->>User: SVG string
+```
+
+### ASCII Rendering Flow
+
+#### Summary
+Takes raw Mermaid text, detects the diagram type, converts the parsed graph to an `AsciiGraph` grid model, then renders it as a multi-line string using ASCII box-drawing characters.
+
+#### Participants
+- `src/ascii/index.ts` (entry point)
+- `src/parser.ts` (reused for flowcharts)
+- `src/ascii/converter.ts`
+- `src/ascii/edge-routing.ts` + `src/ascii/pathfinder.ts` + `src/ascii/grid.ts`
+- `src/ascii/shapes/` (shape renderers)
+- `src/ascii/canvas.ts` (2D character canvas)
+
+#### Key Operations
+
+```mermaid
+sequenceDiagram
+  participant User
+  participant Entry as ascii/index.ts
+  participant Parser as parser.ts
+  participant Converter as ascii/converter.ts
+  participant EdgeRouter as ascii/edge-routing.ts
+  participant Canvas as ascii/canvas.ts
+  participant Shapes as ascii/shapes/
+
+  User->>Entry: renderMermaidASCII(text, options?)
+  Entry->>Entry: detectDiagramType(text)
+  Entry->>Parser: parseMermaid(text)
+  Parser-->>Entry: MermaidGraph
+  Entry->>Converter: convertToAsciiGraph(parsed, config)
+  Converter-->>Entry: AsciiGraph
+  Entry->>EdgeRouter: determinePath(graph, edge) [for each edge]
+  EdgeRouter->>Canvas: reserveSpotInGrid(graph, node, coord)
+  Canvas-->>EdgeRouter: GridCoord
+  Entry->>Shapes: render(label, dimensions, options) [for each node]
+  Shapes-->>Entry: Canvas
+  Entry-->>User: ASCII string
+```
+
+---
+
+## ascii Service
+
+The ASCII art rendering engine responsible for converting positioned Mermaid graphs into multi-line strings using box-drawing characters, Unicode shapes, and ANSI color codes.
+
+### Architecture
+
+```mermaid
+---
+config:
+  layout: elk
+---
+flowchart TB
+  subgraph API["Entry Point"]
+    AsciiIndex["ascii/index.ts\nrenderMermaidASCII()\ndetectDiagramType()"]
+  end
+
+  subgraph Service["Core Rendering"]
+    Converter["ascii/converter.ts\nconvertToAsciiGraph()\nconvertSubgraph()"]
+    EdgeRouting["ascii/edge-routing.ts\ndetermineDirection()\ndeterminePath()\ndetermineStartAndEndDir()"]
+    EdgeBundling["ascii/edge-bundling.ts\nbundle edges"]
+    Pathfinder["ascii/pathfinder.ts\npath finding"]
+    Grid["ascii/grid.ts\ngridToDrawingCoord()\nreserveSpotInGrid()\nsetColumnWidth()"]
+    Canvas["ascii/canvas.ts\nmkCanvas()\ncopyCanvas()\nmkRoleCanvas()"]
+    MultilineUtils["ascii/multiline-utils.ts\nmeasure/wrap labels"]
+  end
+
+  subgraph DiagramRenderers["Diagram-Specific Renderers"]
+    ClassDiagram["ascii/class-diagram.ts\nbuildClassSections()\nformatMember()\ngetRelMarker()"]
+    ErDiagram["ascii/er-diagram.ts\nbuildEntitySections()\nformatAttribute()\ngetCrowsFootChars()"]
+    Sequence["ascii/sequence.ts\nrenderSequenceAscii()"]
+  end
+
+  subgraph Data["Types & Validation"]
+    Types["ascii/types.ts\nAsciiNode / AsciiEdge / AsciiGraph\nAsciiConfig / Canvas / GridCoord\nDrawingCoord / Direction / CharRole"]
+    Ansi["ascii/ansi.ts\ndiagramColorsToAsciiTheme()\ndetectColorMode()\nmixColors()"]
+    Validate["ascii/validate.ts\nhasDiagonalLines()\nassertNoDiagonals()"]
+    ShapesLib["ascii/shapes/\nShapeRegistry\nrender() per shape type"]
+  end
+
+  AsciiIndex --> Converter
+  AsciiIndex --> ClassDiagram
+  AsciiIndex --> ErDiagram
+  AsciiIndex --> Sequence
+  Converter --> EdgeRouting
+  Converter --> Grid
+  EdgeRouting --> Pathfinder
+  EdgeRouting --> Grid
+  Grid --> Canvas
+  AsciiIndex --> ShapesLib
+  AsciiIndex --> Ansi
+  Validate --> Types
+  ClassDiagram --> Types
+  ErDiagram --> Types
+  Sequence --> Types
+```
+
+### Architectural Layers
+
+**Service Layer** (all logic — no data/API/external layers):
+- **Entry**: `ascii/index.ts` exports `renderMermaidASCII()` and `AsciiRenderOptions`. Detects diagram type and dispatches to the appropriate pipeline.
+- **Conversion**: `converter.ts` transforms a `MermaidGraph` (from the main parser) into an `AsciiGraph` with grid coordinates and subgraph structure.
+- **Grid & Routing**: `grid.ts` manages a 2D coordinate space. `edge-routing.ts` computes direction, start/end points, and full paths for each edge. `pathfinder.ts` performs A*-style path-finding around obstacles.
+- **Canvas**: `canvas.ts` provides a 2D character buffer (`Canvas` type) with copy/resize operations. Each node and edge is rendered into canvas regions.
+- **Diagram Renderers**: `class-diagram.ts`, `er-diagram.ts`, and `sequence.ts` provide diagram-type-specific rendering logic on top of the generic engine.
+- **Theme/Color**: `ansi.ts` converts `DiagramColors` into ASCII-specific theme tokens and detects dark/light terminal color mode.
+- **Validation**: `validate.ts` detects and asserts the absence of diagonal line artifacts in ASCII output.
+
+### Technology Stack
+
+| Technology | Version | Role |
+|---|---|---|
+| TypeScript | — | Implementation language |
+| Bun | — | Runtime & test runner |
+
+### Architecture Violations
+
+None detected.
+
+---
+
+## shapes Service
+
+The shape renderer library used by the ASCII engine. Each file exports a `ShapeRenderer` implementing `getDimensions()`, `render()`, and `getAttachmentPoint()`.
+
+### Architecture
+
+```mermaid
+---
+config:
+  layout: elk
+---
+flowchart TB
+  subgraph API["Shape Registry"]
+    Index["shapes/index.ts\nShapeRegistry\ngetShapeRenderer(shape)"]
+  end
+
+  subgraph Service["Shape Implementations"]
+    Rectangle["shapes/rectangle.ts\ngetBoxDimensions()\nrenderBox()\ngetBoxAttachmentPoint()"]
+    Circle["shapes/circle.ts\nrender() — calls getCorners('circle')"]
+    Diamond["shapes/diamond.ts\nrender() — rotated square"]
+    Hexagon["shapes/hexagon.ts\nrender() — calls getCorners('hexagon')"]
+    Rounded["shapes/rounded.ts\nrender() — rounded rect"]
+    Stadium["shapes/stadium.ts\nrender() — pill shape"]
+    Special["shapes/special.ts\nrender() — asymmetric shapes"]
+    State["shapes/state.ts\nStartState.render()\nEndState.render()"]
+    Corners["shapes/corners.ts\ngetCorners(shape, useAscii)\ncorner char tables"]
+  end
+
+  subgraph Data["Types"]
+    Types["shapes/types.ts\nShapeRenderer (interface)\nShapeDimensions (interface)\nShapeRenderOptions (interface)\nShapeRegistry (type)"]
+  end
+
+  Index --> Rectangle
+  Index --> Circle
+  Index --> Diamond
+  Index --> Hexagon
+  Index --> Rounded
+  Index --> Stadium
+  Index --> Special
+  Index --> State
+  Circle --> Corners
+  Hexagon --> Corners
+  Rounded --> Corners
+  Stadium --> Corners
+  Circle --> Rectangle
+  Diamond --> Rectangle
+  Hexagon --> Rectangle
+  State --> Types
+  Index --> Types
+```
+
+### Architectural Layers
+
+**Service Layer** (all logic):
+- **Registry**: `shapes/index.ts` maps `AsciiNodeShape` values to `ShapeRenderer` instances.
+- **Base Shape**: `rectangle.ts` provides the foundational `renderBox()` and `getBoxAttachmentPoint()` functions used by most other shapes.
+- **Composite Shapes**: `circle.ts`, `hexagon.ts`, `stadium.ts`, and `rounded.ts` build on `rectangle.ts` + `corners.ts` for rounded/curved variants.
+- **Specialized**: `diamond.ts` renders rotated squares; `special.ts` handles asymmetric shapes; `state.ts` renders start/end state nodes.
+- **Corners**: `corners.ts` provides corner character lookup tables for both Unicode box-drawing and plain ASCII fallback modes.
+
+### Technology Stack
+
+| Technology | Role |
+|---|---|
+| TypeScript | Implementation language |
+
+### Architecture Violations
+
+None detected.
+
+---
+
+## brave-tu Service
+
+The main library package (`src/`). Provides the public API, all SVG rendering pipelines, parsers, ELK-based layout, theming, and the full test suite.
+
+### Architecture
+
+```mermaid
+---
+config:
+  layout: elk
+---
+flowchart TB
+  subgraph API["Public API"]
+    Index["src/index.ts\nrenderMermaidSVG()\nrenderMermaidSVGAsync()\nrenderMermaidASCII()\ndetectDiagramType()\nbuildColors()"]
+  end
+
+  subgraph Service["Flowchart Pipeline"]
+    Parser["src/parser.ts\nparseMermaid()\nparseFlowchart()"]
+    Layout["src/layout.ts\nlayoutGraphSync()"]
+    Renderer["src/renderer.ts\nrenderSvg()\nrenderGroup()\nrenderEdge()\narrowMarkerDefs()"]
+  end
+
+  subgraph ClassPipeline["Class Diagram Pipeline"]
+    ClassParser["src/class/parser.ts\nparseClassDiagram()\nparseMember()\nparseRelationship()"]
+    ClassLayout["src/class/layout.ts\nlayoutClassDiagramSync()"]
+    ClassRenderer["src/class/renderer.ts\nrenderClassSvg()"]
+    ClassTypes["src/class/types.ts\nClassDiagram / ClassNode\nClassMember / ClassRelationship"]
+  end
+
+  subgraph ErPipeline["ER Diagram Pipeline"]
+    ErParser["src/er/parser.ts\nparseErDiagram()"]
+    ErLayout["src/er/layout.ts\nlayoutErDiagramSync()"]
+    ErRenderer["src/er/renderer.ts\nrenderErSvg()\nrenderEntityBox()\nrenderAttribute()"]
+    ErTypes["src/er/types.ts\nErDiagram / ErEntity\nErAttribute / Cardinality"]
+  end
+
+  subgraph SeqPipeline["Sequence Diagram Pipeline"]
+    SeqParser["src/sequence/parser.ts\nparseSequenceDiagram()"]
+    SeqLayout["src/sequence/layout.ts\nlayoutSequenceDiagram()"]
+    SeqRenderer["src/sequence/renderer.ts\nrenderSequenceSvg()\nrenderActor()\nrenderLifeline()"]
+    SeqTypes["src/sequence/types.ts\nSequenceDiagram / Actor\nMessage / ActivationBox"]
+  end
+
+  subgraph Data["Types & Theme"]
+    Types["src/types.ts\nMermaidGraph / MermaidNode\nMermaidEdge / NodeShape\nPositionedGraph / RenderOptions"]
+    Theme["src/theme.ts\nDiagramColors / ThemeName\nTHEMES / DEFAULTS\nfromShikiTheme()\nbuildStyleBlock()\nsvgOpenTag()"]
+  end
+
+  subgraph Utils["Utilities"]
+    MultilineUtils["src/multiline-utils.ts\nnormalizeBrTags()\nrenderMultilineText()\nescapeXml()\nparseInlineFormatting()"]
+    TextMetrics["src/text-metrics.ts\nmeasureText()\nLINE_HEIGHT_RATIO"]
+    Styles["src/styles.ts\nstyle processing"]
+    ShapeClipping["src/shape-clipping.ts\nclipEdgeToShape()"]
+    ElkInstance["src/elk-instance.ts\ngetElkInstance() singleton"]
+    Browser["src/browser.ts\nbrowser globals shim"]
+  end
+
+  subgraph External["External Dependencies"]
+    ELK[("elkjs\nFakeWorker layout")]
+    Entities[("entities\ndecodeXML()")]
+  end
+
+  Index --> Parser
+  Index --> Layout
+  Index --> Renderer
+  Index --> ClassParser
+  Index --> ClassLayout
+  Index --> ClassRenderer
+  Index --> ErParser
+  Index --> ErLayout
+  Index --> ErRenderer
+  Index --> SeqParser
+  Index --> SeqLayout
+  Index --> SeqRenderer
+  Layout --> ElkInstance
+  ClassLayout --> ElkInstance
+  ErLayout --> ElkInstance
+  ElkInstance --> ELK
+  Index --> Entities
+  Renderer --> Theme
+  Renderer --> MultilineUtils
+  Renderer --> ShapeClipping
+  ClassRenderer --> Theme
+  ClassRenderer --> MultilineUtils
+  ErRenderer --> Theme
+  ErRenderer --> MultilineUtils
+  SeqRenderer --> Theme
+  SeqRenderer --> MultilineUtils
+  MultilineUtils --> TextMetrics
+```
+
+### Architectural Layers
+
+**Service Layer** (all logic — no HTTP API or database layers):
+
+- **Public API** (`src/index.ts`): Single entry point. Decodes XML entities, detects diagram type, dispatches to the correct parse → layout → render pipeline, and returns an SVG string. Exports both sync and async variants plus the ASCII entry point.
+
+- **Parsers**:
+  - `src/parser.ts` — `parseMermaid()` handles flowchart/state diagrams. Parses node definitions, edge connections, subgraphs, and style classes into `MermaidGraph`.
+  - `src/class/parser.ts` — `parseClassDiagram()` parses class member syntax (attributes, methods) and relationship lines into `ClassDiagram`.
+  - `src/er/parser.ts` — `parseErDiagram()` parses entity definitions, attributes, and relationship cardinalities.
+  - `src/sequence/parser.ts` — `parseSequenceDiagram()` parses actors, messages, activations, notes, and loops.
+
+- **Layout**:
+  - `src/layout.ts` — `layoutGraphSync()` orchestrates ELK layout for flowcharts. Handles node sizing (multiline labels), edge routing points, and subgraph nesting.
+  - `src/class/layout.ts` — `layoutClassDiagramSync()` positions class nodes with ELK, accounting for member list heights.
+  - `src/er/layout.ts` — `layoutErDiagramSync()` positions entity boxes with ELK.
+  - `src/sequence/layout.ts` — `layoutSequenceDiagram()` uses a custom top-down layout (no ELK): computes actor column widths, message rows, activation boxes, and lifeline spans.
+
+- **SVG Renderers**:
+  - `src/renderer.ts` — `renderSvg()` generates SVG for flowcharts with `<g>` groups, `<path>` edges, arrow markers, and node shapes.
+  - `src/class/renderer.ts` — `renderClassSvg()` renders class boxes with sections (name, attributes, methods) and relationship lines.
+  - `src/er/renderer.ts` — `renderErSvg()` renders entity boxes with attribute rows (syntax-highlighted with monospace spans) and crow's foot relationship edges.
+  - `src/sequence/renderer.ts` — `renderSequenceSvg()` renders actor boxes/stick-figures, lifelines, activation boxes, messages with arrows, notes, and loop/group frames.
+
+- **Theme System** (`src/theme.ts`): Defines `DiagramColors` (bg, fg, line, accent, muted, surface, border). Provides named themes (`THEMES`), defaults (`DEFAULTS`), and `fromShikiTheme()` to map Shiki syntax-highlight colors to diagram colors. `buildStyleBlock()` generates a `<style>` block with CSS custom properties and optional Google Fonts. `svgOpenTag()` embeds colors as inline CSS vars on the `<svg>` element.
+
+- **Utilities**:
+  - `multiline-utils.ts` — Normalizes Mermaid `<br>` labels, parses inline formatting (`<b>`, `<i>`, `<s>`, `<u>`), renders multi-line `<tspan>` blocks with optional background rectangles.
+  - `text-metrics.ts` — Measures text width and height without a DOM using character width tables.
+  - `styles.ts` — Processes Mermaid `classDef` and `style` directives.
+  - `shape-clipping.ts` — Computes edge endpoint coordinates clipped to node boundaries.
+  - `elk-instance.ts` — Manages the ELK singleton with a `FakeWorker` bypass for synchronous layout.
+  - `browser.ts` — Provides ambient browser global declarations for non-DOM environments.
+
+### Technology Stack
+
+| Technology | Version | Role |
+|---|---|---|
+| TypeScript | — | Implementation language |
+| Bun | — | Runtime, test runner (`bun test`) |
+| elkjs | ^0.11.0 | Graph layout engine (flowchart, class, ER) |
+| entities | ^7.0.1 | XML entity decoding |
+| shiki | ^3.19.0 (devDep) | Optional theme integration |
+
+### Architecture Violations
+
+None detected.
+
+---
+
+## Summary
+
+| Metric | Value |
+|---|---|
+| Total modules | 3 (ascii, shapes, brave-tu) |
+| Total files analyzed | 71 |
+| Total functions | 1,165 |
+| Total classes/interfaces | 87 |
+| Total function calls traced | 6,082 |
+| Languages | TypeScript |
+
+**Key patterns:**
+- **Pipeline architecture**: Every diagram type follows the same Parse → Layout → Render pipeline, making it easy to add new diagram types
+- **Dual output**: SVG and ASCII share the same parsers; ASCII uses its own layout/render engine built around a 2D character canvas
+- **Synchronous ELK**: The `FakeWorker` bypass in `elk-instance.ts` allows `renderMermaidSVG()` to be fully synchronous despite ELK's async API
+- **Zero dependencies at runtime** beyond `elkjs` and `entities`; `shiki` is an optional dev/peer dependency
+
+**Health**: No architectural violations detected. The codebase is well-organized with clear separation between parsing, layout, and rendering concerns across all four supported diagram types.

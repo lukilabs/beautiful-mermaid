@@ -1,0 +1,36 @@
+{
+  "layer": "service",
+  "totalFiles": 11,
+  "totalChunks": 2,
+  "chunkManifest": [
+    {
+      "chunkIndex": 0,
+      "fileCount": 9,
+      "files": [
+        "/Users/jseet/Dropbox/Development/Other/beautiful-mermaid/.claude/worktrees/brave-tu/src/ascii/shapes/circle.ts",
+        "/Users/jseet/Dropbox/Development/Other/beautiful-mermaid/.claude/worktrees/brave-tu/src/ascii/shapes/corners.ts",
+        "/Users/jseet/Dropbox/Development/Other/beautiful-mermaid/.claude/worktrees/brave-tu/src/ascii/shapes/diamond.ts",
+        "/Users/jseet/Dropbox/Development/Other/beautiful-mermaid/.claude/worktrees/brave-tu/src/ascii/shapes/hexagon.ts",
+        "/Users/jseet/Dropbox/Development/Other/beautiful-mermaid/.claude/worktrees/brave-tu/src/ascii/shapes/index.ts",
+        "/Users/jseet/Dropbox/Development/Other/beautiful-mermaid/.claude/worktrees/brave-tu/src/ascii/shapes/rectangle.ts",
+        "/Users/jseet/Dropbox/Development/Other/beautiful-mermaid/.claude/worktrees/brave-tu/src/ascii/shapes/rounded.ts",
+        "/Users/jseet/Dropbox/Development/Other/beautiful-mermaid/.claude/worktrees/brave-tu/src/ascii/shapes/special.ts",
+        "/Users/jseet/Dropbox/Development/Other/beautiful-mermaid/.claude/worktrees/brave-tu/src/ascii/shapes/stadium.ts"
+      ]
+    },
+    {
+      "chunkIndex": 1,
+      "fileCount": 2,
+      "files": [
+        "/Users/jseet/Dropbox/Development/Other/beautiful-mermaid/.claude/worktrees/brave-tu/src/ascii/shapes/state.ts",
+        "/Users/jseet/Dropbox/Development/Other/beautiful-mermaid/.claude/worktrees/brave-tu/src/ascii/shapes/types.ts"
+      ]
+    }
+  ],
+  "summary": {
+    "totalFiles": 11,
+    "totalFunctions": 33,
+    "totalClasses": 6
+  },
+  "crossLayerDependencies": []
+}
