@@ -296,7 +296,7 @@ describe('sequence layout – diagram dimensions', () => {
 //   - Divider line:      at divider.y
 //   - Divider label:     baseline at divider.y + 14
 //   - Message arrow:     at msg.y
-//   - Message label:     at msg.y - 6 (above the arrow)
+//   - Message label:     at msg.y - 10 (above the arrow)
 // ============================================================================
 
 describe('sequence layout – render clearance', () => {
@@ -602,5 +602,146 @@ describe('sequence layout – note bounding box', () => {
     // The left note's left edge should be at or near padding
     const leftNote = withNote.notes[0]!
     expect(leftNote.x).toBeGreaterThanOrEqual(0)
+  })
+})
+
+// ============================================================================
+// Note positioning tests — verify that notes after self-messages clear the
+// loop, consecutive notes stack vertically, and notes push subsequent
+// messages down so nothing overlaps.
+// ============================================================================
+
+describe('sequence layout – note positioning', () => {
+  it('note after a self-message is positioned below the loop', () => {
+    const result = layout(`sequenceDiagram
+      A->>A: Process
+      Note over A: Done`)
+
+    const msg = result.messages[0]!
+    const note = result.notes[0]!
+
+    // Self-message loop bottom is at msg.y + selfMessageHeight (30).
+    // Note must start below that.
+    expect(note.y).toBeGreaterThan(msg.y + 30)
+  })
+
+  it('note after a normal message has clearance from the arrow', () => {
+    const result = layout(`sequenceDiagram
+      A->>B: Hello
+      Note over A: Noted`)
+
+    const msg = result.messages[0]!
+    const note = result.notes[0]!
+
+    // Note should be below the message arrow
+    expect(note.y).toBeGreaterThan(msg.y)
+  })
+
+  it('consecutive notes after the same message are stacked vertically', () => {
+    const result = layout(`sequenceDiagram
+      A->>B: Hello
+      Note over A: First
+      Note over A: Second
+      Note over A: Third`)
+
+    expect(result.notes).toHaveLength(3)
+
+    // Each note starts at or below the previous note's bottom edge
+    for (let i = 1; i < result.notes.length; i++) {
+      const prev = result.notes[i - 1]!
+      const curr = result.notes[i]!
+      expect(curr.y).toBeGreaterThanOrEqual(prev.y + prev.height)
+    }
+  })
+
+  it('consecutive notes after a self-message clear the loop and each other', () => {
+    const result = layout(`sequenceDiagram
+      A->>A: Process
+      Note over A: Step 1
+      Note over A: Step 2`)
+
+    const msg = result.messages[0]!
+    const note1 = result.notes[0]!
+    const note2 = result.notes[1]!
+
+    // First note below loop
+    expect(note1.y).toBeGreaterThan(msg.y + 30)
+    // Second note below first
+    expect(note2.y).toBeGreaterThanOrEqual(note1.y + note1.height)
+  })
+
+  it('messages after notes are pushed down to avoid overlap', () => {
+    // Multiple notes overflow the default self-message vertical space (70px),
+    // forcing the next message to shift down.
+    const withNotes = layout(`sequenceDiagram
+      A->>A: Self
+      Note over A: Note 1
+      Note over A: Note 2
+      Note over A: Note 3
+      A->>B: Next`)
+
+    const withoutNotes = layout(`sequenceDiagram
+      A->>A: Self
+      A->>B: Next`)
+
+    // Gap between messages should be larger when multiple notes are present
+    const gapWith = withNotes.messages[1]!.y - withNotes.messages[0]!.y
+    const gapWithout = withoutNotes.messages[1]!.y - withoutNotes.messages[0]!.y
+
+    expect(gapWith).toBeGreaterThan(gapWithout)
+
+    // Every note's bottom edge must be above the next message's label
+    const lastNote = withNotes.notes[withNotes.notes.length - 1]!
+    const nextMsg = withNotes.messages[1]!
+    expect(lastNote.y + lastNote.height).toBeLessThan(nextMsg.y - 10) // -10 is label offset
+  })
+
+  it('notes inside alt blocks with self-messages have no overlap', () => {
+    const result = layout(`sequenceDiagram
+      participant A
+      participant B
+      alt Case 1
+        A->>A: handle()
+        Note over A: Handled
+      else Case 2
+        B->>B: process()
+        Note over B: Processed
+      end`)
+
+    // Each note must be below its self-message's loop
+    for (let i = 0; i < result.notes.length; i++) {
+      const note = result.notes[i]!
+      const refMsg = result.messages[i]!
+      expect(note.y).toBeGreaterThan(refMsg.y + 30)
+    }
+  })
+
+  it('diagram height increases to accommodate notes', () => {
+    const withNotes = layout(`sequenceDiagram
+      A->>A: Process
+      Note over A: Note 1
+      Note over A: Note 2
+      A->>B: Done`)
+
+    const withoutNotes = layout(`sequenceDiagram
+      A->>A: Process
+      A->>B: Done`)
+
+    expect(withNotes.height).toBeGreaterThan(withoutNotes.height)
+  })
+
+  it('all notes remain within diagram bounds', () => {
+    const result = layout(`sequenceDiagram
+      A->>A: Self message
+      Note over A: Note 1
+      Note right of A: Right note
+      Note left of A: Left note`)
+
+    for (const note of result.notes) {
+      expect(note.x).toBeGreaterThanOrEqual(0)
+      expect(note.x + note.width).toBeLessThanOrEqual(result.width)
+      expect(note.y).toBeGreaterThanOrEqual(0)
+      expect(note.y + note.height).toBeLessThanOrEqual(result.height)
+    }
   })
 })

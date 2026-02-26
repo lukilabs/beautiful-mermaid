@@ -648,6 +648,32 @@ export const samples: Sample[] = [
   N-->>G: Queued
   Note over G: Aggregate response`,
   },
+  {
+    title: 'Sequence: Self-Messages with Notes',
+    category: 'Sequence',
+    description: 'Self-referencing messages inside alt blocks with notes — tests that notes clear self-message loops and stack without overlapping.',
+    source: `sequenceDiagram
+  participant User
+  participant Main as Main Process
+  participant Renderer
+  participant Timer as 3s Fallback Timer
+  User->>Main: CMD+W
+  Main->>Main: event.preventDefault()
+  Main->>Renderer: WINDOW_CLOSE_REQUESTED
+  Main->>Timer: Start 3s timer
+  alt Multiple panels
+    Renderer->>Renderer: closePanel(focusedId)
+    Note over Renderer: Panel removed
+    Note over Renderer: No confirmCloseWindow!
+    Timer-->>Main: 3s elapsed → window.destroy()
+  else Single panel
+    Renderer->>Renderer: closePanel(lastId)
+    Note over Renderer: Stack becomes []
+    Renderer->>Renderer: Auto-select fires → new panel created!
+    Note over Renderer: Panel reopens
+    Timer-->>Main: 3s elapsed → window.destroy()
+  end`,
+  },
 
   // ══════════════════════════════════════════════════════════════════════════
   //  CLASS DIAGRAMS — Core Features

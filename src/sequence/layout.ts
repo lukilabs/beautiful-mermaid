@@ -42,8 +42,9 @@ const SEQ = {
   /** Extra vertical space before a message at a divider boundary (room for else/and label) */
   dividerExtra: 24,
   /** Note dimensions */
-  noteWidth: 120,
-  notePadding: 8,
+  noteWidth: 60,
+  notePadX: 12,
+  notePadY: 6,
   noteGap: 10,
 } as const
 
@@ -115,6 +116,16 @@ export function layoutSequenceDiagram(
     }
   }
 
+  // Pre-group notes by the message index they follow, so we can position
+  // them inline during the message stacking loop (avoids overlap bugs).
+  const notesByAfterIndex = new Map<number, typeof diagram.notes>()
+  for (const note of diagram.notes) {
+    const list = notesByAfterIndex.get(note.afterIndex) ?? []
+    list.push(note)
+    notesByAfterIndex.set(note.afterIndex, list)
+  }
+  const positionedNotes: PositionedNote[] = []
+
   // Track activation stack per actor: array of { startY, depth } objects
   // Depth is used to offset nested activations horizontally for visual clarity
   const activationStacks = new Map<string, { startY: number; depth: number }[]>()
@@ -172,7 +183,63 @@ export function layoutSequenceDiagram(
       }
     }
 
+    // Advance messageY past the message itself
     messageY += isSelf ? SEQ.selfMessageHeight + SEQ.messageRowHeight : SEQ.messageRowHeight
+
+    // Position notes that appear after this message.
+    // Notes start below the self-message loop (if self) or below the arrow,
+    // and consecutive notes stack vertically. If notes extend beyond the
+    // normal message advance, push messageY further so subsequent messages
+    // don't overlap.
+    const notesForMsg = notesByAfterIndex.get(msgIdx)
+    if (notesForMsg && notesForMsg.length > 0) {
+      // Self-message loops extend selfMessageHeight below msg.y;
+      // normal arrows sit at msg.y with no extension below.
+      const selfLoopExtra = isSelf ? SEQ.selfMessageHeight : 0
+      let noteY = messages[msgIdx]!.y + selfLoopExtra + 8
+
+      for (const note of notesForMsg) {
+        const noteW = Math.max(
+          SEQ.noteWidth,
+          estimateTextWidth(note.text, FONT_SIZES.edgeLabel, FONT_WEIGHTS.edgeLabel) + SEQ.notePadX * 2
+        )
+        const noteH = FONT_SIZES.edgeLabel + SEQ.notePadY * 2
+
+        // X positioning based on actor position and note type
+        const firstActorIdx = actorIndex.get(note.actorIds[0] ?? '') ?? 0
+        let noteX: number
+        if (note.position === 'left') {
+          noteX = actorCenterX[firstActorIdx]! - actorWidths[firstActorIdx]! / 2 - noteW - SEQ.noteGap
+        } else if (note.position === 'right') {
+          noteX = actorCenterX[firstActorIdx]! + actorWidths[firstActorIdx]! / 2 + SEQ.noteGap
+        } else {
+          // over — center between first and last actor
+          if (note.actorIds.length > 1) {
+            const lastActorIdx = actorIndex.get(note.actorIds[note.actorIds.length - 1] ?? '') ?? firstActorIdx
+            noteX = (actorCenterX[firstActorIdx]! + actorCenterX[lastActorIdx]!) / 2 - noteW / 2
+          } else {
+            noteX = actorCenterX[firstActorIdx]! - noteW / 2
+          }
+        }
+
+        positionedNotes.push({
+          text: note.text,
+          x: noteX,
+          y: noteY,
+          width: noteW,
+          height: noteH,
+          position: note.position,
+          actors: note.actorIds,
+        })
+
+        noteY += noteH + 4 // Stack next note below with gap
+      }
+
+      // Push messageY forward if notes extended beyond the normal advance.
+      // Add half a row height so the next message's label (rendered at msg.y - 6)
+      // has clearance from the last note's bottom edge.
+      messageY = Math.max(messageY, noteY + SEQ.messageRowHeight / 2)
+    }
   }
 
   // Close any unclosed activations (preserving depth for offset)
@@ -267,45 +334,9 @@ export function layoutSequenceDiagram(
     }
   })
 
-  // 5. Position notes
-  const notes: PositionedNote[] = diagram.notes.map(note => {
-    const noteW = Math.max(
-      SEQ.noteWidth,
-      estimateTextWidth(note.text, FONT_SIZES.edgeLabel, FONT_WEIGHTS.edgeLabel) + SEQ.notePadding * 2
-    )
-    const noteH = FONT_SIZES.edgeLabel + SEQ.notePadding * 2
-
-    // Position based on the message after which it appears
-    const refMsg = messages[note.afterIndex]
-    const noteY = (refMsg?.y ?? actorY + SEQ.actorHeight) + 4
-
-    // X based on actor position and note type
-    const firstActorIdx = actorIndex.get(note.actorIds[0] ?? '') ?? 0
-    let noteX: number
-    if (note.position === 'left') {
-      noteX = actorCenterX[firstActorIdx]! - actorWidths[firstActorIdx]! / 2 - noteW - SEQ.noteGap
-    } else if (note.position === 'right') {
-      noteX = actorCenterX[firstActorIdx]! + actorWidths[firstActorIdx]! / 2 + SEQ.noteGap
-    } else {
-      // over — center between first and last actor
-      if (note.actorIds.length > 1) {
-        const lastActorIdx = actorIndex.get(note.actorIds[note.actorIds.length - 1] ?? '') ?? firstActorIdx
-        noteX = (actorCenterX[firstActorIdx]! + actorCenterX[lastActorIdx]!) / 2 - noteW / 2
-      } else {
-        noteX = actorCenterX[firstActorIdx]! - noteW / 2
-      }
-    }
-
-    return {
-      text: note.text,
-      x: noteX,
-      y: noteY,
-      width: noteW,
-      height: noteH,
-      position: note.position,
-      actors: note.actorIds,
-    }
-  })
+  // 5. Notes — already positioned inline during the message stacking loop
+  //    (step 3) to properly account for self-message loops and vertical stacking.
+  const notes = positionedNotes
 
   // 6. Bounding-box post-processing
   //

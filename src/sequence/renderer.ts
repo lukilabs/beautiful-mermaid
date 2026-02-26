@@ -218,7 +218,7 @@ function renderMessage(msg: PositionedMessage): string {
     // Label above the arrow, centered (supports multi-line)
     const midX = (msg.x1 + msg.x2) / 2
     parts.push(
-      '  ' + renderMultilineText(msg.label, midX, msg.y - 6, FONT_SIZES.edgeLabel,
+      '  ' + renderMultilineText(msg.label, midX, msg.y - 10, FONT_SIZES.edgeLabel,
         `font-size="${FONT_SIZES.edgeLabel}" text-anchor="middle" font-weight="${FONT_WEIGHTS.edgeLabel}" fill="var(--_text-muted)"`)
     )
   }
@@ -292,8 +292,9 @@ function renderBlock(block: PositionedBlock): string {
  * Wrapped in <g class="note"> with semantic data attributes.
  */
 function renderNote(note: PositionedNote): string {
-  // Folded corner effect: note rectangle + small triangle in top-right
+  // Dog-ear note: polygon with clipped top-right corner + fold triangle
   const foldSize = 6
+  const { x, y, width: w, height: h } = note
 
   // Build actor reference attribute if present
   const actorsAttr = note.actors && note.actors.length > 0
@@ -301,15 +302,26 @@ function renderNote(note: PositionedNote): string {
     : ''
   const positionAttr = note.position ? ` data-position="${escapeAttr(note.position)}"` : ''
 
+  // Note body: polygon with top-right corner cut off
+  //   (x,y) → (x+w-fold,y) → (x+w,y+fold) → (x+w,y+h) → (x,y+h)
+  const bodyPoints = [
+    `${x},${y}`,
+    `${x + w - foldSize},${y}`,
+    `${x + w},${y + foldSize}`,
+    `${x + w},${y + h}`,
+    `${x},${y + h}`,
+  ].join(' ')
+
   return (
     `<g class="note"${positionAttr}${actorsAttr}>` +
-    `\n  <rect x="${note.x}" y="${note.y}" width="${note.width}" height="${note.height}" ` +
-    `fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="${STROKE_WIDTHS.innerBox}" />` +
-    // Fold triangle
-    `\n  <polygon points="${note.x + note.width - foldSize},${note.y} ${note.x + note.width},${note.y + foldSize} ${note.x + note.width - foldSize},${note.y + foldSize}" ` +
-    `fill="var(--_inner-stroke)" />` +
+    // Note body with bg fill and clipped corner
+    `\n  <polygon points="${bodyPoints}" ` +
+    `fill="var(--bg)" stroke="var(--_node-stroke)" stroke-width="${STROKE_WIDTHS.innerBox}" />` +
+    // Fold triangle (the folded-over corner)
+    `\n  <polygon points="${x + w - foldSize},${y} ${x + w},${y + foldSize} ${x + w - foldSize},${y + foldSize}" ` +
+    `fill="var(--_inner-stroke)" stroke="var(--_node-stroke)" stroke-width="${STROKE_WIDTHS.innerBox}" />` +
     // Note text (supports multi-line)
-    `\n  ${renderMultilineText(note.text, note.x + note.width / 2, note.y + note.height / 2, FONT_SIZES.edgeLabel,
+    `\n  ${renderMultilineText(note.text, x + w / 2, y + h / 2, FONT_SIZES.edgeLabel,
       `font-size="${FONT_SIZES.edgeLabel}" text-anchor="middle" font-weight="${FONT_WEIGHTS.edgeLabel}" fill="var(--_text-muted)"`)}` +
     `\n</g>`
   )
