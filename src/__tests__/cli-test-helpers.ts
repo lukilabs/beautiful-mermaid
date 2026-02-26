@@ -1,8 +1,3 @@
-/**
- * Shared test helpers for CLI render tests.
- *
- * Used by cli-render.test.ts and cli-diagrams.test.ts.
- */
 import type { RenderArgs } from '../cli/parse-args.ts'
 
 /** Collect all write() calls into a single string. */

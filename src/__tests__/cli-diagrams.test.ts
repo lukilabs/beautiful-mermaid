@@ -1,12 +1,3 @@
-/**
- * Smoke tests: all 6 supported diagram types through the CLI render pipeline.
- *
- * For each diagram type, verifies:
- * - ASCII output is non-empty
- * - SVG file contains proper <svg> wrapper
- *
- * Uses runRender directly (no subprocess) for speed and reliability.
- */
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test'
 import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'

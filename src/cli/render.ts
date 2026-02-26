@@ -1,20 +1,10 @@
-// ============================================================================
-// CLI render command — reads Mermaid input, renders ASCII and/or SVG.
-//
-// Orchestrates:
-//   1. Input reading (file, stdin, or test string)
-//   2. Theme resolution (lookup in THEMES, error on unknown)
-//   3. ASCII rendering → stdout
-//   4. SVG rendering → output file
-// ============================================================================
-
 import { readFile, writeFile } from 'node:fs/promises'
 import { renderMermaidASCII, diagramColorsToAsciiTheme } from '../ascii/index.ts'
 import type { AsciiRenderOptions } from '../ascii/index.ts'
 import { renderMermaidSVG } from '../index.ts'
 import { THEMES } from '../theme.ts'
-import type { RenderArgs } from './parse-args.ts'
 import type { DiagramColors } from '../theme.ts'
+import type { RenderArgs } from './parse-args.ts'
 
 // ============================================================================
 // Types
@@ -43,9 +33,6 @@ export async function runRender(
 ): Promise<void> {
   const out = stdout ?? process.stdout
 
-  // --------------------------------------------------------------------------
-  // 1. Read input
-  // --------------------------------------------------------------------------
   let text: string
 
   if (args.input !== undefined) {
@@ -59,17 +46,11 @@ export async function runRender(
     text = await readStdin()
   }
 
-  // --------------------------------------------------------------------------
-  // 2. Validate — reject empty input
-  // --------------------------------------------------------------------------
   text = text.trim()
   if (text.length === 0) {
     throw new Error('Empty input — provide a Mermaid diagram via file or stdin')
   }
 
-  // --------------------------------------------------------------------------
-  // 3. Resolve theme
-  // --------------------------------------------------------------------------
   let themeColors: DiagramColors | undefined
 
   if (args.theme !== undefined) {
@@ -82,9 +63,6 @@ export async function runRender(
     }
   }
 
-  // --------------------------------------------------------------------------
-  // 4. Render ASCII → stdout
-  // --------------------------------------------------------------------------
   if (args.ascii) {
     // Use plain text by default (respects terminal colors on any background).
     // Only apply ANSI colors when the user explicitly passes --theme.
@@ -95,9 +73,6 @@ export async function runRender(
     out.write(ascii + '\n')
   }
 
-  // --------------------------------------------------------------------------
-  // 5. Render SVG → output file
-  // --------------------------------------------------------------------------
   if (args.svg && args.output) {
     const svg = renderMermaidSVG(text, themeColors ?? {})
     await writeFile(args.output, svg, 'utf-8')
@@ -108,10 +83,6 @@ export async function runRender(
 // Helpers
 // ============================================================================
 
-/**
- * Read all of stdin as a UTF-8 string.
- * Collects chunks until the stream ends.
- */
 async function readStdin(): Promise<string> {
   const chunks: string[] = []
   const stdin = process.stdin

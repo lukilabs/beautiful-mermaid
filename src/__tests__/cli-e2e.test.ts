@@ -1,11 +1,3 @@
-/**
- * End-to-end integration tests for the built CLI (dist/cli.js).
- *
- * These tests spawn the actual CLI binary as a subprocess and verify the full
- * pipeline: argument parsing -> input reading -> rendering -> output.
- *
- * Prerequisites: `bun run build` must have been run before these tests.
- */
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test'
 import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -75,6 +67,13 @@ describe('CLI e2e – help and metadata', () => {
     expect(exitCode).toBe(0)
     expect(stdout).toContain('beautiful-mermaid')
     expect(stdout).toContain('render')
+  })
+
+  it('--version prints version string and exits 0', async () => {
+    const { stdout, exitCode } = await runCli(['--version'])
+
+    expect(exitCode).toBe(0)
+    expect(stdout).toMatch(/beautiful-mermaid \d+\.\d+\.\d+/)
   })
 
   it('themes command lists available themes including tokyo-night and dracula', async () => {

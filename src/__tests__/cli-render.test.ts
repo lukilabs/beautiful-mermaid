@@ -1,15 +1,3 @@
-/**
- * Tests for the CLI render command (runRender).
- *
- * Covers:
- * - ASCII output from file input
- * - SVG output to file
- * - Both ASCII + SVG simultaneously
- * - Theme application to SVG
- * - stdin input via stdinContent
- * - Invalid mermaid syntax
- * - Unknown theme error
- */
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test'
 import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'

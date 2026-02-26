@@ -1,5 +1,6 @@
 import { createRequire } from 'node:module'
 import { parseArgs } from './cli/parse-args.ts'
+import type { CliArgs } from './cli/parse-args.ts'
 import { runRender } from './cli/render.ts'
 import { THEMES } from './theme.ts'
 
@@ -9,7 +10,7 @@ const pkg = require('../package.json') as { version: string }
 async function main() {
   const argv = process.argv.slice(2)
 
-  let args
+  let args: CliArgs
   try {
     args = parseArgs(argv)
   } catch (err) {

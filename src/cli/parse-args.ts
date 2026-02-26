@@ -1,18 +1,4 @@
 // ============================================================================
-// CLI argument parser — zero-dependency, hand-rolled from process.argv.
-//
-// Usage:  parseArgs(process.argv.slice(2))
-//
-// Commands:
-//   render <file> --ascii              ASCII to stdout
-//   render <file> --svg -o <out.svg>   SVG to file
-//   render --ascii                     stdin → ASCII
-//   themes                             list available themes
-//   --help / -h                        show help
-//   --version / -v                     show version
-// ============================================================================
-
-// ============================================================================
 // Types
 // ============================================================================
 

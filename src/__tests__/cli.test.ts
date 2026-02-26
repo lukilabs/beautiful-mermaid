@@ -1,12 +1,3 @@
-/**
- * Tests for CLI argument parsing.
- *
- * Covers:
- * - render command: file input, stdin, --ascii, --svg, -o, --theme
- * - themes command
- * - help / version flags
- * - validation errors (missing flags, missing -o, unknown command)
- */
 import { describe, it, expect } from 'bun:test'
 import { parseArgs } from '../cli/parse-args.ts'
 import type { RenderArgs, SimpleCommand } from '../cli/parse-args.ts'
