@@ -169,35 +169,16 @@ describe('runRender – errors', () => {
     const mockStdout = createMockStdout()
     await expect(
       runRender(renderArgs({ ascii: true }), mockStdout, '   '),
-    ).rejects.toThrow()
+    ).rejects.toThrow('Empty input')
   })
 
-  it('throws on unknown theme with descriptive message', async () => {
+  it('throws on unknown theme with name, "Available themes", and known theme listed', async () => {
     const inputPath = join(tmpDir, 'diagram.mmd')
     await writeFile(inputPath, SIMPLE_FLOWCHART)
 
     await expect(
-      runRender(renderArgs({ input: inputPath, svg: true, output: join(tmpDir, 'out.svg'), theme: 'nonexistent-theme' })),
-    ).rejects.toThrow('Unknown theme')
-  })
-
-  it('unknown theme error lists available themes', async () => {
-    const inputPath = join(tmpDir, 'diagram.mmd')
-    await writeFile(inputPath, SIMPLE_FLOWCHART)
-
-    try {
-      await runRender(
-        renderArgs({ input: inputPath, svg: true, output: join(tmpDir, 'out.svg'), theme: 'nope' }),
-      )
-      // Should not reach here
-      expect(true).toBe(false)
-    } catch (err) {
-      const msg = (err as Error).message
-      expect(msg).toContain('Unknown theme')
-      expect(msg).toContain('"nope"')
-      expect(msg).toContain('Available themes:')
-      expect(msg).toContain('tokyo-night')
-    }
+      runRender(renderArgs({ input: inputPath, svg: true, output: join(tmpDir, 'out.svg'), theme: 'nope' })),
+    ).rejects.toThrow(/Unknown theme.*"nope".*Available themes:.*tokyo-night/)
   })
 
   it('throws on invalid mermaid syntax', async () => {

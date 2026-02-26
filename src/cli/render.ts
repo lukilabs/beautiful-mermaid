@@ -9,7 +9,8 @@
 // ============================================================================
 
 import { readFile, writeFile } from 'node:fs/promises'
-import { renderMermaidASCII } from '../ascii/index.ts'
+import { renderMermaidASCII, diagramColorsToAsciiTheme } from '../ascii/index.ts'
+import type { AsciiRenderOptions } from '../ascii/index.ts'
 import { renderMermaidSVG } from '../index.ts'
 import { THEMES } from '../theme.ts'
 import type { RenderArgs } from './parse-args.ts'
@@ -52,6 +53,9 @@ export async function runRender(
   } else if (stdinContent !== undefined) {
     text = stdinContent
   } else {
+    if (process.stdin.isTTY) {
+      throw new Error('No input file specified and stdin is a terminal. Pipe a diagram or pass a file path.')
+    }
     text = await readStdin()
   }
 
@@ -82,7 +86,11 @@ export async function runRender(
   // 4. Render ASCII → stdout
   // --------------------------------------------------------------------------
   if (args.ascii) {
-    const ascii = renderMermaidASCII(text, { colorMode: 'none' })
+    const asciiOpts: AsciiRenderOptions = { colorMode: 'auto' }
+    if (themeColors) {
+      asciiOpts.theme = diagramColorsToAsciiTheme(themeColors)
+    }
+    const ascii = renderMermaidASCII(text, asciiOpts)
     out.write(ascii)
   }
 
