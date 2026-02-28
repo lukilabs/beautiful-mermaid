@@ -745,3 +745,127 @@ describe('sequence layout – note positioning', () => {
     }
   })
 })
+
+// ============================================================================
+// Pre-message notes — verify fix for issue #53 (notes before first message
+// were silently dropped because afterIndex === -1 was never looked up)
+// ============================================================================
+
+describe('sequence layout – pre-message notes', () => {
+  it('single pre-message note is positioned (not dropped)', () => {
+    const result = layout(`sequenceDiagram
+      participant A as Alice
+      participant B as Bob
+      Note over A: note 1
+      A->>B: Hello`)
+    expect(result.notes).toHaveLength(1)
+    expect(result.notes[0]!.text).toBe('note 1')
+  })
+
+  it('pre-message note is above the first message', () => {
+    const result = layout(`sequenceDiagram
+      participant A as Alice
+      participant B as Bob
+      Note over A: note 1
+      A->>B: Hello`)
+    const note = result.notes[0]!
+    const msg = result.messages[0]!
+    expect(note.y).toBeLessThan(msg.y)
+  })
+
+  it('multiple pre-message notes are stacked vertically', () => {
+    const result = layout(`sequenceDiagram
+      participant A as Alice
+      participant B as Bob
+      Note over A: note 1
+      Note over B: note 2
+      A->>B: Hello`)
+    expect(result.notes).toHaveLength(2)
+    const n0 = result.notes[0]!
+    const n1 = result.notes[1]!
+    expect(n1.y).toBeGreaterThanOrEqual(n0.y + n0.height)
+  })
+
+  it('all pre-message notes are above the first message', () => {
+    const result = layout(`sequenceDiagram
+      participant A as Alice
+      participant B as Bob
+      Note over A: note 1
+      Note over B: note 2
+      A->>B: Hello`)
+    const msg = result.messages[0]!
+    for (const note of result.notes.filter(n => n.y < msg.y)) {
+      expect(note.y + note.height).toBeLessThanOrEqual(msg.y)
+    }
+  })
+
+  it('notes-only diagram (0 messages) renders notes', () => {
+    const result = layout(`sequenceDiagram
+      participant A
+      Note over A: lonely note`)
+    expect(result.notes).toHaveLength(1)
+    expect(result.notes[0]!.text).toBe('lonely note')
+    expect(result.messages).toHaveLength(0)
+  })
+
+  it('pre-message notes push first message down vs diagram without notes', () => {
+    const withNotes = layout(`sequenceDiagram
+      participant A as Alice
+      participant B as Bob
+      Note over A: note 1
+      Note over B: note 2
+      A->>B: Hello`)
+
+    const withoutNotes = layout(`sequenceDiagram
+      participant A as Alice
+      participant B as Bob
+      A->>B: Hello`)
+
+    expect(withNotes.messages[0]!.y).toBeGreaterThan(withoutNotes.messages[0]!.y)
+  })
+
+  it('pre-message note right of actor is within diagram bounds', () => {
+    const result = layout(`sequenceDiagram
+      participant A as Alice
+      participant B as Bob
+      Note right of B: side note
+      A->>B: Hello`)
+    expect(result.notes).toHaveLength(1)
+    for (const note of result.notes) {
+      expect(note.x).toBeGreaterThanOrEqual(0)
+      expect(note.x + note.width).toBeLessThanOrEqual(result.width)
+    }
+  })
+
+  it('pre-message note over two actors is centered between them', () => {
+    const result = layout(`sequenceDiagram
+      participant A as Alice
+      participant B as Bob
+      Note over A,B: shared note
+      A->>B: Hello`)
+    expect(result.notes).toHaveLength(1)
+    const note = result.notes[0]!
+    const a = result.actors[0]!
+    const b = result.actors[1]!
+    const mid = (a.x + b.x) / 2
+    // Note center should be near the midpoint between actor centers
+    const noteCenter = note.x + note.width / 2
+    expect(Math.abs(noteCenter - mid)).toBeLessThan(20) // within 20px
+  })
+
+  it('diagram height accommodates pre-message notes', () => {
+    const withNotes = layout(`sequenceDiagram
+      participant A as Alice
+      participant B as Bob
+      Note over A: note 1
+      Note over B: note 2
+      A->>B: Hello`)
+
+    const withoutNotes = layout(`sequenceDiagram
+      participant A as Alice
+      participant B as Bob
+      A->>B: Hello`)
+
+    expect(withNotes.height).toBeGreaterThan(withoutNotes.height)
+  })
+})

@@ -231,3 +231,42 @@ describe('parseSequenceDiagram – full diagram', () => {
     expect(d.blocks[0]!.dividers).toHaveLength(1)
   })
 })
+
+// ============================================================================
+// Pre-message notes
+// ============================================================================
+
+describe('parseSequenceDiagram – pre-message notes', () => {
+  it('note before first message gets afterIndex -1', () => {
+    const d = parse(`sequenceDiagram
+      participant A as Alice
+      participant B as Bob
+      Note over A: note 1
+      A->>B: Hello`)
+    expect(d.notes).toHaveLength(1)
+    expect(d.notes[0]!.afterIndex).toBe(-1)
+    expect(d.notes[0]!.text).toBe('note 1')
+    expect(d.notes[0]!.position).toBe('over')
+  })
+
+  it('multiple notes before first message all get afterIndex -1', () => {
+    const d = parse(`sequenceDiagram
+      participant A as Alice
+      participant B as Bob
+      Note over A: note 1
+      Note over B: note 2
+      A->>B: Hello`)
+    expect(d.notes).toHaveLength(2)
+    expect(d.notes[0]!.afterIndex).toBe(-1)
+    expect(d.notes[1]!.afterIndex).toBe(-1)
+  })
+
+  it('note in notes-only diagram (0 messages) gets afterIndex -1', () => {
+    const d = parse(`sequenceDiagram
+      participant A
+      Note over A: lonely`)
+    expect(d.notes).toHaveLength(1)
+    expect(d.notes[0]!.afterIndex).toBe(-1)
+    expect(d.messages).toHaveLength(0)
+  })
+})
