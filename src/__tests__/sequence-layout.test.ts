@@ -769,12 +769,19 @@ describe('sequence layout – pre-message notes', () => {
       participant B as Bob
       Note over A: note 1
       Note over B: note 2
+      Note over A,B: spanning note
       A->>B: Hello`)
-    expect(result.notes).toHaveLength(2)
+    expect(result.notes).toHaveLength(3)
     const n0 = result.notes[0]!
     const n1 = result.notes[1]!
     expect(n1.y).toBeGreaterThanOrEqual(n0.y + n0.height)
     expect(n1.y + n1.height).toBeLessThanOrEqual(result.messages[0]!.y)
+    // spanning note is centered between actors
+    const spanning = result.notes.find(n => n.text === 'spanning note')!
+    const aActor = result.actors.find(a => a.id === 'A')!
+    const bActor = result.actors.find(a => a.id === 'B')!
+    const mid = (aActor.x + bActor.x) / 2
+    expect(Math.abs(spanning.x + spanning.width / 2 - mid)).toBeLessThan(20)
   })
 
   it('notes-only diagram (0 messages) renders notes', () => {
