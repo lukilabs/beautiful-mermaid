@@ -132,6 +132,50 @@ export function layoutSequenceDiagram(
   const activations: Activation[] = []
   const nestingOffset = 4 // Horizontal offset per nesting level
 
+  // Handle notes that appear before the first message (afterIndex === -1)
+  const notesBeforeFirstMsg = notesByAfterIndex.get(-1)
+  if (notesBeforeFirstMsg && notesBeforeFirstMsg.length > 0) {
+    let noteY = messageY
+    for (const note of notesBeforeFirstMsg) {
+      const noteW = Math.max(
+        SEQ.noteWidth,
+        estimateTextWidth(note.text, FONT_SIZES.edgeLabel, FONT_WEIGHTS.edgeLabel) + SEQ.notePadX * 2
+      )
+      const noteH = FONT_SIZES.edgeLabel + SEQ.notePadY * 2
+
+      // X positioning based on actor position and note type
+      const firstActorIdx = actorIndex.get(note.actorIds[0] ?? '') ?? 0
+      let noteX: number
+      if (note.position === 'left') {
+        noteX = actorCenterX[firstActorIdx]! - actorWidths[firstActorIdx]! / 2 - noteW - SEQ.noteGap
+      } else if (note.position === 'right') {
+        noteX = actorCenterX[firstActorIdx]! + actorWidths[firstActorIdx]! / 2 + SEQ.noteGap
+      } else {
+        // over — center between first and last actor
+        if (note.actorIds.length > 1) {
+          const lastActorIdx = actorIndex.get(note.actorIds[note.actorIds.length - 1] ?? '') ?? firstActorIdx
+          noteX = (actorCenterX[firstActorIdx]! + actorCenterX[lastActorIdx]!) / 2 - noteW / 2
+        } else {
+          noteX = actorCenterX[firstActorIdx]! - noteW / 2
+        }
+      }
+
+      positionedNotes.push({
+        text: note.text,
+        x: noteX,
+        y: noteY,
+        width: noteW,
+        height: noteH,
+        position: note.position,
+        actors: note.actorIds,
+      })
+
+      noteY += noteH + 4
+    }
+
+    messageY = Math.max(messageY, noteY + SEQ.messageRowHeight / 2)
+  }
+
   for (let msgIdx = 0; msgIdx < diagram.messages.length; msgIdx++) {
     const msg = diagram.messages[msgIdx]!
     const fromIdx = actorIndex.get(msg.from) ?? 0
