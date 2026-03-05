@@ -65,6 +65,19 @@ describe('renderMermaidSVG – options', () => {
     }
     expect(getWidth(large)).toBeGreaterThan(getWidth(small))
   })
+
+  it('respects mergeEdges option', () => {
+    // Fan-out diagram where edge bundling changes path layout
+    const diagram = 'graph TD\n  A --> B\n  A --> C'
+    const withBundling = renderMermaidSVG(diagram, { mergeEdges: true })
+    const withoutBundling = renderMermaidSVG(diagram, { mergeEdges: false })
+    expect(withBundling).not.toBe(withoutBundling)
+    // Both must still be valid SVG with both edges present
+    expect(withBundling).toContain('<polyline')
+    expect(withoutBundling).toContain('<polyline')
+    const polylineCount = (svg: string) => (svg.match(/<polyline/g) ?? []).length
+    expect(polylineCount(withBundling)).toBe(polylineCount(withoutBundling))
+  })
 })
 
 // ============================================================================

@@ -157,6 +157,8 @@ export interface RenderOptions {
   layerSpacing?: number
   /** Spacing between disconnected components. Default: nodeSpacing (24) */
   componentSpacing?: number
+  /** Whether to enable edge bundling to reduce visual clutter by merging overlapping edge paths into shared segments. Default: true */
+  mergeEdges?: boolean
   /** Render with transparent background (no background style on SVG). Default: false */
   transparent?: boolean
   /** Enable hover tooltips on chart data points (xychart only). Default: false */
