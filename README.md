@@ -375,7 +375,7 @@ timeline
 Scored user tasks grouped into sections — using Mermaid's `journey` syntax.
 Supports Mermaid accessibility directives `accTitle:` and `accDescr:` as SVG
 metadata, including multiline `accDescr { ... }` blocks. Design note:
-[`journey-design.md`](./journey-design.md).
+[`docs/diagram-types/journey.md`](./docs/diagram-types/journey.md).
 
 ```
 journey
