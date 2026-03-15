@@ -1,4 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 604 446.6" width="604" height="446.6" style="--bg:#FFFFFF;--fg:#27272A;background:var(--bg)">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 604 446.6" width="604" height="446.6" style="--bg:#FFFFFF;--fg:#27272A;background:var(--bg)" role="img" aria-roledescription="user journey" aria-labelledby="journey-a11y-title">
+<title id="journey-a11y-title">My working day</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap');
   text { font-family: 'Inter', system-ui, sans-serif; }
