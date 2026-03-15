@@ -1,5 +1,5 @@
 /**
- * Generates xychart-test.html showcasing xychart-beta Mermaid examples.
+ * Generates examples/xychart-test.html showcasing xychart-beta Mermaid examples.
  *
  * Usage: bun run xychart-test.ts
  *
@@ -1050,6 +1050,7 @@ if (window.__renderAllSvgs) window.__renderAllSvgs(window.__initThemeKey);
 }
 
 const html = await generateHtml()
-const outPath = new URL('./xychart-test.html', import.meta.url).pathname
+// Keep generated previews out of the repo root with the rest of the visual examples.
+const outPath = new URL('./examples/xychart-test.html', import.meta.url).pathname
 await Bun.write(outPath, html)
 console.log(`Written to ${outPath} (${(html.length / 1024).toFixed(1)} KB)`)
