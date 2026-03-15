@@ -31,4 +31,20 @@ describe('renderMermaidSVG – journey snapshots', () => {
 
     expect(normalizeSvg(actual)).toBe(normalizeSvg(expected))
   })
+
+  it('matches the Mermaid docs journey example SVG', () => {
+    const actual = renderMermaidSVG(`journey
+      title My working day
+      section Go to work
+      Make tea: 5: Me
+      Go upstairs: 3: Me
+      Do work: 1: Me, Cat
+      section Go home
+      Go downstairs: 5: Me
+      Sit down: 3: Me`)
+
+    const expected = readFileSync(join(snapshotDir, 'journey-mermaid-docs-example.svg'), 'utf-8')
+
+    expect(normalizeSvg(actual)).toBe(normalizeSvg(expected))
+  })
 })
