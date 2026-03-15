@@ -6,7 +6,6 @@
 // ============================================================================
 
 import { parseJourneyDiagram } from '../journey/parser.ts'
-import { preprocessMermaidLines } from '../mermaid-source.ts'
 import { colorizeLine, DEFAULT_ASCII_THEME } from './ansi.ts'
 import type { AsciiConfig, AsciiTheme, CharRole, ColorMode } from './types.ts'
 
@@ -52,7 +51,7 @@ export function renderJourneyAscii(
   colorMode: ColorMode = 'none',
   theme: AsciiTheme = DEFAULT_ASCII_THEME,
 ): string {
-  const lines = preprocessMermaidLines(text)
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0 && !l.startsWith('%%'))
   const diagram = parseJourneyDiagram(lines)
   const useAscii = config.useAscii
   const out: string[] = []
