@@ -2,9 +2,13 @@
 // Circle shape renderer — uses corner decorators instead of curves
 // ============================================================================
 
-import type { ShapeRenderer } from './types.ts'
-import { getBoxDimensions, renderBox, getBoxAttachmentPoint } from './rectangle.ts'
-import { getCorners } from './corners.ts'
+import { getCorners } from "./corners.ts";
+import {
+	getBoxAttachmentPoint,
+	getBoxDimensions,
+	renderBox,
+} from "./rectangle.ts";
+import type { ShapeRenderer } from "./types.ts";
 
 /**
  * Circle shape renderer.
@@ -16,12 +20,12 @@ import { getCorners } from './corners.ts'
  *   ◯─────────◯
  */
 export const circleRenderer: ShapeRenderer = {
-  getDimensions: getBoxDimensions,
+	getDimensions: getBoxDimensions,
 
-  render(label, dimensions, options) {
-    const corners = getCorners('circle', options.useAscii)
-    return renderBox(label, dimensions, corners, options.useAscii)
-  },
+	render(label, dimensions, options) {
+		const corners = getCorners("circle", options.useAscii);
+		return renderBox(label, dimensions, corners, options.useAscii);
+	},
 
-  getAttachmentPoint: getBoxAttachmentPoint,
-}
+	getAttachmentPoint: getBoxAttachmentPoint,
+};

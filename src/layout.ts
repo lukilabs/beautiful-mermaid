@@ -5,4 +5,4 @@
  * orthogonal edge routing, and direction overrides.
  */
 
-export { layoutGraphSync } from './layout-engine.ts'
+export { layoutGraphSync } from "./layout-engine.ts";

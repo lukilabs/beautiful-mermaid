@@ -2,62 +2,79 @@
 // Shape registry — pluggable ASCII shape renderers
 // ============================================================================
 
-import type { AsciiNodeShape, Canvas, DrawingCoord, Direction } from '../types.ts'
-import type { ShapeRenderer, ShapeDimensions, ShapeRenderOptions, ShapeRegistry } from './types.ts'
-
+import type {
+	AsciiNodeShape,
+	Canvas,
+	Direction,
+	DrawingCoord,
+} from "../types.ts";
+import { circleRenderer } from "./circle.ts";
+import { diamondRenderer } from "./diamond.ts";
+import { hexagonRenderer } from "./hexagon.ts";
 // Import all shape renderers
-import { rectangleRenderer } from './rectangle.ts'
-import { diamondRenderer } from './diamond.ts'
-import { circleRenderer } from './circle.ts'
-import { stateStartRenderer, stateEndRenderer } from './state.ts'
-import { roundedRenderer } from './rounded.ts'
-import { stadiumRenderer } from './stadium.ts'
-import { hexagonRenderer } from './hexagon.ts'
+import { rectangleRenderer } from "./rectangle.ts";
+import { roundedRenderer } from "./rounded.ts";
 import {
-  subroutineRenderer,
-  doublecircleRenderer,
-  cylinderRenderer,
-  asymmetricRenderer,
-  trapezoidRenderer,
-  trapezoidAltRenderer,
-} from './special.ts'
+	asymmetricRenderer,
+	cylinderRenderer,
+	doublecircleRenderer,
+	subroutineRenderer,
+	trapezoidAltRenderer,
+	trapezoidRenderer,
+} from "./special.ts";
+import { stadiumRenderer } from "./stadium.ts";
+import { stateEndRenderer, stateStartRenderer } from "./state.ts";
+import type {
+	ShapeDimensions,
+	ShapeRegistry,
+	ShapeRenderer,
+	ShapeRenderOptions,
+} from "./types.ts";
 
 // Re-export types
-export type { ShapeRenderer, ShapeDimensions, ShapeRenderOptions, ShapeRegistry }
+export type {
+	ShapeDimensions,
+	ShapeRegistry,
+	ShapeRenderer,
+	ShapeRenderOptions,
+};
 
 /**
  * Global shape registry — maps shape types to their renderers.
  * Rectangle is the default fallback for unregistered shapes.
  */
-export const shapeRegistry: ShapeRegistry = new Map<AsciiNodeShape, ShapeRenderer>([
-  // Core shapes
-  ['rectangle', rectangleRenderer],
-  ['rounded', roundedRenderer],
-  ['diamond', diamondRenderer],
-  ['stadium', stadiumRenderer],
-  ['circle', circleRenderer],
+export const shapeRegistry: ShapeRegistry = new Map<
+	AsciiNodeShape,
+	ShapeRenderer
+>([
+	// Core shapes
+	["rectangle", rectangleRenderer],
+	["rounded", roundedRenderer],
+	["diamond", diamondRenderer],
+	["stadium", stadiumRenderer],
+	["circle", circleRenderer],
 
-  // Batch 1 additions
-  ['subroutine', subroutineRenderer],
-  ['doublecircle', doublecircleRenderer],
-  ['hexagon', hexagonRenderer],
+	// Batch 1 additions
+	["subroutine", subroutineRenderer],
+	["doublecircle", doublecircleRenderer],
+	["hexagon", hexagonRenderer],
 
-  // Batch 2 additions
-  ['cylinder', cylinderRenderer],
-  ['asymmetric', asymmetricRenderer],
-  ['trapezoid', trapezoidRenderer],
-  ['trapezoid-alt', trapezoidAltRenderer],
+	// Batch 2 additions
+	["cylinder", cylinderRenderer],
+	["asymmetric", asymmetricRenderer],
+	["trapezoid", trapezoidRenderer],
+	["trapezoid-alt", trapezoidAltRenderer],
 
-  // State diagram pseudo-states
-  ['state-start', stateStartRenderer],
-  ['state-end', stateEndRenderer],
-])
+	// State diagram pseudo-states
+	["state-start", stateStartRenderer],
+	["state-end", stateEndRenderer],
+]);
 
 /**
  * Get the renderer for a shape type, falling back to rectangle.
  */
 export function getShapeRenderer(shape: AsciiNodeShape): ShapeRenderer {
-  return shapeRegistry.get(shape) ?? rectangleRenderer
+	return shapeRegistry.get(shape) ?? rectangleRenderer;
 }
 
 /**
@@ -65,13 +82,13 @@ export function getShapeRenderer(shape: AsciiNodeShape): ShapeRenderer {
  * This is the main entry point for shape rendering.
  */
 export function renderShape(
-  shape: AsciiNodeShape,
-  label: string,
-  options: ShapeRenderOptions
+	shape: AsciiNodeShape,
+	label: string,
+	options: ShapeRenderOptions,
 ): Canvas {
-  const renderer = getShapeRenderer(shape)
-  const dimensions = renderer.getDimensions(label, options)
-  return renderer.render(label, dimensions, options)
+	const renderer = getShapeRenderer(shape);
+	const dimensions = renderer.getDimensions(label, options);
+	return renderer.render(label, dimensions, options);
 }
 
 /**
@@ -79,23 +96,23 @@ export function renderShape(
  * Used during layout to determine node size.
  */
 export function getShapeDimensions(
-  shape: AsciiNodeShape,
-  label: string,
-  options: ShapeRenderOptions
+	shape: AsciiNodeShape,
+	label: string,
+	options: ShapeRenderOptions,
 ): ShapeDimensions {
-  const renderer = getShapeRenderer(shape)
-  return renderer.getDimensions(label, options)
+	const renderer = getShapeRenderer(shape);
+	return renderer.getDimensions(label, options);
 }
 
 /**
  * Get edge attachment point for a shape.
  */
 export function getShapeAttachmentPoint(
-  shape: AsciiNodeShape,
-  dir: Direction,
-  dimensions: ShapeDimensions,
-  baseCoord: DrawingCoord
+	shape: AsciiNodeShape,
+	dir: Direction,
+	dimensions: ShapeDimensions,
+	baseCoord: DrawingCoord,
 ): DrawingCoord {
-  const renderer = getShapeRenderer(shape)
-  return renderer.getAttachmentPoint(dir, dimensions, baseCoord)
+	const renderer = getShapeRenderer(shape);
+	return renderer.getAttachmentPoint(dir, dimensions, baseCoord);
 }

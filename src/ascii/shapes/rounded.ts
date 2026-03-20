@@ -2,9 +2,13 @@
 // Rounded rectangle shape renderer — uses rounded corner decorators
 // ============================================================================
 
-import type { ShapeRenderer } from './types.ts'
-import { getBoxDimensions, renderBox, getBoxAttachmentPoint } from './rectangle.ts'
-import { getCorners } from './corners.ts'
+import { getCorners } from "./corners.ts";
+import {
+	getBoxAttachmentPoint,
+	getBoxDimensions,
+	renderBox,
+} from "./rectangle.ts";
+import type { ShapeRenderer } from "./types.ts";
 
 /**
  * Rounded rectangle shape renderer.
@@ -16,12 +20,12 @@ import { getCorners } from './corners.ts'
  *   ╰─────────╯
  */
 export const roundedRenderer: ShapeRenderer = {
-  getDimensions: getBoxDimensions,
+	getDimensions: getBoxDimensions,
 
-  render(label, dimensions, options) {
-    const corners = getCorners('rounded', options.useAscii)
-    return renderBox(label, dimensions, corners, options.useAscii)
-  },
+	render(label, dimensions, options) {
+		const corners = getCorners("rounded", options.useAscii);
+		return renderBox(label, dimensions, corners, options.useAscii);
+	},
 
-  getAttachmentPoint: getBoxAttachmentPoint,
-}
+	getAttachmentPoint: getBoxAttachmentPoint,
+};

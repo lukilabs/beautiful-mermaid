@@ -15,9 +15,9 @@
  * Sample definitions live in samples-data.ts (shared with bench.ts).
  */
 
-import { samples } from './samples-data.ts'
-import { THEMES } from './src/theme.ts'
-import { createHighlighter } from 'shiki'
+import { createHighlighter } from "shiki";
+import { samples } from "./samples-data.ts";
+import { THEMES } from "./src/theme.ts";
 
 // ============================================================================
 // HTML generation — dynamic version
@@ -29,201 +29,215 @@ import { createHighlighter } from 'shiki'
 // ============================================================================
 
 function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
+	return text
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;")
+		.replace(/"/g, "&quot;");
 }
 
 /** Convert markdown-style backtick spans to <code> tags in description text. */
 function formatDescription(text: string): string {
-  return text.replace(/`([^`]+)`/g, '<code>$1</code>')
+	return text.replace(/`([^`]+)`/g, "<code>$1</code>");
 }
 
 /** Human-readable labels for theme keys */
 const THEME_LABELS: Record<string, string> = {
-  'zinc-dark': 'Zinc Dark',
-  'tokyo-night': 'Tokyo Night',
-  'tokyo-night-storm': 'Tokyo Storm',
-  'tokyo-night-light': 'Tokyo Light',
-  'catppuccin-mocha': 'Catppuccin',
-  'catppuccin-latte': 'Latte',
-  'nord': 'Nord',
-  'nord-light': 'Nord Light',
-  'dracula': 'Dracula',
-  'github-light': 'GitHub',
-  'github-dark': 'GitHub Dark',
-  'solarized-light': 'Solarized',
-  'solarized-dark': 'Solar Dark',
-  'one-dark': 'One Dark',
-}
+	"zinc-dark": "Zinc Dark",
+	"tokyo-night": "Tokyo Night",
+	"tokyo-night-storm": "Tokyo Storm",
+	"tokyo-night-light": "Tokyo Light",
+	"catppuccin-mocha": "Catppuccin",
+	"catppuccin-latte": "Latte",
+	nord: "Nord",
+	"nord-light": "Nord Light",
+	dracula: "Dracula",
+	"github-light": "GitHub",
+	"github-dark": "GitHub Dark",
+	"solarized-light": "Solarized",
+	"solarized-dark": "Solar Dark",
+	"one-dark": "One Dark",
+};
 
 async function generateHtml(): Promise<string> {
-  // Step 0: Create Shiki highlighter for mermaid syntax highlighting in source panels.
-  // We use 'github-light' as the base theme — its hex colors get overridden by CSS
-  // color-mix() rules derived from --t-fg / --t-bg so tokens adapt to any theme.
-  const highlighter = await createHighlighter({
-    langs: ['mermaid'],
-    themes: ['github-light'],
-  })
+	// Step 0: Create Shiki highlighter for mermaid syntax highlighting in source panels.
+	// We use 'github-light' as the base theme — its hex colors get overridden by CSS
+	// color-mix() rules derived from --t-fg / --t-bg so tokens adapt to any theme.
+	const highlighter = await createHighlighter({
+		langs: ["mermaid"],
+		themes: ["github-light"],
+	});
 
-  // Step 1: Bundle the mermaid renderer for the browser
-  const buildResult = await Bun.build({
-    entrypoints: [new URL('./src/browser.ts', import.meta.url).pathname],
-    target: 'browser',
-    format: 'esm',
-    minify: true,
-  })
-  if (!buildResult.success) {
-    console.error('Bundle build failed:', buildResult.logs)
-    process.exit(1)
-  }
-  const bundleJs = await buildResult.outputs[0]!.text()
-  console.log(`Browser bundle: ${(bundleJs.length / 1024).toFixed(1)} KB`)
+	// Step 1: Bundle the mermaid renderer for the browser
+	const buildResult = await Bun.build({
+		entrypoints: [new URL("./src/browser.ts", import.meta.url).pathname],
+		target: "browser",
+		format: "esm",
+		minify: true,
+	});
+	if (!buildResult.success) {
+		console.error("Bundle build failed:", buildResult.logs);
+		process.exit(1);
+	}
+	const bundleJs = await buildResult.outputs[0]!.text();
+	console.log(`Browser bundle: ${(bundleJs.length / 1024).toFixed(1)} KB`);
 
-  // Step 2: Build sample JSON (only serializable fields needed by client)
-  const samplesJson = JSON.stringify(samples.map(s => ({
-    title: s.title,
-    description: s.description,
-    source: s.source,
-    category: s.category ?? 'Other',
-    options: s.options ?? {},
-  })))
+	// Step 2: Build sample JSON (only serializable fields needed by client)
+	const samplesJson = JSON.stringify(
+		samples.map((s) => ({
+			title: s.title,
+			description: s.description,
+			source: s.source,
+			category: s.category ?? "Other",
+			options: s.options ?? {},
+		})),
+	);
 
-  // Step 3: Group samples by category for TOC (done at build time since it's static)
-  const categories = new Map<string, number[]>()
-  samples.forEach((sample, i) => {
-    const cat = sample.category ?? 'Other'
-    if (!categories.has(cat)) categories.set(cat, [])
-    categories.get(cat)!.push(i)
-  })
+	// Step 3: Group samples by category for TOC (done at build time since it's static)
+	const categories = new Map<string, number[]>();
+	samples.forEach((sample, i) => {
+		const cat = sample.category ?? "Other";
+		if (!categories.has(cat)) categories.set(cat, []);
+		categories.get(cat)!.push(i);
+	});
 
-  const categoryBadgeColors: Record<string, string> = {
-    Flowchart: '#3b82f6',
-    State: '#8b5cf6',
-    Sequence: '#10b981',
-    Class: '#f59e0b',
-    ER: '#ef4444',
-    'XY Chart': '#f97316',
-    'Theme Showcase': '#06b6d4',
-  }
+	const categoryBadgeColors: Record<string, string> = {
+		Flowchart: "#3b82f6",
+		State: "#8b5cf6",
+		Sequence: "#10b981",
+		Class: "#f59e0b",
+		ER: "#ef4444",
+		C4: "#0ea5e9",
+		ArchiMate: "#d97706",
+		"XY Chart": "#f97316",
+		"Theme Showcase": "#06b6d4",
+	};
 
-  // Map category names to the title prefixes they use, so we can strip duplicates in the ToC
-  const categoryPrefixes: Record<string, string> = {
-    'State': 'State: ',
-    'Sequence': 'Sequence: ',
-    'Class': 'Class: ',
-    'ER': 'ER: ',
-    'XY Chart': 'XY: ',
-    'Theme Showcase': 'Theme: ',
-  }
+	// Map category names to the title prefixes they use, so we can strip duplicates in the ToC
+	const categoryPrefixes: Record<string, string> = {
+		State: "State: ",
+		Sequence: "Sequence: ",
+		Class: "Class: ",
+		ER: "ER: ",
+		"XY Chart": "XY: ",
+		"Theme Showcase": "Theme: ",
+	};
 
-  // Build mapping from original index to display number (excluding Hero samples)
-  const heroCount = samples.filter(s => s.category === 'Hero').length
-  const displayNum = (i: number) => i + 1 - heroCount
+	// Build mapping from original index to display number (excluding Hero samples)
+	const heroCount = samples.filter((s) => s.category === "Hero").length;
+	const displayNum = (i: number) => i + 1 - heroCount;
 
-  const tocSections = [...categories.entries()]
-    .filter(([cat]) => cat !== 'Hero') // Skip Hero from TOC
-    .map(([cat, indices]) => {
-    const badgeColor = categoryBadgeColors[cat] ?? '#71717a'
-    const prefix = categoryPrefixes[cat]
-    const items = indices.map(i => {
-      let title = samples[i]!.title
-      // Strip the category prefix from the title since it's already under the category heading
-      if (prefix && title.startsWith(prefix)) title = title.slice(prefix.length)
-      return `<li><a href="#sample-${i}"><span class="toc-num">${displayNum(i)}.</span> ${escapeHtml(title)}</a></li>`
-    }).join('\n            ')
-    return `
+	const tocSections = [...categories.entries()]
+		.filter(([cat]) => cat !== "Hero") // Skip Hero from TOC
+		.map(([cat, indices]) => {
+			const _badgeColor = categoryBadgeColors[cat] ?? "#71717a";
+			const prefix = categoryPrefixes[cat];
+			const items = indices
+				.map((i) => {
+					let title = samples[i]!.title;
+					// Strip the category prefix from the title since it's already under the category heading
+					if (prefix && title.startsWith(prefix))
+						title = title.slice(prefix.length);
+					return `<li><a href="#sample-${i}"><span class="toc-num">${displayNum(i)}.</span> ${escapeHtml(title)}</a></li>`;
+				})
+				.join("\n            ");
+			return `
         <div class="toc-category">
           <h3>${escapeHtml(cat)} (${indices.length} samples)</h3>
           <ol start="${displayNum(indices[0]!)}">
             ${items}
           </ol>
-        </div>`
-  }).join('\n')
+        </div>`;
+		})
+		.join("\n");
 
-  // Step 3b: Build theme selector pills (build-time so we include swatches)
-  // Only show Default, Dracula, and Solarized inline; rest go in "More" dropdown
-  const VISIBLE_THEMES = new Set(['dracula', 'solarized-light'])
+	// Step 3b: Build theme selector pills (build-time so we include swatches)
+	// Only show Default, Dracula, and Solarized inline; rest go in "More" dropdown
+	const VISIBLE_THEMES = new Set(["dracula", "solarized-light"]);
 
-  function buildThemePill(key: string, colors: { bg: string; fg: string }, active = false): string {
-    const isDark = parseInt(colors.bg.replace('#', '').slice(0, 2), 16) < 0x80
-    const shadow = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)'
-    const label = key === '' ? 'Default' : (THEME_LABELS[key] ?? key)
-    const activeClass = active ? ' active' : ''
-    return `<button class="theme-pill shadow-minimal${activeClass}" data-theme="${key}"><span class="theme-swatch" style="background:${colors.bg};box-shadow:inset 0 0 0 1px ${shadow}"></span>${escapeHtml(label)}</button>`
-  }
+	function buildThemePill(
+		key: string,
+		colors: { bg: string; fg: string },
+		active = false,
+	): string {
+		const isDark = parseInt(colors.bg.replace("#", "").slice(0, 2), 16) < 0x80;
+		const shadow = isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.1)";
+		const label = key === "" ? "Default" : (THEME_LABELS[key] ?? key);
+		const activeClass = active ? " active" : "";
+		return `<button class="theme-pill shadow-minimal${activeClass}" data-theme="${key}"><span class="theme-swatch" style="background:${colors.bg};box-shadow:inset 0 0 0 1px ${shadow}"></span>${escapeHtml(label)}</button>`;
+	}
 
-  const themeEntries = Object.entries(THEMES)
-  // Visible inline pills: Default + Dracula + Solarized
-  const visiblePills = [
-    '<button class="theme-pill shadow-minimal active" data-theme=""><span class="theme-swatch" style="background:#FFFFFF;box-shadow:inset 0 0 0 1px rgba(0,0,0,0.1)"></span>Default</button>',
-    ...themeEntries
-      .filter(([key]) => VISIBLE_THEMES.has(key))
-      .map(([key, colors]) => buildThemePill(key, colors)),
-  ]
-  // All themes go in the dropdown (including Default, Dracula, Solarized)
-  const allDropdownPills = [
-    buildThemePill('', { bg: '#FFFFFF', fg: '#27272A' }, true),
-    ...themeEntries.map(([key, colors]) => buildThemePill(key, colors)),
-  ]
-  const totalThemes = allDropdownPills.length
+	const themeEntries = Object.entries(THEMES);
+	// Visible inline pills: Default + Dracula + Solarized
+	const visiblePills = [
+		'<button class="theme-pill shadow-minimal active" data-theme=""><span class="theme-swatch" style="background:#FFFFFF;box-shadow:inset 0 0 0 1px rgba(0,0,0,0.1)"></span>Default</button>',
+		...themeEntries
+			.filter(([key]) => VISIBLE_THEMES.has(key))
+			.map(([key, colors]) => buildThemePill(key, colors)),
+	];
+	// All themes go in the dropdown (including Default, Dracula, Solarized)
+	const allDropdownPills = [
+		buildThemePill("", { bg: "#FFFFFF", fg: "#27272A" }, true),
+		...themeEntries.map(([key, colors]) => buildThemePill(key, colors)),
+	];
+	const totalThemes = allDropdownPills.length;
 
-  const themePillsHtml = `
+	const themePillsHtml = `
     <div class="theme-pills-inline">
-      ${visiblePills.join('\n      ')}
+      ${visiblePills.join("\n      ")}
     </div>
     <div class="theme-more-wrapper">
       <button class="theme-pill shadow-minimal" id="theme-more-btn">${totalThemes} Themes</button>
       <div class="theme-more-dropdown shadow-modal-small" id="theme-more-dropdown">
-        ${allDropdownPills.join('\n        ')}
+        ${allDropdownPills.join("\n        ")}
       </div>
-    </div>`
+    </div>`;
 
-  // Step 4: Pre-highlight all sample sources with Shiki (build-time only, zero runtime cost).
-  // The mermaid TextMate grammar requires a fenced code block prefix to tokenize properly
-  // (see https://github.com/shikijs/shiki/issues/973), so we wrap each source with
-  // ```mermaid ... ``` and then strip those fence lines from the output HTML.
-  // Source panels always use github-dark — Shiki's inline colors are used directly.
-  const highlightedSources = samples.map(sample => {
-    const fenced = '```mermaid\n' + sample.source.trim() + '\n```'
-    const html = highlighter.codeToHtml(fenced, {
-      lang: 'mermaid',
-      theme: 'github-light',
-    })
-    // Strip the first line (```mermaid) and last line (```) from the output
-    return html.replace(
-      /(<code>)<span class="line">.*?<\/span>\n/,  // first line
-      '$1'
-    ).replace(
-      /\n<span class="line">.*?<\/span>(<\/code>)/, // last line
-      '$1'
-    )
-  })
+	// Step 4: Pre-highlight all sample sources with Shiki (build-time only, zero runtime cost).
+	// The mermaid TextMate grammar requires a fenced code block prefix to tokenize properly
+	// (see https://github.com/shikijs/shiki/issues/973), so we wrap each source with
+	// ```mermaid ... ``` and then strip those fence lines from the output HTML.
+	// Source panels always use github-dark — Shiki's inline colors are used directly.
+	const highlightedSources = samples.map((sample) => {
+		const fenced = "```mermaid\n" + sample.source.trim() + "\n```";
+		const html = highlighter.codeToHtml(fenced, {
+			lang: "mermaid",
+			theme: "github-light",
+		});
+		// Strip the first line (```mermaid) and last line (```) from the output
+		return html
+			.replace(
+				/(<code>)<span class="line">.*?<\/span>\n/, // first line
+				"$1",
+			)
+			.replace(
+				/\n<span class="line">.*?<\/span>(<\/code>)/, // last line
+				"$1",
+			);
+	});
 
-  // Step 5: Build sample card HTML shells (SVG + ASCII are empty, filled client-side)
-  // data-sample-bg stores the per-sample background for "Default" mode restoration.
-  // Hero samples get special full-width SVG-only treatment and are placed before "Samples" heading.
-  const heroCards: string[] = []
-  const regularCards: string[] = []
+	// Step 5: Build sample card HTML shells (SVG + ASCII are empty, filled client-side)
+	// data-sample-bg stores the per-sample background for "Default" mode restoration.
+	// Hero samples get special full-width SVG-only treatment and are placed before "Samples" heading.
+	const heroCards: string[] = [];
+	const regularCards: string[] = [];
 
-  samples.forEach((sample, i) => {
-    const bg = sample.options?.bg ?? ''
-    const isHero = sample.category === 'Hero'
+	samples.forEach((sample, i) => {
+		const bg = sample.options?.bg ?? "";
+		const isHero = sample.category === "Hero";
 
-    if (isHero) {
-      // Hero sample: full-width SVG only, no header/source/ASCII panels
-      heroCards.push(`
+		if (isHero) {
+			// Hero sample: full-width SVG only, no header/source/ASCII panels
+			heroCards.push(`
     <section class="sample sample-hero" id="sample-${i}">
       <div class="hero-diagram-panel" id="svg-panel-${i}" data-sample-bg="${bg}">
         <div class="svg-container" id="svg-${i}">
           <div class="loading-spinner"></div>
         </div>
       </div>
-    </section>`)
-    } else {
-      regularCards.push(`
+    </section>`);
+		} else {
+			regularCards.push(`
     <section class="sample" id="sample-${i}">
       <div class="sample-header">
         <h2>${escapeHtml(sample.title)}</h2>
@@ -232,7 +246,7 @@ async function generateHtml(): Promise<string> {
       <div class="sample-content">
         <div class="source-panel" id="source-panel-${i}">
           ${highlightedSources[i]}
-          ${sample.options ? `<div class="options"><strong>Options:</strong> <code>${escapeHtml(JSON.stringify(sample.options))}</code></div>` : ''}
+          ${sample.options ? `<div class="options"><strong>Options:</strong> <code>${escapeHtml(JSON.stringify(sample.options))}</code></div>` : ""}
           <button class="edit-btn" data-sample="${i}">Edit</button>
         </div>
         <div class="svg-panel" id="svg-panel-${i}" data-sample-bg="${bg}">
@@ -244,18 +258,18 @@ async function generateHtml(): Promise<string> {
           <pre class="ascii-output"><code id="ascii-${i}">Rendering\u2026</code></pre>
         </div>
       </div>
-    </section>`)
-    }
-  })
+    </section>`);
+		}
+	});
 
-  const heroCardsHtml = heroCards.join('\n')
-  const regularCardsHtml = regularCards.join('\n')
+	const heroCardsHtml = heroCards.join("\n");
+	const regularCardsHtml = regularCards.join("\n");
 
-  // ============================================================================
-  // Step 5: Assemble full HTML
-  // ============================================================================
+	// ============================================================================
+	// Step 5: Assemble full HTML
+	// ============================================================================
 
-  return `<!DOCTYPE html>
+	return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -1844,14 +1858,14 @@ ${bundleJs}
     </div>
   </footer>
 </body>
-</html>`
+</html>`;
 }
 
 // ============================================================================
 // Main
 // ============================================================================
 
-const html = await generateHtml()
-const outPath = new URL('./index.html', import.meta.url).pathname
-await Bun.write(outPath, html)
-console.log(`Written to ${outPath} (${(html.length / 1024).toFixed(1)} KB)`)
+const html = await generateHtml();
+const outPath = new URL("./index.html", import.meta.url).pathname;
+await Bun.write(outPath, html);
+console.log(`Written to ${outPath} (${(html.length / 1024).toFixed(1)} KB)`);

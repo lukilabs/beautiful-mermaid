@@ -2,9 +2,13 @@
 // Diamond shape renderer — uses corner decorators instead of diagonals
 // ============================================================================
 
-import type { ShapeRenderer } from './types.ts'
-import { getBoxDimensions, renderBox, getBoxAttachmentPoint } from './rectangle.ts'
-import { getCorners } from './corners.ts'
+import { getCorners } from "./corners.ts";
+import {
+	getBoxAttachmentPoint,
+	getBoxDimensions,
+	renderBox,
+} from "./rectangle.ts";
+import type { ShapeRenderer } from "./types.ts";
 
 /**
  * Diamond shape renderer.
@@ -16,12 +20,12 @@ import { getCorners } from './corners.ts'
  *   ◇─────────◇
  */
 export const diamondRenderer: ShapeRenderer = {
-  getDimensions: getBoxDimensions,
+	getDimensions: getBoxDimensions,
 
-  render(label, dimensions, options) {
-    const corners = getCorners('diamond', options.useAscii)
-    return renderBox(label, dimensions, corners, options.useAscii)
-  },
+	render(label, dimensions, options) {
+		const corners = getCorners("diamond", options.useAscii);
+		return renderBox(label, dimensions, corners, options.useAscii);
+	},
 
-  getAttachmentPoint: getBoxAttachmentPoint,
-}
+	getAttachmentPoint: getBoxAttachmentPoint,
+};

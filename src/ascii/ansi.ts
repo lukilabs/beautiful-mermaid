@@ -6,11 +6,11 @@
 // for browser rendering.
 // ============================================================================
 
-import type { CharRole, AsciiTheme, ColorMode } from './types.ts'
-import type { DiagramColors } from '../theme.ts'
-import { MIX } from '../theme.ts'
+import type { DiagramColors } from "../theme.ts";
+import { MIX } from "../theme.ts";
+import type { AsciiTheme, CharRole, ColorMode } from "./types.ts";
 
-declare const document: unknown
+declare const document: unknown;
 
 // ============================================================================
 // Default theme — matches SVG theme colors for consistency
@@ -21,13 +21,13 @@ declare const document: unknown
  * Uses the same mixing ratios to maintain visual consistency.
  */
 export const DEFAULT_ASCII_THEME: AsciiTheme = {
-  fg: '#27272a',      // zinc-800 — primary text
-  border: '#a1a1aa',  // zinc-400 — node borders (12% mix)
-  line: '#71717a',    // zinc-500 — edge lines (35% mix)
-  arrow: '#52525b',   // zinc-600 — arrowheads (60% mix)
-  corner: '#71717a',  // same as line
-  junction: '#a1a1aa', // same as border
-}
+	fg: "#27272a", // zinc-800 — primary text
+	border: "#a1a1aa", // zinc-400 — node borders (12% mix)
+	line: "#71717a", // zinc-500 — edge lines (35% mix)
+	arrow: "#52525b", // zinc-600 — arrowheads (60% mix)
+	corner: "#71717a", // same as line
+	junction: "#a1a1aa", // same as border
+};
 
 // ============================================================================
 // DiagramColors → AsciiTheme bridge
@@ -39,10 +39,14 @@ export const DEFAULT_ASCII_THEME: AsciiTheme = {
 
 /** Mix fg into bg at a given percentage (replicates CSS color-mix(in srgb)). */
 function mixColors(fg: string, bg: string, pct: number): string {
-  const f = parseHex(fg), b = parseHex(bg)
-  const mix = (a: number, z: number) => Math.round(a * (pct / 100) + z * (1 - pct / 100))
-  const r = mix(f.r, b.r), g = mix(f.g, b.g), bl = mix(f.b, b.b)
-  return '#' + [r, g, bl].map(c => c.toString(16).padStart(2, '0')).join('')
+	const f = parseHex(fg),
+		b = parseHex(bg);
+	const mix = (a: number, z: number) =>
+		Math.round(a * (pct / 100) + z * (1 - pct / 100));
+	const r = mix(f.r, b.r),
+		g = mix(f.g, b.g),
+		bl = mix(f.b, b.b);
+	return "#" + [r, g, bl].map((c) => c.toString(16).padStart(2, "0")).join("");
 }
 
 /**
@@ -51,18 +55,19 @@ function mixColors(fg: string, bg: string, pct: number): string {
  * otherwise falls back to color-mix derivation — matching SVG behavior.
  */
 export function diagramColorsToAsciiTheme(colors: DiagramColors): AsciiTheme {
-  const line = colors.line ?? mixColors(colors.fg, colors.bg, MIX.line)
-  const border = colors.border ?? mixColors(colors.fg, colors.bg, MIX.nodeStroke)
-  return {
-    fg:       colors.fg,
-    border,
-    line,
-    arrow:    colors.accent ?? mixColors(colors.fg, colors.bg, MIX.arrow),
-    accent:   colors.accent,
-    bg:       colors.bg,
-    corner:   line,
-    junction: border,
-  }
+	const line = colors.line ?? mixColors(colors.fg, colors.bg, MIX.line);
+	const border =
+		colors.border ?? mixColors(colors.fg, colors.bg, MIX.nodeStroke);
+	return {
+		fg: colors.fg,
+		border,
+		line,
+		arrow: colors.accent ?? mixColors(colors.fg, colors.bg, MIX.arrow),
+		accent: colors.accent,
+		bg: colors.bg,
+		corner: line,
+		junction: border,
+	};
 }
 
 // ============================================================================
@@ -81,43 +86,50 @@ export function diagramColorsToAsciiTheme(colors: DiagramColors): AsciiTheme {
  * Unknown/piped: returns 'none'.
  */
 export function detectColorMode(): ColorMode {
-  // Check if we're in a Node.js-like environment with process object
-  // Use globalThis to safely check for process without TypeScript errors
-  const proc = (globalThis as { process?: { stdout?: { isTTY?: boolean }, env?: Record<string, string | undefined> } }).process
+	// Check if we're in a Node.js-like environment with process object
+	// Use globalThis to safely check for process without TypeScript errors
+	const proc = (
+		globalThis as {
+			process?: {
+				stdout?: { isTTY?: boolean };
+				env?: Record<string, string | undefined>;
+			};
+		}
+	).process;
 
-  if (proc) {
-    // Check if stdout is a TTY (not piped/redirected)
-    if (!proc.stdout?.isTTY) {
-      return 'none'
-    }
+	if (proc) {
+		// Check if stdout is a TTY (not piped/redirected)
+		if (!proc.stdout?.isTTY) {
+			return "none";
+		}
 
-    const colorTerm = proc.env?.COLORTERM?.toLowerCase() ?? ''
-    const term = proc.env?.TERM?.toLowerCase() ?? ''
+		const colorTerm = proc.env?.COLORTERM?.toLowerCase() ?? "";
+		const term = proc.env?.TERM?.toLowerCase() ?? "";
 
-    // True color support
-    if (colorTerm === 'truecolor' || colorTerm === '24bit') {
-      return 'truecolor'
-    }
+		// True color support
+		if (colorTerm === "truecolor" || colorTerm === "24bit") {
+			return "truecolor";
+		}
 
-    // 256 color support
-    if (term.includes('256color') || term.includes('256')) {
-      return 'ansi256'
-    }
+		// 256 color support
+		if (term.includes("256color") || term.includes("256")) {
+			return "ansi256";
+		}
 
-    // Basic color support
-    if (term && term !== 'dumb') {
-      return 'ansi16'
-    }
+		// Basic color support
+		if (term && term !== "dumb") {
+			return "ansi16";
+		}
 
-    return 'none'
-  }
+		return "none";
+	}
 
-  // No process object → browser environment → use HTML color output
-  if (typeof document !== 'undefined') {
-    return 'html'
-  }
+	// No process object → browser environment → use HTML color output
+	if (typeof document !== "undefined") {
+		return "html";
+	}
 
-  return 'none'
+	return "none";
 }
 
 // ============================================================================
@@ -129,19 +141,19 @@ export function detectColorMode(): ColorMode {
  * Supports both 3-char (#RGB) and 6-char (#RRGGBB) formats.
  */
 function parseHex(hex: string): { r: number; g: number; b: number } {
-  const h = hex.replace('#', '')
-  if (h.length === 3) {
-    return {
-      r: parseInt(h[0]! + h[0]!, 16),
-      g: parseInt(h[1]! + h[1]!, 16),
-      b: parseInt(h[2]! + h[2]!, 16),
-    }
-  }
-  return {
-    r: parseInt(h.substring(0, 2), 16),
-    g: parseInt(h.substring(2, 4), 16),
-    b: parseInt(h.substring(4, 6), 16),
-  }
+	const h = hex.replace("#", "");
+	if (h.length === 3) {
+		return {
+			r: parseInt(h[0]! + h[0]!, 16),
+			g: parseInt(h[1]! + h[1]!, 16),
+			b: parseInt(h[2]! + h[2]!, 16),
+		};
+	}
+	return {
+		r: parseInt(h.substring(0, 2), 16),
+		g: parseInt(h.substring(2, 4), 16),
+		b: parseInt(h.substring(4, 6), 16),
+	};
 }
 
 // ============================================================================
@@ -149,17 +161,17 @@ function parseHex(hex: string): { r: number; g: number; b: number } {
 // ============================================================================
 
 /** ANSI escape sequence prefix */
-const ESC = '\x1b['
+const ESC = "\x1b[";
 /** Reset all attributes */
-const RESET = `${ESC}0m`
+const RESET = `${ESC}0m`;
 
 /**
  * Generate ANSI foreground color escape sequence for 24-bit true color.
  * Format: ESC[38;2;R;G;Bm
  */
 function truecolorFg(hex: string): string {
-  const { r, g, b } = parseHex(hex)
-  return `${ESC}38;2;${r};${g};${b}m`
+	const { r, g, b } = parseHex(hex);
+	return `${ESC}38;2;${r};${g};${b}m`;
 }
 
 /**
@@ -170,30 +182,34 @@ function truecolorFg(hex: string): string {
  * - 232-255: Grayscale ramp (24 shades)
  */
 function rgbTo256(r: number, g: number, b: number): number {
-  // Check if it's close to grayscale
-  const avg = (r + g + b) / 3
-  const maxDiff = Math.max(Math.abs(r - avg), Math.abs(g - avg), Math.abs(b - avg))
+	// Check if it's close to grayscale
+	const avg = (r + g + b) / 3;
+	const maxDiff = Math.max(
+		Math.abs(r - avg),
+		Math.abs(g - avg),
+		Math.abs(b - avg),
+	);
 
-  if (maxDiff < 10) {
-    // Use grayscale ramp (232-255)
-    // Each step is ~10.625 (256/24)
-    const gray = Math.round((avg / 255) * 23)
-    return 232 + Math.min(23, Math.max(0, gray))
-  }
+	if (maxDiff < 10) {
+		// Use grayscale ramp (232-255)
+		// Each step is ~10.625 (256/24)
+		const gray = Math.round((avg / 255) * 23);
+		return 232 + Math.min(23, Math.max(0, gray));
+	}
 
-  // Use 6x6x6 color cube (16-231)
-  // Each channel maps to 0-5: 0, 95, 135, 175, 215, 255
-  const toIndex = (v: number): number => {
-    if (v < 48) return 0
-    if (v < 115) return 1
-    return Math.min(5, Math.floor((v - 35) / 40))
-  }
+	// Use 6x6x6 color cube (16-231)
+	// Each channel maps to 0-5: 0, 95, 135, 175, 215, 255
+	const toIndex = (v: number): number => {
+		if (v < 48) return 0;
+		if (v < 115) return 1;
+		return Math.min(5, Math.floor((v - 35) / 40));
+	};
 
-  const ri = toIndex(r)
-  const gi = toIndex(g)
-  const bi = toIndex(b)
+	const ri = toIndex(r);
+	const gi = toIndex(g);
+	const bi = toIndex(b);
 
-  return 16 + (36 * ri) + (6 * gi) + bi
+	return 16 + 36 * ri + 6 * gi + bi;
 }
 
 /**
@@ -201,9 +217,9 @@ function rgbTo256(r: number, g: number, b: number): number {
  * Format: ESC[38;5;Nm
  */
 function ansi256Fg(hex: string): string {
-  const { r, g, b } = parseHex(hex)
-  const index = rgbTo256(r, g, b)
-  return `${ESC}38;5;${index}m`
+	const { r, g, b } = parseHex(hex);
+	const index = rgbTo256(r, g, b);
+	return `${ESC}38;5;${index}m`;
 }
 
 /**
@@ -215,25 +231,33 @@ function ansi256Fg(hex: string): string {
  * 8-15 = bright versions
  */
 function ansi16Fg(hex: string): string {
-  const { r, g, b } = parseHex(hex)
-  const luma = 0.299 * r + 0.587 * g + 0.114 * b
+	const { r, g, b } = parseHex(hex);
+	const luma = 0.299 * r + 0.587 * g + 0.114 * b;
 
-  // Determine brightness (use bright colors for better visibility)
-  const bright = luma > 100 ? 0 : 60 // 60 = bright variant offset
+	// Determine brightness (use bright colors for better visibility)
+	const bright = luma > 100 ? 0 : 60; // 60 = bright variant offset
 
-  // Determine base color based on dominant channel
-  let code: number
-  if (r > 180 && g < 100 && b < 100) code = 31 // red
-  else if (g > 180 && r < 100 && b < 100) code = 32 // green
-  else if (r > 150 && g > 150 && b < 100) code = 33 // yellow
-  else if (b > 180 && r < 100 && g < 100) code = 34 // blue
-  else if (r > 150 && b > 150 && g < 100) code = 35 // magenta
-  else if (g > 150 && b > 150 && r < 100) code = 36 // cyan
-  else if (luma > 200) code = 37 // white
-  else if (luma < 50) code = 30 // black
-  else code = 37 // default to white for grays
+	// Determine base color based on dominant channel
+	let code: number;
+	if (r > 180 && g < 100 && b < 100)
+		code = 31; // red
+	else if (g > 180 && r < 100 && b < 100)
+		code = 32; // green
+	else if (r > 150 && g > 150 && b < 100)
+		code = 33; // yellow
+	else if (b > 180 && r < 100 && g < 100)
+		code = 34; // blue
+	else if (r > 150 && b > 150 && g < 100)
+		code = 35; // magenta
+	else if (g > 150 && b > 150 && r < 100)
+		code = 36; // cyan
+	else if (luma > 200)
+		code = 37; // white
+	else if (luma < 50)
+		code = 30; // black
+	else code = 37; // default to white for grays
 
-  return `${ESC}${code + bright}m`
+	return `${ESC}${code + bright}m`;
 }
 
 // ============================================================================
@@ -242,12 +266,15 @@ function ansi16Fg(hex: string): string {
 
 /** Escape characters that would break HTML output. */
 function escapeHtml(text: string): string {
-  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+	return text
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;");
 }
 
 /** Wrap text in a <span> with an inline color style. */
 function htmlSpan(hex: string, text: string): string {
-  return `<span style="color:${hex}">${escapeHtml(text)}</span>`
+	return `<span style="color:${hex}">${escapeHtml(text)}</span>`;
 }
 
 // ============================================================================
@@ -258,55 +285,70 @@ function htmlSpan(hex: string, text: string): string {
  * Get the color for a character role from the theme.
  */
 function getRoleColor(role: CharRole, theme: AsciiTheme): string {
-  switch (role) {
-    case 'text': return theme.fg
-    case 'border': return theme.border
-    case 'line': return theme.line
-    case 'arrow': return theme.arrow
-    case 'corner': return theme.corner ?? theme.line
-    case 'junction': return theme.junction ?? theme.border
-    default: return theme.fg
-  }
+	switch (role) {
+		case "text":
+			return theme.fg;
+		case "border":
+			return theme.border;
+		case "line":
+			return theme.line;
+		case "arrow":
+			return theme.arrow;
+		case "corner":
+			return theme.corner ?? theme.line;
+		case "junction":
+			return theme.junction ?? theme.border;
+		default:
+			return theme.fg;
+	}
 }
 
 /**
  * Generate the ANSI escape sequence for a role color.
  */
-export function getAnsiColor(role: CharRole, theme: AsciiTheme, mode: ColorMode): string {
-  if (mode === 'none') return ''
+export function getAnsiColor(
+	role: CharRole,
+	theme: AsciiTheme,
+	mode: ColorMode,
+): string {
+	if (mode === "none") return "";
 
-  const hex = getRoleColor(role, theme)
+	const hex = getRoleColor(role, theme);
 
-  switch (mode) {
-    case 'truecolor': return truecolorFg(hex)
-    case 'ansi256': return ansi256Fg(hex)
-    case 'ansi16': return ansi16Fg(hex)
-    default: return ''
-  }
+	switch (mode) {
+		case "truecolor":
+			return truecolorFg(hex);
+		case "ansi256":
+			return ansi256Fg(hex);
+		case "ansi16":
+			return ansi16Fg(hex);
+		default:
+			return "";
+	}
 }
 
 /**
  * Get the ANSI reset sequence.
  */
 export function getAnsiReset(mode: ColorMode): string {
-  return mode === 'none' ? '' : RESET
+	return mode === "none" ? "" : RESET;
 }
 
 /**
  * Wrap a character with ANSI color codes based on its role.
  */
 export function colorizeChar(
-  char: string,
-  role: CharRole | null,
-  theme: AsciiTheme,
-  mode: ColorMode,
+	char: string,
+	role: CharRole | null,
+	theme: AsciiTheme,
+	mode: ColorMode,
 ): string {
-  if (mode === 'none' || role === null || char === ' ') {
-    return char
-  }
+	if (mode === "none" || role === null || char === " ") {
+		return char;
+	}
 
-  const colorCode = getAnsiColor(role, theme, mode)
-  return `${colorCode}${char}${RESET}`
+	const colorCode = getAnsiColor(role, theme, mode);
+	return `${colorCode}${char}${RESET}`;
 }
 
 /**
@@ -314,69 +356,69 @@ export function colorizeChar(
  * This reduces the number of escape sequences (ANSI) or span tags (HTML) in the output.
  */
 export function colorizeLine(
-  chars: string[],
-  roles: (CharRole | null)[],
-  theme: AsciiTheme,
-  mode: ColorMode,
+	chars: string[],
+	roles: (CharRole | null)[],
+	theme: AsciiTheme,
+	mode: ColorMode,
 ): string {
-  if (mode === 'none') {
-    return chars.join('')
-  }
+	if (mode === "none") {
+		return chars.join("");
+	}
 
-  if (mode === 'html') {
-    return colorizeLineHtml(chars, roles, theme)
-  }
+	if (mode === "html") {
+		return colorizeLineHtml(chars, roles, theme);
+	}
 
-  let result = ''
-  let currentRole: CharRole | null = null
-  let buffer = ''
+	let result = "";
+	let currentRole: CharRole | null = null;
+	let buffer = "";
 
-  for (let i = 0; i < chars.length; i++) {
-    const char = chars[i]!
-    const role = roles[i] ?? null
+	for (let i = 0; i < chars.length; i++) {
+		const char = chars[i]!;
+		const role = roles[i] ?? null;
 
-    // Whitespace doesn't need coloring
-    if (char === ' ') {
-      // Flush any buffered characters (with or without color)
-      if (buffer.length > 0) {
-        if (currentRole !== null) {
-          result += getAnsiColor(currentRole, theme, mode) + buffer + RESET
-        } else {
-          result += buffer
-        }
-        buffer = ''
-        currentRole = null
-      }
-      result += char
-      continue
-    }
+		// Whitespace doesn't need coloring
+		if (char === " ") {
+			// Flush any buffered characters (with or without color)
+			if (buffer.length > 0) {
+				if (currentRole !== null) {
+					result += getAnsiColor(currentRole, theme, mode) + buffer + RESET;
+				} else {
+					result += buffer;
+				}
+				buffer = "";
+				currentRole = null;
+			}
+			result += char;
+			continue;
+		}
 
-    // Same role as previous — accumulate
-    if (role === currentRole) {
-      buffer += char
-      continue
-    }
+		// Same role as previous — accumulate
+		if (role === currentRole) {
+			buffer += char;
+			continue;
+		}
 
-    // Role changed — flush buffer (with or without color) and start new
-    if (buffer.length > 0) {
-      if (currentRole !== null) {
-        result += getAnsiColor(currentRole, theme, mode) + buffer + RESET
-      } else {
-        result += buffer
-      }
-    }
-    buffer = char
-    currentRole = role
-  }
+		// Role changed — flush buffer (with or without color) and start new
+		if (buffer.length > 0) {
+			if (currentRole !== null) {
+				result += getAnsiColor(currentRole, theme, mode) + buffer + RESET;
+			} else {
+				result += buffer;
+			}
+		}
+		buffer = char;
+		currentRole = role;
+	}
 
-  // Flush remaining buffer
-  if (buffer.length > 0 && currentRole !== null) {
-    result += getAnsiColor(currentRole, theme, mode) + buffer + RESET
-  } else if (buffer.length > 0) {
-    result += buffer
-  }
+	// Flush remaining buffer
+	if (buffer.length > 0 && currentRole !== null) {
+		result += getAnsiColor(currentRole, theme, mode) + buffer + RESET;
+	} else if (buffer.length > 0) {
+		result += buffer;
+	}
 
-  return result
+	return result;
 }
 
 /**
@@ -385,47 +427,47 @@ export function colorizeLine(
  * Whitespace is emitted bare (no wrapping) to keep output compact.
  */
 function colorizeLineHtml(
-  chars: string[],
-  roles: (CharRole | null)[],
-  theme: AsciiTheme,
+	chars: string[],
+	roles: (CharRole | null)[],
+	theme: AsciiTheme,
 ): string {
-  let result = ''
-  let currentRole: CharRole | null = null
-  let buffer = ''
+	let result = "";
+	let currentRole: CharRole | null = null;
+	let buffer = "";
 
-  const flush = () => {
-    if (buffer.length === 0) return
-    if (currentRole !== null) {
-      result += htmlSpan(getRoleColor(currentRole, theme), buffer)
-    } else {
-      result += escapeHtml(buffer)
-    }
-    buffer = ''
-    currentRole = null
-  }
+	const flush = () => {
+		if (buffer.length === 0) return;
+		if (currentRole !== null) {
+			result += htmlSpan(getRoleColor(currentRole, theme), buffer);
+		} else {
+			result += escapeHtml(buffer);
+		}
+		buffer = "";
+		currentRole = null;
+	};
 
-  for (let i = 0; i < chars.length; i++) {
-    const char = chars[i]!
-    const role = roles[i] ?? null
+	for (let i = 0; i < chars.length; i++) {
+		const char = chars[i]!;
+		const role = roles[i] ?? null;
 
-    if (char === ' ') {
-      flush()
-      result += ' '
-      continue
-    }
+		if (char === " ") {
+			flush();
+			result += " ";
+			continue;
+		}
 
-    if (role === currentRole) {
-      buffer += char
-      continue
-    }
+		if (role === currentRole) {
+			buffer += char;
+			continue;
+		}
 
-    flush()
-    buffer = char
-    currentRole = role
-  }
+		flush();
+		buffer = char;
+		currentRole = role;
+	}
 
-  flush()
-  return result
+	flush();
+	return result;
 }
 
 /**
@@ -433,15 +475,26 @@ function colorizeLineHtml(
  * Used by renderers that need per-cell color control (e.g. multi-series xychart).
  * Handles all output modes: ANSI (16/256/truecolor) and HTML.
  */
-export function colorizeText(text: string, hex: string, mode: ColorMode): string {
-  if (mode === 'none' || text.length === 0) return text
-  if (mode === 'html') return htmlSpan(hex, text)
-  let code: string
-  switch (mode) {
-    case 'truecolor': code = truecolorFg(hex); break
-    case 'ansi256': code = ansi256Fg(hex); break
-    case 'ansi16': code = ansi16Fg(hex); break
-    default: return text
-  }
-  return `${code}${text}${RESET}`
+export function colorizeText(
+	text: string,
+	hex: string,
+	mode: ColorMode,
+): string {
+	if (mode === "none" || text.length === 0) return text;
+	if (mode === "html") return htmlSpan(hex, text);
+	let code: string;
+	switch (mode) {
+		case "truecolor":
+			code = truecolorFg(hex);
+			break;
+		case "ansi256":
+			code = ansi256Fg(hex);
+			break;
+		case "ansi16":
+			code = ansi16Fg(hex);
+			break;
+		default:
+			return text;
+	}
+	return `${code}${text}${RESET}`;
 }
