@@ -7,12 +7,19 @@
  *   3. Methods section
  */
 
-import type { ElkNode, ElkExtendedEdge } from 'elkjs'
-import type { ClassDiagram, ClassNode, ClassMember, PositionedClassDiagram, PositionedClassNode, PositionedClassRelationship } from './types.ts'
-import type { RenderOptions, Point } from '../types.ts'
-import { estimateTextWidth, estimateMonoTextWidth, FONT_SIZES, FONT_WEIGHTS } from '../styles.ts'
-import { measureMultilineText } from '../text-metrics.ts'
+import type { ElkExtendedEdge, ElkNode } from 'elkjs'
 import { elkLayoutSync } from '../elk-instance.ts'
+import { estimateMonoTextWidth, estimateTextWidth, FONT_SIZES, FONT_WEIGHTS } from '../styles.ts'
+import { measureMultilineText } from '../text-metrics.ts'
+import type { Point, RenderOptions } from '../types.ts'
+import type {
+  ClassDiagram,
+  ClassMember,
+  ClassNode,
+  PositionedClassDiagram,
+  PositionedClassNode,
+  PositionedClassRelationship,
+} from './types.ts'
 
 /** Layout constants for class diagrams */
 export const CLS = {
@@ -30,35 +37,51 @@ export const CLS = {
   layerSpacing: 60,
 } as const
 
-type ClassSizeMap = Map<string, { width: number; height: number; headerHeight: number; attrHeight: number; methodHeight: number }>
+type ClassSizeMap = Map<
+  string,
+  {
+    width: number
+    height: number
+    headerHeight: number
+    attrHeight: number
+    methodHeight: number
+  }
+>
 
 /** Build ELK graph and size map from a class diagram. */
 function buildClassElkGraph(
   diagram: ClassDiagram,
-  _options: RenderOptions
+  _options: RenderOptions,
 ): { elkGraph: ElkNode; classSizes: ClassSizeMap } {
   const classSizes: ClassSizeMap = new Map()
 
   for (const cls of diagram.classes) {
-    const headerHeight = cls.annotation
-      ? CLS.headerBaseHeight + CLS.annotationHeight
-      : CLS.headerBaseHeight
+    const headerHeight = cls.annotation ? CLS.headerBaseHeight + CLS.annotationHeight : CLS.headerBaseHeight
 
-    const attrHeight = cls.attributes.length > 0
-      ? cls.attributes.length * CLS.memberRowHeight + CLS.sectionPadY
-      : CLS.emptySectionHeight
+    const attrHeight =
+      cls.attributes.length > 0 ? cls.attributes.length * CLS.memberRowHeight + CLS.sectionPadY : CLS.emptySectionHeight
 
-    const methodHeight = cls.methods.length > 0
-      ? cls.methods.length * CLS.memberRowHeight + CLS.sectionPadY
-      : CLS.emptySectionHeight
+    const methodHeight =
+      cls.methods.length > 0 ? cls.methods.length * CLS.memberRowHeight + CLS.sectionPadY : CLS.emptySectionHeight
 
     const headerTextW = estimateTextWidth(cls.label, FONT_SIZES.nodeLabel, FONT_WEIGHTS.nodeLabel)
     const maxAttrW = maxMemberWidth(cls.attributes)
     const maxMethodW = maxMemberWidth(cls.methods)
-    const width = Math.max(CLS.minWidth, headerTextW + CLS.boxPadX * 2, maxAttrW + CLS.boxPadX * 2, maxMethodW + CLS.boxPadX * 2)
+    const width = Math.max(
+      CLS.minWidth,
+      headerTextW + CLS.boxPadX * 2,
+      maxAttrW + CLS.boxPadX * 2,
+      maxMethodW + CLS.boxPadX * 2,
+    )
     const height = headerHeight + attrHeight + methodHeight
 
-    classSizes.set(cls.id, { width, height, headerHeight, attrHeight, methodHeight })
+    classSizes.set(cls.id, {
+      width,
+      height,
+      headerHeight,
+      attrHeight,
+      methodHeight,
+    })
   }
 
   const elkGraph: ElkNode = {
@@ -78,15 +101,29 @@ function buildClassElkGraph(
 
   for (const cls of diagram.classes) {
     const size = classSizes.get(cls.id)!
-    elkGraph.children!.push({ id: cls.id, width: size.width, height: size.height })
+    elkGraph.children!.push({
+      id: cls.id,
+      width: size.width,
+      height: size.height,
+    })
   }
 
   for (let i = 0; i < diagram.relationships.length; i++) {
     const rel = diagram.relationships[i]!
-    const edge: ElkExtendedEdge = { id: `e${i}`, sources: [rel.from], targets: [rel.to] }
+    const edge: ElkExtendedEdge = {
+      id: `e${i}`,
+      sources: [rel.from],
+      targets: [rel.to],
+    }
     if (rel.label) {
       const metrics = measureMultilineText(rel.label, FONT_SIZES.edgeLabel, FONT_WEIGHTS.edgeLabel)
-      edge.labels = [{ text: rel.label, width: metrics.width + 8, height: metrics.height + 6 }]
+      edge.labels = [
+        {
+          text: rel.label,
+          width: metrics.width + 8,
+          height: metrics.height + 6,
+        },
+      ]
     }
     elkGraph.edges!.push(edge)
   }
@@ -95,11 +132,7 @@ function buildClassElkGraph(
 }
 
 /** Extract positioned classes and relationships from ELK result. */
-function extractClassLayout(
-  result: ElkNode,
-  diagram: ClassDiagram,
-  classSizes: ClassSizeMap
-): PositionedClassDiagram {
+function extractClassLayout(result: ElkNode, diagram: ClassDiagram, classSizes: ClassSizeMap): PositionedClassDiagram {
   const classLookup = new Map<string, ClassNode>()
   for (const cls of diagram.classes) classLookup.set(cls.id, cls)
 
@@ -177,10 +210,7 @@ function extractClassLayout(
 /**
  * Lay out a parsed class diagram using ELK.js (synchronous).
  */
-export function layoutClassDiagramSync(
-  diagram: ClassDiagram,
-  options: RenderOptions = {}
-): PositionedClassDiagram {
+export function layoutClassDiagramSync(diagram: ClassDiagram, options: RenderOptions = {}): PositionedClassDiagram {
   if (diagram.classes.length === 0) {
     return { width: 0, height: 0, classes: [], relationships: [] }
   }

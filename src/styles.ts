@@ -93,4 +93,3 @@ export const ARROW_HEAD = {
   width: 8,
   height: 5,
 } as const
-

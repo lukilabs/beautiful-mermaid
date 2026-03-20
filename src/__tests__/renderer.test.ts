@@ -4,10 +4,10 @@
  * Uses hand-crafted PositionedGraph data to test SVG output without
  * depending on the layout engine.
  */
-import { describe, it, expect } from 'bun:test'
+import { describe, expect, it } from 'bun:test'
 import { renderSvg } from '../renderer.ts'
 import type { DiagramColors } from '../theme.ts'
-import type { PositionedGraph, PositionedNode, PositionedEdge, PositionedGroup } from '../types.ts'
+import type { PositionedEdge, PositionedGraph, PositionedGroup, PositionedNode } from '../types.ts'
 
 /** Minimal positioned graph for testing */
 function makeGraph(overrides: Partial<PositionedGraph> = {}): PositionedGraph {
@@ -43,7 +43,10 @@ function makeEdge(overrides: Partial<PositionedEdge> = {}): PositionedEdge {
     style: 'solid',
     hasArrowStart: false,
     hasArrowEnd: true,
-    points: [{ x: 100, y: 120 }, { x: 100, y: 200 }],
+    points: [
+      { x: 100, y: 120 },
+      { x: 100, y: 200 },
+    ],
     ...overrides,
   }
 }
@@ -245,7 +248,12 @@ describe('renderSvg – new shapes (Batch 2)', () => {
 
 describe('renderSvg – state pseudostates', () => {
   it('renders state-start as a filled circle', () => {
-    const node = makeNode({ shape: 'state-start', label: '', width: 28, height: 28 })
+    const node = makeNode({
+      shape: 'state-start',
+      label: '',
+      width: 28,
+      height: 28,
+    })
     const graph = makeGraph({ nodes: [node] })
     const svg = renderSvg(graph, lightColors)
     expect(svg).toContain('<circle')
@@ -254,7 +262,12 @@ describe('renderSvg – state pseudostates', () => {
   })
 
   it('renders state-end as bullseye (two circles)', () => {
-    const node = makeNode({ shape: 'state-end', label: '', width: 28, height: 28 })
+    const node = makeNode({
+      shape: 'state-end',
+      label: '',
+      width: 28,
+      height: 28,
+    })
     const graph = makeGraph({ nodes: [node] })
     const svg = renderSvg(graph, lightColors)
     const circleMatches = svg.match(/<circle/g) ?? []
@@ -352,7 +365,10 @@ describe('renderSvg – edge labels', () => {
     // labelPosition overrides to (50, 80) — verify the SVG uses that coordinate.
     const edge = makeEdge({
       label: 'Go',
-      points: [{ x: 100, y: 120 }, { x: 100, y: 200 }],
+      points: [
+        { x: 100, y: 120 },
+        { x: 100, y: 200 },
+      ],
       labelPosition: { x: 50, y: 80 },
     })
     const graph = makeGraph({ edges: [edge] })
@@ -372,8 +388,13 @@ describe('renderSvg – edge labels', () => {
 describe('renderSvg – groups', () => {
   it('renders group with outer rectangle and header band', () => {
     const group: PositionedGroup = {
-      id: 'sg1', label: 'Backend',
-      x: 20, y: 20, width: 200, height: 150, children: [],
+      id: 'sg1',
+      label: 'Backend',
+      x: 20,
+      y: 20,
+      width: 200,
+      height: 150,
+      children: [],
     }
     const graph = makeGraph({ groups: [group] })
     const svg = renderSvg(graph, lightColors)
@@ -384,12 +405,22 @@ describe('renderSvg – groups', () => {
 
   it('renders nested groups recursively', () => {
     const inner: PositionedGroup = {
-      id: 'inner', label: 'Inner',
-      x: 40, y: 60, width: 120, height: 80, children: [],
+      id: 'inner',
+      label: 'Inner',
+      x: 40,
+      y: 60,
+      width: 120,
+      height: 80,
+      children: [],
     }
     const outer: PositionedGroup = {
-      id: 'outer', label: 'Outer',
-      x: 20, y: 20, width: 200, height: 150, children: [inner],
+      id: 'outer',
+      label: 'Outer',
+      x: 20,
+      y: 20,
+      width: 200,
+      height: 150,
+      children: [inner],
     }
     const graph = makeGraph({ groups: [outer] })
     const svg = renderSvg(graph, lightColors)
@@ -456,8 +487,13 @@ describe('renderSvg – XML escaping', () => {
 
   it('escapes special characters in group labels', () => {
     const group: PositionedGroup = {
-      id: 'g1', label: 'A < B',
-      x: 0, y: 0, width: 100, height: 100, children: [],
+      id: 'g1',
+      label: 'A < B',
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      children: [],
     }
     const graph = makeGraph({ groups: [group] })
     const svg = renderSvg(graph, lightColors)
@@ -471,7 +507,9 @@ describe('renderSvg – XML escaping', () => {
 
 describe('renderSvg – inline style XSS prevention', () => {
   it('escapes attribute injection in inline style fill', () => {
-    const node = makeNode({ inlineStyle: { fill: 'red" onmouseover="alert(1)' } })
+    const node = makeNode({
+      inlineStyle: { fill: 'red" onmouseover="alert(1)' },
+    })
     const graph = makeGraph({ nodes: [node] })
     const svg = renderSvg(graph, lightColors)
     expect(svg).not.toContain('onmouseover="alert')
@@ -479,7 +517,9 @@ describe('renderSvg – inline style XSS prevention', () => {
   })
 
   it('escapes element injection in inline style fill', () => {
-    const node = makeNode({ inlineStyle: { fill: 'red"/><svg onload="alert(1)"><rect fill="x' } })
+    const node = makeNode({
+      inlineStyle: { fill: 'red"/><svg onload="alert(1)"><rect fill="x' },
+    })
     const graph = makeGraph({ nodes: [node] })
     const svg = renderSvg(graph, lightColors)
     expect(svg).not.toContain('<svg onload')
@@ -487,7 +527,9 @@ describe('renderSvg – inline style XSS prevention', () => {
   })
 
   it('escapes injection in inline style stroke', () => {
-    const node = makeNode({ inlineStyle: { stroke: 'blue" onclick="alert(1)' } })
+    const node = makeNode({
+      inlineStyle: { stroke: 'blue" onclick="alert(1)' },
+    })
     const graph = makeGraph({ nodes: [node] })
     const svg = renderSvg(graph, lightColors)
     expect(svg).not.toContain('onclick="alert')
@@ -495,7 +537,9 @@ describe('renderSvg – inline style XSS prevention', () => {
   })
 
   it('escapes injection in inline style stroke-width', () => {
-    const node = makeNode({ inlineStyle: { 'stroke-width': '2" onmouseover="alert(1)' } })
+    const node = makeNode({
+      inlineStyle: { 'stroke-width': '2" onmouseover="alert(1)' },
+    })
     const graph = makeGraph({ nodes: [node] })
     const svg = renderSvg(graph, lightColors)
     expect(svg).not.toContain('onmouseover="alert')
@@ -503,7 +547,9 @@ describe('renderSvg – inline style XSS prevention', () => {
   })
 
   it('escapes injection in inline style color', () => {
-    const node = makeNode({ inlineStyle: { color: 'green" onfocus="alert(1)' } })
+    const node = makeNode({
+      inlineStyle: { color: 'green" onfocus="alert(1)' },
+    })
     const graph = makeGraph({ nodes: [node] })
     const svg = renderSvg(graph, lightColors)
     expect(svg).not.toContain('onfocus="alert')

@@ -1,11 +1,14 @@
-import { describe, it, expect } from 'bun:test'
-import { parseMermaid } from '../parser.ts'
+import { describe, expect, it } from 'bun:test'
 import { renderMermaidSVG } from '../index.ts'
+import { parseMermaid } from '../parser.ts'
 
 describe('linkStyle – parser', () => {
   it('parses linkStyle with single index', () => {
     const g = parseMermaid('graph TD\n  A --> B\n  linkStyle 0 stroke:#ff0000,stroke-width:2px')
-    expect(g.linkStyles.get(0)).toEqual({ stroke: '#ff0000', 'stroke-width': '2px' })
+    expect(g.linkStyles.get(0)).toEqual({
+      stroke: '#ff0000',
+      'stroke-width': '2px',
+    })
   })
 
   it('parses linkStyle with comma-separated indices', () => {
@@ -16,7 +19,10 @@ describe('linkStyle – parser', () => {
 
   it('parses linkStyle default', () => {
     const g = parseMermaid('graph TD\n  A --> B\n  linkStyle default stroke:#888888,stroke-width:3px')
-    expect(g.linkStyles.get('default')).toEqual({ stroke: '#888888', 'stroke-width': '3px' })
+    expect(g.linkStyles.get('default')).toEqual({
+      stroke: '#888888',
+      'stroke-width': '3px',
+    })
   })
 
   it('later linkStyle overrides earlier for same index', () => {
@@ -32,7 +38,10 @@ describe('linkStyle – parser', () => {
 
   it('strips trailing semicolons from style values', () => {
     const g = parseMermaid('graph TD\n  A --> B\n  linkStyle 0 stroke:#ff0000,stroke-width:4px;')
-    expect(g.linkStyles.get(0)).toEqual({ stroke: '#ff0000', 'stroke-width': '4px' })
+    expect(g.linkStyles.get(0)).toEqual({
+      stroke: '#ff0000',
+      'stroke-width': '4px',
+    })
   })
 })
 
@@ -68,7 +77,7 @@ describe('linkStyle – SVG integration', () => {
 
   it('index-specific linkStyle overrides default', () => {
     const svg = renderMermaidSVG(
-      'graph TD\n  A --> B\n  B --> C\n  linkStyle default stroke:#888\n  linkStyle 0 stroke:#ff0000'
+      'graph TD\n  A --> B\n  B --> C\n  linkStyle default stroke:#888\n  linkStyle 0 stroke:#ff0000',
     )
     expect(svg).toContain('stroke="#ff0000"')
     expect(svg).toContain('stroke="#888"')

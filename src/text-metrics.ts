@@ -176,7 +176,7 @@ export function measureTextWidth(text: string, fontSize: number, fontWeight: num
   // Base ratio calibrated for Inter font family
   // Heavier weights are slightly wider
   // Added +0.02 buffer to prevent edge truncation of characters like 's' at line ends
-  const baseRatio = fontWeight >= 600 ? 0.60 : fontWeight >= 500 ? 0.57 : 0.54
+  const baseRatio = fontWeight >= 600 ? 0.6 : fontWeight >= 500 ? 0.57 : 0.54
 
   let totalWidth = 0
 
@@ -221,11 +221,7 @@ export interface MultilineMetrics {
  * @param fontWeight - Font weight (affects width slightly)
  * @returns Metrics including width, height, lines array, and lineHeight
  */
-export function measureMultilineText(
-  text: string,
-  fontSize: number,
-  fontWeight: number
-): MultilineMetrics {
+export function measureMultilineText(text: string, fontSize: number, fontWeight: number): MultilineMetrics {
   const lines = text.split('\n')
   const lineHeight = fontSize * LINE_HEIGHT_RATIO
 

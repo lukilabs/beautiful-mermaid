@@ -7,7 +7,7 @@
  * Covers: original features, Batch 1 (new shapes), Batch 2 (edges, styles),
  * and Batch 3 (state diagrams).
  */
-import { describe, it, expect } from 'bun:test'
+import { describe, expect, it } from 'bun:test'
 import { renderMermaidSVG } from '../index.ts'
 
 // ============================================================================
@@ -42,7 +42,10 @@ describe('renderMermaidSVG – basic', () => {
 
 describe('renderMermaidSVG – options', () => {
   it('applies dark colors', () => {
-    const svg = renderMermaidSVG('graph TD\n  A --> B', { bg: '#18181B', fg: '#FAFAFA' })
+    const svg = renderMermaidSVG('graph TD\n  A --> B', {
+      bg: '#18181B',
+      fg: '#FAFAFA',
+    })
     expect(svg).toContain('--bg:#18181B')
   })
 
@@ -52,7 +55,9 @@ describe('renderMermaidSVG – options', () => {
   })
 
   it('applies custom font', () => {
-    const svg = renderMermaidSVG('graph TD\n  A --> B', { font: 'JetBrains Mono' })
+    const svg = renderMermaidSVG('graph TD\n  A --> B', {
+      font: 'JetBrains Mono',
+    })
     expect(svg).toContain("'JetBrains Mono'")
   })
 
@@ -340,7 +345,7 @@ describe('renderMermaidSVG – state diagrams', () => {
         const overlapY = a.y < b.y + b.h && a.y + a.h > b.y
         expect(
           overlapX && overlapY,
-          `Label pills ${i} (x=${a.x},y=${a.y},w=${a.w},h=${a.h}) and ${j} (x=${b.x},y=${b.y},w=${b.w},h=${b.h}) overlap`
+          `Label pills ${i} (x=${a.x},y=${a.y},w=${a.w},h=${a.h}) and ${j} (x=${b.x},y=${b.y},w=${b.w},h=${b.h}) overlap`,
         ).toBe(false)
       }
     }
@@ -506,8 +511,20 @@ describe('renderMermaidSVG – all shapes combined', () => {
       K --> L[\\TrapAlt/]`)
 
     // Verify every label renders
-    for (const label of ['Rectangle', 'Rounded', 'Diamond', 'Stadium', 'Circle',
-      'Subroutine', 'DoubleCircle', 'Hexagon', 'Cylinder', 'Flag', 'Trapezoid', 'TrapAlt']) {
+    for (const label of [
+      'Rectangle',
+      'Rounded',
+      'Diamond',
+      'Stadium',
+      'Circle',
+      'Subroutine',
+      'DoubleCircle',
+      'Hexagon',
+      'Cylinder',
+      'Flag',
+      'Trapezoid',
+      'TrapAlt',
+    ]) {
       expect(svg).toContain(`>${label}</text>`)
     }
 

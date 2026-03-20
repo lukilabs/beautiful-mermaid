@@ -1,9 +1,15 @@
-import type { PositionedErDiagram, PositionedErEntity, PositionedErRelationship, ErAttribute, Cardinality } from './types.ts'
-import type { DiagramColors } from '../theme.ts'
-import { svgOpenTag, buildStyleBlock } from '../theme.ts'
-import { FONT_SIZES, FONT_WEIGHTS, STROKE_WIDTHS, estimateTextWidth, TEXT_BASELINE_SHIFT } from '../styles.ts'
-import { renderMultilineText, escapeXml as escapeXmlUtil } from '../multiline-utils.ts'
+import { escapeXml as escapeXmlUtil, renderMultilineText } from '../multiline-utils.ts'
+import { estimateTextWidth, FONT_SIZES, FONT_WEIGHTS, STROKE_WIDTHS, TEXT_BASELINE_SHIFT } from '../styles.ts'
 import { measureMultilineText } from '../text-metrics.ts'
+import type { DiagramColors } from '../theme.ts'
+import { buildStyleBlock, svgOpenTag } from '../theme.ts'
+import type {
+  Cardinality,
+  ErAttribute,
+  PositionedErDiagram,
+  PositionedErEntity,
+  PositionedErRelationship,
+} from './types.ts'
 
 // ============================================================================
 // ER diagram SVG renderer
@@ -36,7 +42,7 @@ export function renderErSvg(
   diagram: PositionedErDiagram,
   colors: DiagramColors,
   font: string = 'Inter',
-  transparent: boolean = false
+  transparent: boolean = false,
 ): string {
   const parts: string[] = []
 
@@ -83,52 +89,51 @@ function renderEntityBox(entity: PositionedErEntity): string {
   const parts: string[] = []
 
   // Semantic wrapper with entity metadata
-  parts.push(
-    `<g class="entity" data-id="${escapeAttr(id)}" data-label="${escapeAttr(label)}">`
-  )
+  parts.push(`<g class="entity" data-id="${escapeAttr(id)}" data-label="${escapeAttr(label)}">`)
 
   // Outer rectangle
   parts.push(
     `  <rect x="${x}" y="${y}" width="${width}" height="${height}" ` +
-    `rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="${STROKE_WIDTHS.outerBox}" />`
+      `rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="${STROKE_WIDTHS.outerBox}" />`,
   )
 
   // Header background
   parts.push(
     `  <rect x="${x}" y="${y}" width="${width}" height="${headerHeight}" ` +
-    `rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="${STROKE_WIDTHS.outerBox}" />`
+      `rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="${STROKE_WIDTHS.outerBox}" />`,
   )
 
   // Entity name (supports multi-line via <br> tags)
   parts.push(
-    '  ' + renderMultilineText(
-      label,
-      x + width / 2,
-      y + headerHeight / 2,
-      FONT_SIZES.nodeLabel,
-      `text-anchor="middle" font-size="${FONT_SIZES.nodeLabel}" font-weight="700" fill="var(--_text)"`
-    )
+    '  ' +
+      renderMultilineText(
+        label,
+        x + width / 2,
+        y + headerHeight / 2,
+        FONT_SIZES.nodeLabel,
+        `text-anchor="middle" font-size="${FONT_SIZES.nodeLabel}" font-weight="700" fill="var(--_text)"`,
+      ),
   )
 
   // Divider
   const attrTop = y + headerHeight
   parts.push(
     `  <line x1="${x}" y1="${attrTop}" x2="${x + width}" y2="${attrTop}" ` +
-    `stroke="var(--_node-stroke)" stroke-width="${STROKE_WIDTHS.innerBox}" />`
+      `stroke="var(--_node-stroke)" stroke-width="${STROKE_WIDTHS.innerBox}" />`,
   )
 
   // Attribute rows
   for (let i = 0; i < attributes.length; i++) {
     const attr = attributes[i]!
     const rowY = attrTop + i * rowHeight + rowHeight / 2
-    parts.push('  ' + renderAttribute(attr, x, rowY, width).replace(/\n/g, '\n  '))
+    parts.push(`  ${renderAttribute(attr, x, rowY, width).replace(/\n/g, '\n  ')}`)
   }
 
   // Empty row placeholder when no attributes
   if (attributes.length === 0) {
     parts.push(
       `  <text x="${x + width / 2}" y="${attrTop + rowHeight / 2}" text-anchor="middle" dy="${TEXT_BASELINE_SHIFT}" ` +
-      `font-size="${ER_FONT.attrSize}" fill="var(--_text-faint)" font-style="italic">(no attributes)</text>`
+        `font-size="${ER_FONT.attrSize}" fill="var(--_text-faint)" font-style="italic">(no attributes)</text>`,
     )
   }
 
@@ -162,11 +167,11 @@ function renderAttribute(attr: ErAttribute, boxX: number, y: number, boxWidth: n
     keyWidth = estimateTextWidth(keyText, ER_FONT.keySize, ER_FONT.keyWeight) + 8
     parts.push(
       `<rect x="${boxX + 6}" y="${y - 7}" width="${keyWidth}" height="14" rx="2" ry="2" ` +
-      `fill="var(--_key-badge)" />`
+        `fill="var(--_key-badge)" />`,
     )
     parts.push(
       `<text x="${boxX + 6 + keyWidth / 2}" y="${y}" text-anchor="middle" dy="${TEXT_BASELINE_SHIFT}" ` +
-      `font-size="${ER_FONT.keySize}" font-weight="${ER_FONT.keyWeight}" fill="var(--_text-sec)">${attr.keys.join(',')}</text>`
+        `font-size="${ER_FONT.keySize}" font-weight="${ER_FONT.keyWeight}" fill="var(--_text-sec)">${attr.keys.join(',')}</text>`,
     )
   }
 
@@ -174,16 +179,16 @@ function renderAttribute(attr: ErAttribute, boxX: number, y: number, boxWidth: n
   const typeX = boxX + 8 + (keyWidth > 0 ? keyWidth + 6 : 0)
   parts.push(
     `<text x="${typeX}" y="${y}" class="mono" dy="${TEXT_BASELINE_SHIFT}" ` +
-    `font-size="${ER_FONT.attrSize}" font-weight="${ER_FONT.attrWeight}">` +
-    `<tspan fill="var(--_text-muted)">${escapeXml(attr.type)}</tspan></text>`
+      `font-size="${ER_FONT.attrSize}" font-weight="${ER_FONT.attrWeight}">` +
+      `<tspan fill="var(--_text-muted)">${escapeXml(attr.type)}</tspan></text>`,
   )
 
   // Name (right-aligned, monospace with syntax highlighting)
   const nameX = boxX + boxWidth - 8
   parts.push(
     `<text x="${nameX}" y="${y}" class="mono" text-anchor="end" dy="${TEXT_BASELINE_SHIFT}" ` +
-    `font-size="${ER_FONT.attrSize}" font-weight="${ER_FONT.attrWeight}">` +
-    `<tspan fill="var(--_text-sec)">${escapeXml(attr.name)}</tspan></text>`
+      `font-size="${ER_FONT.attrSize}" font-weight="${ER_FONT.attrWeight}">` +
+      `<tspan fill="var(--_text-sec)">${escapeXml(attr.name)}</tspan></text>`,
   )
 
   // Close the group if we opened one
@@ -238,8 +243,13 @@ function renderRelationshipLabel(rel: PositionedErRelationship): string {
   return (
     `<rect x="${mid.x - bgW / 2}" y="${mid.y - bgH / 2}" width="${bgW}" height="${bgH}" rx="2" ry="2" ` +
     `fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="0.5" />` +
-    `\n${renderMultilineText(rel.label, mid.x, mid.y, FONT_SIZES.edgeLabel,
-      `text-anchor="middle" font-size="${FONT_SIZES.edgeLabel}" font-weight="${FONT_WEIGHTS.edgeLabel}" fill="var(--_text-muted)"`)}`
+    `\n${renderMultilineText(
+      rel.label,
+      mid.x,
+      mid.y,
+      FONT_SIZES.edgeLabel,
+      `text-anchor="middle" font-size="${FONT_SIZES.edgeLabel}" font-weight="${FONT_WEIGHTS.edgeLabel}" fill="var(--_text-muted)"`,
+    )}`
   )
 }
 
@@ -276,7 +286,7 @@ function renderCardinality(rel: PositionedErRelationship): string {
 function renderCrowsFoot(
   point: { x: number; y: number },
   toward: { x: number; y: number },
-  cardinality: Cardinality
+  cardinality: Cardinality,
 ): string {
   const parts: string[] = []
   const sw = STROKE_WIDTHS.connector + 0.25
@@ -309,16 +319,16 @@ function renderCrowsFoot(
     const halfW = 6
     parts.push(
       `<line x1="${tipX + px * halfW}" y1="${tipY + py * halfW}" ` +
-      `x2="${tipX - px * halfW}" y2="${tipY - py * halfW}" ` +
-      `stroke="var(--_line)" stroke-width="${sw}" />`
+        `x2="${tipX - px * halfW}" y2="${tipY - py * halfW}" ` +
+        `stroke="var(--_line)" stroke-width="${sw}" />`,
     )
     // Second line slightly back for "exactly one" emphasis
     const line2X = tipX - ux * 4
     const line2Y = tipY - uy * 4
     parts.push(
       `<line x1="${line2X + px * halfW}" y1="${line2Y + py * halfW}" ` +
-      `x2="${line2X - px * halfW}" y2="${line2Y - py * halfW}" ` +
-      `stroke="var(--_line)" stroke-width="${sw}" />`
+        `x2="${line2X - px * halfW}" y2="${line2Y - py * halfW}" ` +
+        `stroke="var(--_line)" stroke-width="${sw}" />`,
     )
   }
 
@@ -332,20 +342,20 @@ function renderCrowsFoot(
     parts.push(
       // Top fan line
       `<line x1="${cfTipX + px * fanW}" y1="${cfTipY + py * fanW}" ` +
-      `x2="${backX}" y2="${backY}" ` +
-      `stroke="var(--_line)" stroke-width="${sw}" />`
+        `x2="${backX}" y2="${backY}" ` +
+        `stroke="var(--_line)" stroke-width="${sw}" />`,
     )
     parts.push(
       // Center line
       `<line x1="${cfTipX}" y1="${cfTipY}" ` +
-      `x2="${backX}" y2="${backY}" ` +
-      `stroke="var(--_line)" stroke-width="${sw}" />`
+        `x2="${backX}" y2="${backY}" ` +
+        `stroke="var(--_line)" stroke-width="${sw}" />`,
     )
     parts.push(
       // Bottom fan line
       `<line x1="${cfTipX - px * fanW}" y1="${cfTipY - py * fanW}" ` +
-      `x2="${backX}" y2="${backY}" ` +
-      `stroke="var(--_line)" stroke-width="${sw}" />`
+        `x2="${backX}" y2="${backY}" ` +
+        `stroke="var(--_line)" stroke-width="${sw}" />`,
     )
   }
 
@@ -356,7 +366,7 @@ function renderCrowsFoot(
     const circleY = point.y - uy * circleOffset
     parts.push(
       `<circle cx="${circleX}" cy="${circleY}" r="4" ` +
-      `fill="var(--bg)" stroke="var(--_line)" stroke-width="${sw}" />`
+        `fill="var(--bg)" stroke="var(--_line)" stroke-width="${sw}" />`,
     )
   }
 
@@ -367,7 +377,10 @@ function renderCrowsFoot(
  *  Walks along each segment, finds the point at exactly 50% of total path length.
  *  This ensures the label sits ON the path even for orthogonal routes with bends,
  *  unlike the naive first/last geometric center which floats in space for L/Z shapes. */
-function midpoint(points: Array<{ x: number; y: number }>): { x: number; y: number } {
+function midpoint(points: Array<{ x: number; y: number }>): {
+  x: number
+  y: number
+} {
   if (points.length === 0) return { x: 0, y: 0 }
   if (points.length === 1) return points[0]!
 
@@ -412,9 +425,5 @@ const escapeXml = escapeXmlUtil
  * Escape a string for use as an XML/HTML attribute value.
  */
 function escapeAttr(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
+  return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }

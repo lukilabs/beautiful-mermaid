@@ -19,11 +19,7 @@ import type { Point, PositionedNode } from './types.ts'
  * @param isStart - True if clipping the start point (source), false for end (target)
  * @returns New points array with clipped endpoint
  */
-export function clipEdgeToShape(
-  points: Point[],
-  node: PositionedNode,
-  isStart: boolean
-): Point[] {
+export function clipEdgeToShape(points: Point[], node: PositionedNode, isStart: boolean): Point[] {
   if (points.length < 2) return points
 
   // Only clip non-rectangular shapes
@@ -67,8 +63,8 @@ export function clipEdgeToShape(
 function clipToDiamond(endpoint: Point, adjacent: Point, node: PositionedNode): Point {
   const cx = node.x + node.width / 2
   const cy = node.y + node.height / 2
-  const halfW = node.width / 2
-  const halfH = node.height / 2
+  const _halfW = node.width / 2
+  const _halfH = node.height / 2
 
   // Diamond vertices
   const top: Point = { x: cx, y: node.y }

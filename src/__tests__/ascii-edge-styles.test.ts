@@ -2,7 +2,7 @@
 // ASCII edge style tests — dotted and thick line rendering
 // ============================================================================
 
-import { describe, it, expect } from 'bun:test'
+import { describe, expect, it } from 'bun:test'
 import { renderMermaidAscii } from '../ascii/index.ts'
 
 describe('ASCII edge styles', () => {
@@ -18,10 +18,13 @@ describe('ASCII edge styles', () => {
     })
 
     it('renders solid edges with - in ascii mode', () => {
-      const result = renderMermaidAscii(`
+      const result = renderMermaidAscii(
+        `
         graph LR
           A --> B
-      `, { useAscii: true })
+      `,
+        { useAscii: true },
+      )
       expect(result).toContain('-')
     })
   })
@@ -37,10 +40,13 @@ describe('ASCII edge styles', () => {
     })
 
     it('renders dotted edges with . in ascii mode', () => {
-      const result = renderMermaidAscii(`
+      const result = renderMermaidAscii(
+        `
         graph LR
           A -.-> B
-      `, { useAscii: true })
+      `,
+        { useAscii: true },
+      )
       // Should contain dots for dotted lines
       expect(result).toContain('.')
     })
@@ -55,10 +61,13 @@ describe('ASCII edge styles', () => {
     })
 
     it('renders dotted vertical edges with : in ascii mode', () => {
-      const result = renderMermaidAscii(`
+      const result = renderMermaidAscii(
+        `
         graph TD
           A -.-> B
-      `, { useAscii: true })
+      `,
+        { useAscii: true },
+      )
       // Should contain colons for dotted vertical lines
       expect(result).toContain(':')
     })
@@ -84,10 +93,13 @@ describe('ASCII edge styles', () => {
     })
 
     it('renders thick edges with = in ascii mode', () => {
-      const result = renderMermaidAscii(`
+      const result = renderMermaidAscii(
+        `
         graph LR
           A ==> B
-      `, { useAscii: true })
+      `,
+        { useAscii: true },
+      )
       // Should contain equals for thick lines
       expect(result).toContain('=')
     })
@@ -111,18 +123,21 @@ describe('ASCII edge styles', () => {
           C ==> D
       `)
       // Should have all three line types
-      expect(result).toContain('─')  // solid
-      expect(result).toContain('┄')  // dotted
-      expect(result).toContain('━')  // thick
+      expect(result).toContain('─') // solid
+      expect(result).toContain('┄') // dotted
+      expect(result).toContain('━') // thick
     })
 
     it('renders mixed styles in ascii mode', () => {
-      const result = renderMermaidAscii(`
+      const result = renderMermaidAscii(
+        `
         graph LR
           A --> B
           B -.-> C
           C ==> D
-      `, { useAscii: true })
+      `,
+        { useAscii: true },
+      )
       // Note: ASCII mode uses - for solid, . for dotted, = for thick
       // We just check that the diagram renders without error
       expect(result).toContain('A')

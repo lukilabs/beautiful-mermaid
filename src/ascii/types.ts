@@ -43,19 +43,27 @@ export interface Direction {
   readonly y: number
 }
 
-export const Up: Direction         = { x: 1, y: 0 }
-export const Down: Direction       = { x: 1, y: 2 }
-export const Left: Direction       = { x: 0, y: 1 }
-export const Right: Direction      = { x: 2, y: 1 }
+export const Up: Direction = { x: 1, y: 0 }
+export const Down: Direction = { x: 1, y: 2 }
+export const Left: Direction = { x: 0, y: 1 }
+export const Right: Direction = { x: 2, y: 1 }
 export const UpperRight: Direction = { x: 2, y: 0 }
-export const UpperLeft: Direction  = { x: 0, y: 0 }
+export const UpperLeft: Direction = { x: 0, y: 0 }
 export const LowerRight: Direction = { x: 2, y: 2 }
-export const LowerLeft: Direction  = { x: 0, y: 2 }
-export const Middle: Direction     = { x: 1, y: 1 }
+export const LowerLeft: Direction = { x: 0, y: 2 }
+export const Middle: Direction = { x: 1, y: 1 }
 
 /** All named directions for iteration. */
 export const ALL_DIRECTIONS: readonly Direction[] = [
-  Up, Down, Left, Right, UpperRight, UpperLeft, LowerRight, LowerLeft, Middle,
+  Up,
+  Down,
+  Left,
+  Right,
+  UpperRight,
+  UpperLeft,
+  LowerRight,
+  LowerLeft,
+  Middle,
 ]
 
 /**
@@ -197,12 +205,12 @@ export const EMPTY_STYLE: AsciiStyleClass = { name: '', styles: {} }
  * Each role maps to a different color when colors are enabled.
  */
 export type CharRole =
-  | 'text'      // Node labels, edge labels
-  | 'border'    // Node box borders, subgraph borders
-  | 'line'      // Edge lines (paths between nodes)
-  | 'arrow'     // Arrowheads (▲▼◄► or ^v<>)
-  | 'corner'    // Corner characters at path bends
-  | 'junction'  // Junction characters (┬┴├┤ where edges meet boxes)
+  | 'text' // Node labels, edge labels
+  | 'border' // Node box borders, subgraph borders
+  | 'line' // Edge lines (paths between nodes)
+  | 'arrow' // Arrowheads (▲▼◄► or ^v<>)
+  | 'corner' // Corner characters at path bends
+  | 'junction' // Junction characters (┬┴├┤ where edges meet boxes)
 
 /**
  * Role canvas — parallel to Canvas, tracks the role of each character.
@@ -236,11 +244,11 @@ export interface AsciiTheme {
 
 /** Color mode for output. */
 export type ColorMode =
-  | 'none'      // No colors (plain text)
-  | 'ansi16'    // 16-color ANSI (basic terminals)
-  | 'ansi256'   // 256-color ANSI (xterm)
+  | 'none' // No colors (plain text)
+  | 'ansi16' // 16-color ANSI (basic terminals)
+  | 'ansi256' // 256-color ANSI (xterm)
   | 'truecolor' // 24-bit RGB (modern terminals)
-  | 'html'      // HTML <span> tags with inline color styles (browsers)
+  | 'html' // HTML <span> tags with inline color styles (browsers)
 
 // ============================================================================
 // Edge bundling types

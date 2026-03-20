@@ -48,14 +48,36 @@ function hslToHex(h: number, s: number, l: number): string {
   const m = li - c / 2
 
   let r: number, g: number, b: number
-  if (h < 60) { r = c; g = x; b = 0 }
-  else if (h < 120) { r = x; g = c; b = 0 }
-  else if (h < 180) { r = 0; g = c; b = x }
-  else if (h < 240) { r = 0; g = x; b = c }
-  else if (h < 300) { r = x; g = 0; b = c }
-  else { r = c; g = 0; b = x }
+  if (h < 60) {
+    r = c
+    g = x
+    b = 0
+  } else if (h < 120) {
+    r = x
+    g = c
+    b = 0
+  } else if (h < 180) {
+    r = 0
+    g = c
+    b = x
+  } else if (h < 240) {
+    r = 0
+    g = x
+    b = c
+  } else if (h < 300) {
+    r = x
+    g = 0
+    b = c
+  } else {
+    r = c
+    g = 0
+    b = x
+  }
 
-  const toHex = (v: number) => Math.round((v + m) * 255).toString(16).padStart(2, '0')
+  const toHex = (v: number) =>
+    Math.round((v + m) * 255)
+      .toString(16)
+      .padStart(2, '0')
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`
 }
 
@@ -65,15 +87,14 @@ function hslToHex(h: number, s: number, l: number): string {
 
 function hexToRgb(hex: string): [number, number, number] {
   const h = hex.replace('#', '')
-  return [
-    parseInt(h.substring(0, 2), 16),
-    parseInt(h.substring(2, 4), 16),
-    parseInt(h.substring(4, 6), 16),
-  ]
+  return [parseInt(h.substring(0, 2), 16), parseInt(h.substring(2, 4), 16), parseInt(h.substring(4, 6), 16)]
 }
 
 function rgbToHex(r: number, g: number, b: number): string {
-  const toHex = (v: number) => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, '0')
+  const toHex = (v: number) =>
+    Math.round(Math.max(0, Math.min(255, v)))
+      .toString(16)
+      .padStart(2, '0')
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`
 }
 
@@ -128,13 +149,11 @@ export function getSeriesColor(index: number, accentColor: string, bgColor?: str
 
   // On dark backgrounds, flip: odd = lighter, even = darker
   const dark = safeBg && isDarkBackground(safeBg) ? !oddIndex : oddIndex
-  const l = dark
-    ? Math.max(25, 48 - tier * 13)
-    : Math.min(78, 55 + tier * 11)
+  const l = dark ? Math.max(25, 48 - tier * 13) : Math.min(78, 55 + tier * 11)
 
   // Subtle hue drift: darker shades shift slightly negative, lighter shift positive
   const hShift = (dark ? -8 : 12) * tier
-  const newH = ((h + hShift) % 360 + 360) % 360
+  const newH = (((h + hShift) % 360) + 360) % 360
 
   return hslToHex(newH, chartS, l)
 }

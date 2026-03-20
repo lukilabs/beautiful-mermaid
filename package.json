@@ -38,6 +38,9 @@
   "author": "Craft Docs",
   "files": ["src/", "dist/", "LICENSE", "README.md"],
   "scripts": {
+    "lint": "biome check src/",
+    "lint:fix": "biome check --write src/",
+    "format": "biome format --write src/",
     "test": "bun test src/__tests__/",
     "samples": "bun run index.ts",
     "dev": "bun run dev.ts",
@@ -53,6 +56,7 @@
     "entities": "^7.0.1"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.4.8",
     "@types/bun": "^1.3.9",
     "shiki": "^3.19.0",
     "tsup": "^8.5.1",

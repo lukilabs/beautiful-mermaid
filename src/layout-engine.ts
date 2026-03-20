@@ -16,23 +16,23 @@
  * Safe for Electron, Node, and browser environments.
  */
 
-import type { ElkNode, ElkExtendedEdge, LayoutOptions } from 'elkjs'
-import type {
-  MermaidGraph,
-  MermaidSubgraph,
-  MermaidEdge,
-  Direction,
-  PositionedGraph,
-  PositionedNode,
-  PositionedEdge,
-  PositionedGroup,
-  Point,
-  RenderOptions,
-} from './types.ts'
-import { FONT_SIZES, FONT_WEIGHTS, NODE_PADDING, ARROW_HEAD } from './styles.ts'
-import { measureMultilineText } from './text-metrics.ts'
+import type { ElkExtendedEdge, ElkNode, LayoutOptions } from 'elkjs'
 import { elkLayoutSync } from './elk-instance.ts'
 import { clipEdgeToShape } from './shape-clipping.ts'
+import { ARROW_HEAD, FONT_SIZES, FONT_WEIGHTS, NODE_PADDING } from './styles.ts'
+import { measureMultilineText } from './text-metrics.ts'
+import type {
+  Direction,
+  MermaidEdge,
+  MermaidGraph,
+  MermaidSubgraph,
+  Point,
+  PositionedEdge,
+  PositionedGraph,
+  PositionedGroup,
+  PositionedNode,
+  RenderOptions,
+} from './types.ts'
 
 // ============================================================================
 // Layout options
@@ -51,12 +51,14 @@ const DEFAULTS = {
 /** Convert Mermaid direction to ELK direction */
 function directionToElk(dir: MermaidGraph['direction']): string {
   switch (dir) {
-    case 'LR': return 'RIGHT'
-    case 'RL': return 'LEFT'
-    case 'BT': return 'UP'
-    case 'TD':
-    case 'TB':
-    default: return 'DOWN'
+    case 'LR':
+      return 'RIGHT'
+    case 'RL':
+      return 'LEFT'
+    case 'BT':
+      return 'UP'
+    default:
+      return 'DOWN'
   }
 }
 
@@ -64,7 +66,7 @@ function directionToElk(dir: MermaidGraph['direction']): string {
 // Node sizing (same logic as Dagre adapter)
 // ============================================================================
 
-function estimateNodeSize(id: string, label: string, shape: string): { width: number; height: number } {
+function estimateNodeSize(_id: string, label: string, shape: string): { width: number; height: number } {
   const metrics = measureMultilineText(label, FONT_SIZES.nodeLabel, FONT_WEIGHTS.nodeLabel)
 
   let width = metrics.width + NODE_PADDING.horizontal * 2
@@ -118,18 +120,6 @@ interface ElkGraphNode extends ElkNode {
 }
 
 /**
- * Tracks port-to-edge mappings for hierarchical port edges.
- * Used to combine external and internal edge sections during extraction.
- */
-interface HierarchicalEdgeInfo {
-  originalIndex: number
-  externalEdgeId: string
-  internalEdgeId: string
-  subgraphId: string
-  direction: 'incoming' | 'outgoing'
-}
-
-/**
  * Convert a MermaidGraph to ELK's nested JSON input format.
  *
  * Uses SEPARATE hierarchy handling for proper subgraph direction override support.
@@ -137,7 +127,7 @@ interface HierarchicalEdgeInfo {
  */
 function mermaidToElk(
   graph: MermaidGraph,
-  opts: Required<Pick<RenderOptions, 'font' | 'padding' | 'nodeSpacing' | 'layerSpacing'>>
+  opts: Required<Pick<RenderOptions, 'font' | 'padding' | 'nodeSpacing' | 'layerSpacing'>>,
 ): ElkGraphNode {
   // Collect all node IDs that belong to subgraphs
   const subgraphNodeIds = new Set<string>()
@@ -154,13 +144,13 @@ function mermaidToElk(
   // 1. Internal edges (both endpoints in same subgraph)
   // 2. Root-level edges (neither endpoint in a subgraph)
   // 3. Cross-hierarchy edges (endpoints in different levels)
-  const edgesBySubgraph = new Map<string | null, Array<{ index: number; edge: typeof graph.edges[0] }>>()
+  const edgesBySubgraph = new Map<string | null, Array<{ index: number; edge: (typeof graph.edges)[0] }>>()
   edgesBySubgraph.set(null, []) // Root-level edges
 
   // Track cross-hierarchy edges for hierarchical port creation
   const crossHierarchyEdges: Array<{
     index: number
-    edge: typeof graph.edges[0]
+    edge: (typeof graph.edges)[0]
     sourceSubgraph: string | undefined
     targetSubgraph: string | undefined
   }> = []
@@ -181,7 +171,12 @@ function mermaidToElk(
       edgesBySubgraph.get(null)!.push({ index: i, edge })
     } else {
       // Cross-hierarchy edge: need hierarchical ports
-      crossHierarchyEdges.push({ index: i, edge, sourceSubgraph, targetSubgraph })
+      crossHierarchyEdges.push({
+        index: i,
+        edge,
+        sourceSubgraph,
+        targetSubgraph,
+      })
     }
   }
 
@@ -219,12 +214,15 @@ function mermaidToElk(
   }
 
   // Track hierarchical ports per subgraph for cross-hierarchy edges
-  const subgraphPorts = new Map<string, Array<{
-    portId: string
-    edgeIndex: number
-    direction: 'incoming' | 'outgoing'
-    internalNodeId: string
-  }>>()
+  const subgraphPorts = new Map<
+    string,
+    Array<{
+      portId: string
+      edgeIndex: number
+      direction: 'incoming' | 'outgoing'
+      internalNodeId: string
+    }>
+  >()
 
   // Process cross-hierarchy edges to create port entries
   if (hasDirectionOverride) {
@@ -286,15 +284,17 @@ function mermaidToElk(
     }
     if (edge.label) {
       const metrics = measureMultilineText(edge.label, FONT_SIZES.edgeLabel, FONT_WEIGHTS.edgeLabel)
-      elkEdge.labels = [{
-        text: edge.label,
-        width: metrics.width + 8,
-        height: metrics.height + 6,
-        layoutOptions: {
-          'elk.edgeLabels.inline': 'true',
-          'elk.edgeLabels.placement': 'CENTER',
+      elkEdge.labels = [
+        {
+          text: edge.label,
+          width: metrics.width + 8,
+          height: metrics.height + 6,
+          layoutOptions: {
+            'elk.edgeLabels.inline': 'true',
+            'elk.edgeLabels.placement': 'CENTER',
+          },
         },
-      }]
+      ]
     }
     elkGraph.edges!.push(elkEdge)
   }
@@ -308,15 +308,17 @@ function mermaidToElk(
     }
     if (edge.label) {
       const metrics = measureMultilineText(edge.label, FONT_SIZES.edgeLabel, FONT_WEIGHTS.edgeLabel)
-      elkEdge.labels = [{
-        text: edge.label,
-        width: metrics.width + 8,
-        height: metrics.height + 6,
-        layoutOptions: {
-          'elk.edgeLabels.inline': 'true',
-          'elk.edgeLabels.placement': 'CENTER',
+      elkEdge.labels = [
+        {
+          text: edge.label,
+          width: metrics.width + 8,
+          height: metrics.height + 6,
+          layoutOptions: {
+            'elk.edgeLabels.inline': 'true',
+            'elk.edgeLabels.placement': 'CENTER',
+          },
         },
-      }]
+      ]
     }
     elkGraph.edges!.push(elkEdge)
   }
@@ -337,12 +339,15 @@ function subgraphToElk(
   graph: MermaidGraph,
   opts: Required<Pick<RenderOptions, 'font' | 'padding' | 'nodeSpacing' | 'layerSpacing'>>,
   edgesBySubgraph: Map<string | null, Array<{ index: number; edge: MermaidEdge }>>,
-  subgraphPorts: Map<string, Array<{
-    portId: string
-    edgeIndex: number
-    direction: 'incoming' | 'outgoing'
-    internalNodeId: string
-  }>>
+  subgraphPorts: Map<
+    string,
+    Array<{
+      portId: string
+      edgeIndex: number
+      direction: 'incoming' | 'outgoing'
+      internalNodeId: string
+    }>
+  >,
 ): ElkGraphNode {
   const layoutOptions: LayoutOptions = {
     'elk.algorithm': 'layered',
@@ -374,7 +379,7 @@ function subgraphToElk(
   const ports = subgraphPorts.get(sg.id) ?? []
   if (ports.length > 0) {
     // ELK supports ports but types don't include it
-    (elkNode as unknown as Record<string, unknown>).ports = ports.map(p => ({
+    ;(elkNode as unknown as Record<string, unknown>).ports = ports.map(p => ({
       id: p.portId,
       // Port side is determined by ELK based on edge direction
     }))
@@ -409,15 +414,17 @@ function subgraphToElk(
     }
     if (edge.label) {
       const metrics = measureMultilineText(edge.label, FONT_SIZES.edgeLabel, FONT_WEIGHTS.edgeLabel)
-      elkEdge.labels = [{
-        text: edge.label,
-        width: metrics.width + 8,
-        height: metrics.height + 6,
-        layoutOptions: {
-          'elk.edgeLabels.inline': 'true',
-          'elk.edgeLabels.placement': 'CENTER',
+      elkEdge.labels = [
+        {
+          text: edge.label,
+          width: metrics.width + 8,
+          height: metrics.height + 6,
+          layoutOptions: {
+            'elk.edgeLabels.inline': 'true',
+            'elk.edgeLabels.placement': 'CENTER',
+          },
         },
-      }]
+      ]
     }
     elkNode.edges!.push(elkEdge)
   }
@@ -426,9 +433,18 @@ function subgraphToElk(
   // These connect the boundary ports to actual internal nodes
   for (const port of ports) {
     const internalEdgeId = `e${port.edgeIndex}_internal`
-    const elkEdge: ElkExtendedEdge = port.direction === 'incoming'
-      ? { id: internalEdgeId, sources: [port.portId], targets: [port.internalNodeId] }
-      : { id: internalEdgeId, sources: [port.internalNodeId], targets: [port.portId] }
+    const elkEdge: ElkExtendedEdge =
+      port.direction === 'incoming'
+        ? {
+            id: internalEdgeId,
+            sources: [port.portId],
+            targets: [port.internalNodeId],
+          }
+        : {
+            id: internalEdgeId,
+            sources: [port.internalNodeId],
+            targets: [port.portId],
+          }
     elkNode.edges!.push(elkEdge)
   }
 
@@ -489,17 +505,18 @@ interface MarginInfo {
 function flattenGroupBounds(groups: PositionedGroup[]): Array<{ x: number; y: number; right: number; bottom: number }> {
   const bounds: Array<{ x: number; y: number; right: number; bottom: number }> = []
   for (const g of groups) {
-    bounds.push({ x: g.x, y: g.y, right: g.x + g.width, bottom: g.y + g.height })
+    bounds.push({
+      x: g.x,
+      y: g.y,
+      right: g.x + g.width,
+      bottom: g.y + g.height,
+    })
     bounds.push(...flattenGroupBounds(g.children))
   }
   return bounds
 }
 
-function elkToPositioned(
-  elkResult: ElkNode,
-  graph: MermaidGraph,
-  mergeEdges: boolean = false
-): PositionedGraph {
+function elkToPositioned(elkResult: ElkNode, graph: MermaidGraph, mergeEdges: boolean = false): PositionedGraph {
   const nodes: PositionedNode[] = []
   const edges: PositionedEdge[] = []
   const groups: PositionedGroup[] = []
@@ -516,12 +533,13 @@ function elkToPositioned(
   // Compute margin positions for cross-hierarchy edge routing.
   // Margins sit outside all group bounding boxes so edges don't cross through subgraphs.
   const allBounds = flattenGroupBounds(groups)
-  const margins: MarginInfo | undefined = allBounds.length > 0
-    ? {
-        leftX: Math.min(...allBounds.map(b => b.x)) - 20,
-        rightX: Math.max(...allBounds.map(b => b.right)) + 20,
-      }
-    : undefined
+  const margins: MarginInfo | undefined =
+    allBounds.length > 0
+      ? {
+          leftX: Math.min(...allBounds.map(b => b.x)) - 20,
+          rightX: Math.max(...allBounds.map(b => b.right)) + 20,
+        }
+      : undefined
 
   // Extract edges recursively from all levels (root and subgraphs)
   // Edges are distributed to subgraphs for direction override to work,
@@ -592,7 +610,7 @@ function extractNodesAndGroups(
   nodes: PositionedNode[],
   groups: PositionedGroup[],
   offsetX: number,
-  offsetY: number
+  offsetY: number,
 ): void {
   if (!elkNode.children) return
 
@@ -652,7 +670,7 @@ function extractNodesAndGroups(
  */
 interface EdgeSegment {
   edgeIndex: number
-  isInternal: boolean  // true for port-to-node segments (e.g., "e3_internal")
+  isInternal: boolean // true for port-to-node segments (e.g., "e3_internal")
   points: Point[]
   labelPosition?: Point
 }
@@ -704,9 +722,9 @@ function extractEdgesRecursively(
   elkNode: ElkNode,
   graph: MermaidGraph,
   edges: PositionedEdge[],
-  offsetX: number,
-  offsetY: number,
-  margins?: MarginInfo
+  _offsetX: number,
+  _offsetY: number,
+  margins?: MarginInfo,
 ): void {
   // First pass: collect all edge segments
   const segments = new Map<number, { external?: EdgeSegment; incoming?: EdgeSegment; outgoing?: EdgeSegment }>()
@@ -805,11 +823,7 @@ function extractEdgesRecursively(
  * Returns the original array reference (identity) if no changes were needed,
  * so callers can detect whether routing was applied.
  */
-function orthogonalizeEdgePoints(
-  points: Point[],
-  margins?: MarginInfo,
-  edgeIndex: number = 0
-): Point[] {
+function orthogonalizeEdgePoints(points: Point[], margins?: MarginInfo, edgeIndex: number = 0): Point[] {
   if (points.length < 2) return points
 
   // Check if any segment needs orthogonalization
@@ -817,7 +831,10 @@ function orthogonalizeEdgePoints(
   for (let i = 1; i < points.length; i++) {
     const dx = Math.abs(points[i]!.x - points[i - 1]!.x)
     const dy = Math.abs(points[i]!.y - points[i - 1]!.y)
-    if (dx > 1 && dy > 1) { needsWork = true; break }
+    if (dx > 1 && dy > 1) {
+      needsWork = true
+      break
+    }
   }
   if (!needsWork) return points
 
@@ -836,9 +853,7 @@ function orthogonalizeEdgePoints(
         // Alternate left/right margins and offset for parallel edge spacing
         const useRight = edgeIndex % 2 === 0
         const offset = Math.floor(edgeIndex / 2) * EDGE_SPACING
-        const marginX = useRight
-          ? margins.rightX + offset
-          : margins.leftX - offset
+        const marginX = useRight ? margins.rightX + offset : margins.leftX - offset
 
         result.push({ x: marginX, y: prev.y })
         result.push({ x: marginX, y: curr.y })
@@ -863,14 +878,14 @@ function collectEdgeSegments(
   elkNode: ElkNode,
   segments: Map<number, { external?: EdgeSegment; incoming?: EdgeSegment; outgoing?: EdgeSegment }>,
   offsetX: number,
-  offsetY: number
+  offsetY: number,
 ): void {
   if (elkNode.edges) {
     for (const elkEdge of elkNode.edges) {
       // Parse edge ID: "e{index}" or "e{index}_internal"
       const isInternal = elkEdge.id.endsWith('_internal')
       const edgeIndex = parseInt(elkEdge.id.substring(1), 10)
-      if (isNaN(edgeIndex)) continue
+      if (Number.isNaN(edgeIndex)) continue
 
       // Extract points
       const points: Point[] = []
@@ -960,10 +975,7 @@ function collectAllSubgraphIds(sg: MermaidSubgraph, out: Set<string>): void {
  * Resolve inline styles for a node from classDefs and nodeStyles.
  * Class styles are applied first, then explicit style directives override.
  */
-function resolveNodeStyle(
-  nodeId: string,
-  graph: MermaidGraph
-): Record<string, string> | undefined {
+function resolveNodeStyle(nodeId: string, graph: MermaidGraph): Record<string, string> | undefined {
   let result: Record<string, string> | undefined
 
   // First, apply class styles (if node has a class assignment)
@@ -988,10 +1000,7 @@ function resolveNodeStyle(
  * Resolve inline styles for an edge from linkStyles map.
  * Default link style is applied first, then index-specific overrides.
  */
-function resolveEdgeStyle(
-  edgeIndex: number,
-  graph: MermaidGraph
-): Record<string, string> | undefined {
+function resolveEdgeStyle(edgeIndex: number, graph: MermaidGraph): Record<string, string> | undefined {
   let result: Record<string, string> | undefined
 
   const defaultStyle = graph.linkStyles.get('default')
@@ -1028,11 +1037,7 @@ function resolveEdgeStyle(
  * Intermediate bend points are left unchanged — edge bundling or clipping
  * will recalculate them afterwards.
  */
-function alignLayerNodes(
-  nodes: PositionedNode[],
-  edges: PositionedEdge[],
-  direction: Direction
-): void {
+function alignLayerNodes(nodes: PositionedNode[], edges: PositionedEdge[], direction: Direction): void {
   if (nodes.length === 0) return
 
   const isHorizontal = direction === 'LR' || direction === 'RL'
@@ -1054,9 +1059,7 @@ function alignLayerNodes(
   const THRESHOLD = DEFAULTS.layerSpacing * 0.6
 
   // Sort nodes by flow-axis position
-  const sorted = [...nodes].sort((a, b) =>
-    isHorizontal ? a.x - b.x : a.y - b.y
-  )
+  const sorted = [...nodes].sort((a, b) => (isHorizontal ? a.x - b.x : a.y - b.y))
 
   const layers: PositionedNode[][] = []
   let currentLayer: PositionedNode[] = [sorted[0]!]
@@ -1067,9 +1070,7 @@ function alignLayerNodes(
     // Single-linkage: compare with previous node, not layer start
     const gap = pos - prevPos
     // Check if this node is connected to any node already in the current layer
-    const hasEdgeToLayer = currentLayer.some(n =>
-      connectedPairs.has(`${n.id}:${sorted[i]!.id}`)
-    )
+    const hasEdgeToLayer = currentLayer.some(n => connectedPairs.has(`${n.id}:${sorted[i]!.id}`))
     if (gap <= THRESHOLD && !hasEdgeToLayer) {
       currentLayer.push(sorted[i]!)
     } else {
@@ -1085,7 +1086,7 @@ function alignLayerNodes(
   for (const layer of layers) {
     if (layer.length <= 1) continue
 
-    const positions = layer.map(n => isHorizontal ? n.x : n.y)
+    const positions = layer.map(n => (isHorizontal ? n.x : n.y))
     const min = Math.min(...positions)
     const max = Math.max(...positions)
     if (max - min <= 1) continue // Already aligned
@@ -1110,7 +1111,7 @@ function alignLayerNodes(
   if (deltas.size === 0) return
 
   // Build node lookup for edge adjustment
-  const nodeMap = new Map(nodes.map(n => [n.id, n]))
+  const _nodeMap = new Map(nodes.map(n => [n.id, n]))
 
   // Adjust edge endpoints to match shifted node positions
   for (const edge of edges) {
@@ -1162,10 +1163,7 @@ function alignLayerNodes(
 /**
  * Find all groups (outermost first) that geometrically contain the given point.
  */
-function findGroupsContainingPoint(
-  x: number, y: number,
-  groups: PositionedGroup[]
-): PositionedGroup[] {
+function findGroupsContainingPoint(x: number, y: number, groups: PositionedGroup[]): PositionedGroup[] {
   const result: PositionedGroup[] = []
   for (const g of groups) {
     if (x >= g.x && x <= g.x + g.width && y >= g.y && y <= g.y + g.height) {
@@ -1181,11 +1179,11 @@ function findGroupsContainingPoint(
  * move it just outside the outermost such group boundary.
  */
 function adjustJunctionForGroups(
-  junctionMain: number,  // the junction coordinate along the flow axis (Y for TD, X for LR)
-  refX: number,          // reference node center X (for finding its groups)
-  refY: number,          // reference node center Y
+  junctionMain: number, // the junction coordinate along the flow axis (Y for TD, X for LR)
+  refX: number, // reference node center X (for finding its groups)
+  refY: number, // reference node center Y
   groups: PositionedGroup[],
-  direction: Direction
+  direction: Direction,
 ): number {
   const GAP = 12
   const isLR = direction === 'LR'
@@ -1229,7 +1227,7 @@ function bundleEdgePaths(
   edges: PositionedEdge[],
   nodes: PositionedNode[],
   groups: PositionedGroup[],
-  direction: Direction
+  direction: Direction,
 ): void {
   const nodeMap = new Map(nodes.map(n => [n.id, n]))
   const processed = new Set<PositionedEdge>()
@@ -1267,7 +1265,10 @@ function bundleEdgePaths(
     })
     if (forward.length < 2) continue
 
-    const targets = forward.map(e => ({ edge: e, node: nodeMap.get(e.target)! }))
+    const targets = forward.map(e => ({
+      edge: e,
+      node: nodeMap.get(e.target)!,
+    }))
     const srcCX = source.x + source.width / 2
     const srcCY = source.y + source.height / 2
 
@@ -1343,7 +1344,10 @@ function bundleEdgePaths(
     })
     if (forward.length < 2) continue
 
-    const sources = forward.map(e => ({ edge: e, node: nodeMap.get(e.source)! }))
+    const sources = forward.map(e => ({
+      edge: e,
+      node: nodeMap.get(e.source)!,
+    }))
     const tgtCX = target.x + target.width / 2
     const tgtCY = target.y + target.height / 2
 
@@ -1399,10 +1403,7 @@ function bundleEdgePaths(
  * Lay out a parsed MermaidGraph using ELK.js (synchronous).
  * Returns a fully positioned graph ready for rendering.
  */
-export function layoutGraphSync(
-  graph: MermaidGraph,
-  options: RenderOptions = {}
-): PositionedGraph {
+export function layoutGraphSync(graph: MermaidGraph, options: RenderOptions = {}): PositionedGraph {
   const opts = { ...DEFAULTS, ...options }
   const elkGraph = mermaidToElk(graph, opts)
   const result = elkLayoutSync(elkGraph)
@@ -1412,10 +1413,7 @@ export function layoutGraphSync(
 /**
  * Convert MermaidGraph to ELK format (for benchmarking conversion overhead).
  */
-export function convertToElkFormat(
-  graph: MermaidGraph,
-  options: RenderOptions = {}
-): ElkNode {
+export function convertToElkFormat(graph: MermaidGraph, options: RenderOptions = {}): ElkNode {
   const opts = { ...DEFAULTS, ...options }
   return mermaidToElk(graph, opts)
 }

@@ -1,10 +1,12 @@
-import { describe, it, expect } from 'bun:test'
+import { describe, expect, it } from 'bun:test'
 import { renderMermaidAscii } from '../ascii/index.ts'
 
 describe('ASCII multi-line labels', () => {
   describe('flowchart nodes', () => {
     it('renders multi-line node labels', () => {
-      const ascii = renderMermaidAscii('graph TD\n  A[Line1<br>Line2]', { useAscii: false })
+      const ascii = renderMermaidAscii('graph TD\n  A[Line1<br>Line2]', {
+        useAscii: false,
+      })
       expect(ascii).toContain('Line1')
       expect(ascii).toContain('Line2')
       // Lines should be on different rows
@@ -15,7 +17,9 @@ describe('ASCII multi-line labels', () => {
     })
 
     it('handles 3+ line labels', () => {
-      const ascii = renderMermaidAscii('graph TD\n  A[A<br>B<br>C]', { useAscii: false })
+      const ascii = renderMermaidAscii('graph TD\n  A[A<br>B<br>C]', {
+        useAscii: false,
+      })
       expect(ascii).toContain('A')
       expect(ascii).toContain('B')
       expect(ascii).toContain('C')
@@ -29,7 +33,9 @@ describe('ASCII multi-line labels', () => {
     })
 
     it('renders in ASCII mode (not Unicode)', () => {
-      const ascii = renderMermaidAscii('graph TD\n  A[Line1<br>Line2]', { useAscii: true })
+      const ascii = renderMermaidAscii('graph TD\n  A[Line1<br>Line2]', {
+        useAscii: true,
+      })
       expect(ascii).toContain('Line1')
       expect(ascii).toContain('Line2')
       // Should use ASCII box characters
@@ -48,11 +54,14 @@ describe('ASCII multi-line labels', () => {
 
   describe('flowchart subgraph labels', () => {
     it('renders multi-line subgraph labels', () => {
-      const ascii = renderMermaidAscii(`graph TD
+      const ascii = renderMermaidAscii(
+        `graph TD
         subgraph sg [Group<br>Header]
           A[Node]
         end
-      `, { useAscii: false })
+      `,
+        { useAscii: false },
+      )
       expect(ascii).toContain('Group')
       expect(ascii).toContain('Header')
     })
@@ -60,30 +69,39 @@ describe('ASCII multi-line labels', () => {
 
   describe('sequence diagram', () => {
     it('renders multi-line actor labels', () => {
-      const ascii = renderMermaidAscii(`sequenceDiagram
+      const ascii = renderMermaidAscii(
+        `sequenceDiagram
         participant A as Actor<br>One
         A->>A: msg
-      `, { useAscii: false })
+      `,
+        { useAscii: false },
+      )
       expect(ascii).toContain('Actor')
       expect(ascii).toContain('One')
     })
 
     it('renders multi-line message labels', () => {
-      const ascii = renderMermaidAscii(`sequenceDiagram
+      const ascii = renderMermaidAscii(
+        `sequenceDiagram
         participant A
         participant B
         A->>B: Line1<br>Line2
-      `, { useAscii: false })
+      `,
+        { useAscii: false },
+      )
       expect(ascii).toContain('Line1')
       expect(ascii).toContain('Line2')
     })
 
     it('preserves existing note multi-line support', () => {
-      const ascii = renderMermaidAscii(`sequenceDiagram
+      const ascii = renderMermaidAscii(
+        `sequenceDiagram
         participant A
         A->>A: self
         Note over A: Note line 1<br>Note line 2
-      `, { useAscii: false })
+      `,
+        { useAscii: false },
+      )
       expect(ascii).toContain('Note line 1')
       expect(ascii).toContain('Note line 2')
     })
@@ -91,17 +109,23 @@ describe('ASCII multi-line labels', () => {
 
   describe('class diagram', () => {
     it('renders multi-line class names', () => {
-      const ascii = renderMermaidAscii(`classDiagram
+      const ascii = renderMermaidAscii(
+        `classDiagram
         class MyClass["Long<br>Name"]
-      `, { useAscii: false })
+      `,
+        { useAscii: false },
+      )
       expect(ascii).toContain('Long')
       expect(ascii).toContain('Name')
     })
 
     it('renders multi-line relationship labels', () => {
-      const ascii = renderMermaidAscii(`classDiagram
+      const ascii = renderMermaidAscii(
+        `classDiagram
         A --> B : uses<br>implements
-      `, { useAscii: false })
+      `,
+        { useAscii: false },
+      )
       expect(ascii).toContain('uses')
       expect(ascii).toContain('implements')
     })
@@ -109,19 +133,25 @@ describe('ASCII multi-line labels', () => {
 
   describe('ER diagram', () => {
     it('renders multi-line entity names', () => {
-      const ascii = renderMermaidAscii(`erDiagram
+      const ascii = renderMermaidAscii(
+        `erDiagram
         "Entity<br>Name" {
           string id
         }
-      `, { useAscii: false })
+      `,
+        { useAscii: false },
+      )
       expect(ascii).toContain('Entity')
       expect(ascii).toContain('Name')
     })
 
     it('renders multi-line relationship labels', () => {
-      const ascii = renderMermaidAscii(`erDiagram
+      const ascii = renderMermaidAscii(
+        `erDiagram
         A ||--o{ B : "has<br>many"
-      `, { useAscii: false })
+      `,
+        { useAscii: false },
+      )
       expect(ascii).toContain('has')
       expect(ascii).toContain('many')
     })
@@ -129,19 +159,25 @@ describe('ASCII multi-line labels', () => {
 
   describe('edge cases', () => {
     it('handles empty lines from consecutive <br>', () => {
-      const ascii = renderMermaidAscii('graph TD\n  A[Line1<br><br>Line3]', { useAscii: false })
+      const ascii = renderMermaidAscii('graph TD\n  A[Line1<br><br>Line3]', {
+        useAscii: false,
+      })
       expect(ascii).toContain('Line1')
       expect(ascii).toContain('Line3')
     })
 
     it('handles single-line labels (no <br>)', () => {
-      const ascii = renderMermaidAscii('graph TD\n  A[SingleLine]', { useAscii: false })
+      const ascii = renderMermaidAscii('graph TD\n  A[SingleLine]', {
+        useAscii: false,
+      })
       expect(ascii).toContain('SingleLine')
     })
 
     it('handles very long lines', () => {
       const long = 'A'.repeat(30)
-      const ascii = renderMermaidAscii(`graph TD\n  A[${long}<br>Short]`, { useAscii: false })
+      const ascii = renderMermaidAscii(`graph TD\n  A[${long}<br>Short]`, {
+        useAscii: false,
+      })
       expect(ascii).toContain(long)
       expect(ascii).toContain('Short')
     })
@@ -157,7 +193,9 @@ describe('ASCII multi-line labels', () => {
   describe('multiline-utils functions', () => {
     it('splitLines splits on newlines', () => {
       // Test through the rendering pipeline
-      const ascii = renderMermaidAscii('graph TD\n  A[One<br>Two<br>Three]', { useAscii: false })
+      const ascii = renderMermaidAscii('graph TD\n  A[One<br>Two<br>Three]', {
+        useAscii: false,
+      })
       const lines = ascii.split('\n')
       // All three words should appear on separate lines
       expect(lines.some(l => l.includes('One'))).toBe(true)
@@ -167,7 +205,9 @@ describe('ASCII multi-line labels', () => {
 
     it('maxLineWidth uses longest line for box sizing', () => {
       // Box should be wide enough for the longest line
-      const ascii = renderMermaidAscii('graph TD\n  A[X<br>LongLine<br>Y]', { useAscii: false })
+      const ascii = renderMermaidAscii('graph TD\n  A[X<br>LongLine<br>Y]', {
+        useAscii: false,
+      })
       // The box should contain LongLine without truncation
       expect(ascii).toContain('LongLine')
     })

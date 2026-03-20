@@ -1,8 +1,8 @@
-import type { PositionedXYChart } from './types.ts'
+import { estimateTextWidth, TEXT_BASELINE_SHIFT } from '../styles.ts'
 import type { DiagramColors } from '../theme.ts'
-import { svgOpenTag, buildStyleBlock } from '../theme.ts'
-import { TEXT_BASELINE_SHIFT, estimateTextWidth } from '../styles.ts'
-import { getSeriesColor, CHART_ACCENT_FALLBACK } from './colors.ts'
+import { buildStyleBlock, svgOpenTag } from '../theme.ts'
+import { CHART_ACCENT_FALLBACK, getSeriesColor } from './colors.ts'
+import type { PositionedXYChart } from './types.ts'
 
 // ============================================================================
 // XY Chart SVG renderer
@@ -67,8 +67,10 @@ export function renderXYChartSvg(
   // SVG root + base styles
   // Stamp data-xychart-colors so theme-switching JS knows how many series color vars to update
   const maxColorIdx = Math.max(0, ...chart.bars.map(b => b.colorIndex), ...chart.lines.map(l => l.colorIndex))
-  const svgTag = svgOpenTag(chart.width, chart.height, colors, transparent)
-    .replace('<svg ', `<svg data-xychart-colors="${maxColorIdx}" `)
+  const svgTag = svgOpenTag(chart.width, chart.height, colors, transparent).replace(
+    '<svg ',
+    `<svg data-xychart-colors="${maxColorIdx}" `,
+  )
   parts.push(svgTag)
   parts.push(buildStyleBlock(font, false))
 
@@ -84,9 +86,7 @@ export function renderXYChartSvg(
   // 1. Dot grid (dense dots across plot area, aligned to tick spacing)
   const { plotArea } = chart
   const xTicks = chart.xAxis.ticks.map(t => t.x)
-  const yVals = chart.horizontal
-    ? chart.yAxis.ticks.map(t => t.y)
-    : chart.gridLines.map(g => g.y1)
+  const yVals = chart.horizontal ? chart.yAxis.ticks.map(t => t.y) : chart.gridLines.map(g => g.y1)
   const xBase = xTicks.length > 1 ? Math.abs(xTicks[1]! - xTicks[0]!) : plotArea.width / 6
   const yBase = yVals.length > 1 ? Math.abs(yVals[1]! - yVals[0]!) : plotArea.height / 6
   const xGap = xBase / Math.max(1, Math.round(xBase / 20))
@@ -109,19 +109,17 @@ export function renderXYChartSvg(
     const barPath = chart.horizontal
       ? roundedRightBarPath(bar.x, bar.y, bar.width, bar.height, CHART_FONT.barRadius)
       : roundedTopBarPath(bar.x, bar.y, bar.width, bar.height, CHART_FONT.barRadius)
-    parts.push(
-      `<path d="${barPath}" class="xychart-bar xychart-color-${bar.colorIndex}"${dataAttrs}/>`
-    )
+    parts.push(`<path d="${barPath}" class="xychart-bar xychart-color-${bar.colorIndex}"${dataAttrs}/>`)
     if (interactive) {
       const tipText = formatTipValue(bar.value)
       const tipTitle = bar.label ? `${bar.label}: ${tipText}` : tipText
       const tip = tooltipAbove(bar.x + bar.width / 2, bar.y, tipText)
       barOverlay.push(
         `<g class="xychart-bar-group">` +
-        `<rect x="${r(bar.x)}" y="${r(bar.y)}" width="${r(bar.width)}" height="${r(bar.height)}" fill="transparent"/>` +
-        `<title>${escapeXml(tipTitle)}</title>` +
-        tip +
-        `</g>`
+          `<rect x="${r(bar.x)}" y="${r(bar.y)}" width="${r(bar.width)}" height="${r(bar.height)}" fill="transparent"/>` +
+          `<title>${escapeXml(tipTitle)}</title>` +
+          tip +
+          `</g>`,
       )
     }
   }
@@ -130,7 +128,9 @@ export function renderXYChartSvg(
   for (const line of chart.lines) {
     if (line.points.length === 0) continue
     const d = smoothCurvePath(line.points)
-    parts.push(`<path d="${d}" class="xychart-line-shadow xychart-color-${line.colorIndex}" transform="translate(0,2)"/>`)
+    parts.push(
+      `<path d="${d}" class="xychart-line-shadow xychart-color-${line.colorIndex}" transform="translate(0,2)"/>`,
+    )
     parts.push(`<path d="${d}" class="xychart-line xychart-color-${line.colorIndex}"/>`)
   }
 
@@ -143,14 +143,28 @@ export function renderXYChartSvg(
       if (item.type === 'line') lineLegendLabels.set(item.seriesIndex, item.label)
     }
 
-    type DotEntry = { x: number; y: number; value: number; label?: string; seriesIndex: number; colorIndex: number }
+    type DotEntry = {
+      x: number
+      y: number
+      value: number
+      label?: string
+      seriesIndex: number
+      colorIndex: number
+    }
     const columns = new Map<string, DotEntry[]>()
 
     for (const line of chart.lines) {
       for (const p of line.points) {
         const key = r(p.x)
         if (!columns.has(key)) columns.set(key, [])
-        columns.get(key)!.push({ x: p.x, y: p.y, value: p.value, label: p.label, seriesIndex: line.seriesIndex, colorIndex: line.colorIndex })
+        columns.get(key)!.push({
+          x: p.x,
+          y: p.y,
+          value: p.value,
+          label: p.label,
+          seriesIndex: line.seriesIndex,
+          colorIndex: line.colorIndex,
+        })
       }
     }
 
@@ -178,7 +192,6 @@ export function renderXYChartSvg(
         }
         group += `<title>${escapeXml(titleText)}</title>${tip}</g>`
         dotOverlay.push(group)
-
       } else if (interactive) {
         const e = entries[0]!
         const dataAttrs = ` data-value="${e.value}"${e.label ? ` data-label="${escapeXml(e.label)}"` : ''}`
@@ -190,16 +203,15 @@ export function renderXYChartSvg(
           : ''
         dotOverlay.push(
           `<g class="xychart-dot-group">${hitArea}` +
-          `<circle cx="${r(e.x)}" cy="${r(e.y)}" r="${CHART_FONT.dotRadius}" class="xychart-dot xychart-color-${e.colorIndex}"${dataAttrs}/>` +
-          `<title>${escapeXml(tipTitle)}</title>${tip}</g>`
+            `<circle cx="${r(e.x)}" cy="${r(e.y)}" r="${CHART_FONT.dotRadius}" class="xychart-dot xychart-color-${e.colorIndex}"${dataAttrs}/>` +
+            `<title>${escapeXml(tipTitle)}</title>${tip}</g>`,
         )
-
       } else {
         // Sparse, not interactive: static dots render inline
         for (const e of entries) {
           const dataAttrs = ` data-value="${e.value}"${e.label ? ` data-label="${escapeXml(e.label)}"` : ''}`
           parts.push(
-            `<circle cx="${r(e.x)}" cy="${r(e.y)}" r="${CHART_FONT.dotRadius}" class="xychart-dot xychart-color-${e.colorIndex}"${dataAttrs}/>`
+            `<circle cx="${r(e.x)}" cy="${r(e.y)}" r="${CHART_FONT.dotRadius}" class="xychart-dot xychart-color-${e.colorIndex}"${dataAttrs}/>`,
           )
         }
       }
@@ -210,15 +222,15 @@ export function renderXYChartSvg(
   for (const tick of chart.xAxis.ticks) {
     parts.push(
       `<text x="${tick.labelX}" y="${tick.labelY}" text-anchor="${tick.textAnchor}" ` +
-      `font-size="${CHART_FONT.labelSize}" font-weight="${CHART_FONT.labelWeight}" ` +
-      `dy="${TEXT_BASELINE_SHIFT}" class="xychart-label">${escapeXml(tick.label)}</text>`
+        `font-size="${CHART_FONT.labelSize}" font-weight="${CHART_FONT.labelWeight}" ` +
+        `dy="${TEXT_BASELINE_SHIFT}" class="xychart-label">${escapeXml(tick.label)}</text>`,
     )
   }
   for (const tick of chart.yAxis.ticks) {
     parts.push(
       `<text x="${tick.labelX}" y="${tick.labelY}" text-anchor="${tick.textAnchor}" ` +
-      `font-size="${CHART_FONT.labelSize}" font-weight="${CHART_FONT.labelWeight}" ` +
-      `dy="${TEXT_BASELINE_SHIFT}" class="xychart-label">${escapeXml(tick.label)}</text>`
+        `font-size="${CHART_FONT.labelSize}" font-weight="${CHART_FONT.labelWeight}" ` +
+        `dy="${TEXT_BASELINE_SHIFT}" class="xychart-label">${escapeXml(tick.label)}</text>`,
     )
   }
 
@@ -228,8 +240,8 @@ export function renderXYChartSvg(
     const transform = t.rotate ? ` transform="rotate(${t.rotate},${t.x},${t.y})"` : ''
     parts.push(
       `<text x="${t.x}" y="${t.y}" text-anchor="middle"${transform} ` +
-      `font-size="${CHART_FONT.axisTitleSize}" font-weight="${CHART_FONT.axisTitleWeight}" ` +
-      `dy="${TEXT_BASELINE_SHIFT}" class="xychart-axis-title">${escapeXml(t.text)}</text>`
+        `font-size="${CHART_FONT.axisTitleSize}" font-weight="${CHART_FONT.axisTitleWeight}" ` +
+        `dy="${TEXT_BASELINE_SHIFT}" class="xychart-axis-title">${escapeXml(t.text)}</text>`,
     )
   }
   if (chart.yAxis.title) {
@@ -237,8 +249,8 @@ export function renderXYChartSvg(
     const transform = t.rotate ? ` transform="rotate(${t.rotate},${t.x},${t.y})"` : ''
     parts.push(
       `<text x="${t.x}" y="${t.y}" text-anchor="middle"${transform} ` +
-      `font-size="${CHART_FONT.axisTitleSize}" font-weight="${CHART_FONT.axisTitleWeight}" ` +
-      `dy="${TEXT_BASELINE_SHIFT}" class="xychart-axis-title">${escapeXml(t.text)}</text>`
+        `font-size="${CHART_FONT.axisTitleSize}" font-weight="${CHART_FONT.axisTitleWeight}" ` +
+        `dy="${TEXT_BASELINE_SHIFT}" class="xychart-axis-title">${escapeXml(t.text)}</text>`,
     )
   }
 
@@ -246,31 +258,32 @@ export function renderXYChartSvg(
   if (chart.title) {
     parts.push(
       `<text x="${chart.title.x}" y="${chart.title.y}" text-anchor="middle" ` +
-      `font-size="${CHART_FONT.titleSize}" font-weight="${CHART_FONT.titleWeight}" ` +
-      `dy="${TEXT_BASELINE_SHIFT}" class="xychart-title">${escapeXml(chart.title.text)}</text>`
+        `font-size="${CHART_FONT.titleSize}" font-weight="${CHART_FONT.titleWeight}" ` +
+        `dy="${TEXT_BASELINE_SHIFT}" class="xychart-title">${escapeXml(chart.title.text)}</text>`,
     )
   }
 
   // 8. Legend
   for (const item of chart.legend) {
-    const swatchW = 14, swatchH = 14
+    const swatchW = 14,
+      swatchH = 14
     const gap = 6
     if (item.type === 'bar') {
       parts.push(
         `<rect x="${item.x}" y="${item.y - swatchH / 2}" width="${swatchW}" height="${swatchH}" rx="3" ` +
-        `class="xychart-bar xychart-color-${item.colorIndex}"/>`
+          `class="xychart-bar xychart-color-${item.colorIndex}"/>`,
       )
     } else {
       const ly = item.y
       parts.push(
         `<line x1="${item.x}" y1="${ly}" x2="${item.x + swatchW}" y2="${ly}" ` +
-        `stroke-width="${CHART_FONT.lineWidth}" stroke-linecap="round" class="xychart-legend-line xychart-color-${item.colorIndex}"/>`
+          `stroke-width="${CHART_FONT.lineWidth}" stroke-linecap="round" class="xychart-legend-line xychart-color-${item.colorIndex}"/>`,
       )
     }
     parts.push(
       `<text x="${item.x + swatchW + gap}" y="${item.y}" text-anchor="start" ` +
-      `font-size="${CHART_FONT.legendSize}" font-weight="${CHART_FONT.legendWeight}" ` +
-      `dy="${TEXT_BASELINE_SHIFT}" class="xychart-label">${escapeXml(item.label)}</text>`
+        `font-size="${CHART_FONT.legendSize}" font-weight="${CHART_FONT.legendWeight}" ` +
+        `dy="${TEXT_BASELINE_SHIFT}" class="xychart-label">${escapeXml(item.label)}</text>`,
     )
   }
 
@@ -286,7 +299,13 @@ export function renderXYChartSvg(
 // Chart-specific CSS styles
 // ============================================================================
 
-function chartStyles(chart: PositionedXYChart, interactive: boolean, sparse: boolean, themeAccent?: string, bgColor?: string): { style: string; defs: string } {
+function chartStyles(
+  chart: PositionedXYChart,
+  interactive: boolean,
+  _sparse: boolean,
+  themeAccent?: string,
+  bgColor?: string,
+): { style: string; defs: string } {
   const accentHex = themeAccent ?? CHART_ACCENT_FALLBACK
 
   // Collect all unique global color indices from bars + lines
@@ -298,11 +317,11 @@ function chartStyles(chart: PositionedXYChart, interactive: boolean, sparse: boo
   // Also define --xychart-bar-fill-N via color-mix() so it stays dynamic on theme change
   const colorVarDefs: string[] = []
   for (const idx of [...colorIndices].sort((a, b) => a - b)) {
-    const value = idx === 0
-      ? `var(--accent, ${CHART_ACCENT_FALLBACK})`
-      : getSeriesColor(idx, accentHex, bgColor)
+    const value = idx === 0 ? `var(--accent, ${CHART_ACCENT_FALLBACK})` : getSeriesColor(idx, accentHex, bgColor)
     colorVarDefs.push(`    --xychart-color-${idx}: ${value};`)
-    colorVarDefs.push(`    --xychart-bar-fill-${idx}: color-mix(in srgb, var(--bg) 75%, var(--xychart-color-${idx}) 25%);`)
+    colorVarDefs.push(
+      `    --xychart-bar-fill-${idx}: color-mix(in srgb, var(--bg) 75%, var(--xychart-color-${idx}) 25%);`,
+    )
   }
 
   // Generate unified color rules — one per global index, referencing the CSS vars
@@ -316,13 +335,15 @@ function chartStyles(chart: PositionedXYChart, interactive: boolean, sparse: boo
     seriesRules.push(`  circle.xychart-color-${idx} { fill: ${color}; }`)
   }
 
-  const tipRules = interactive ? `
+  const tipRules = interactive
+    ? `
   .xychart-tip { opacity: 0; pointer-events: none; }
   .xychart-tip-bg { fill: var(--_text); filter: drop-shadow(0 1px 3px color-mix(in srgb, var(--fg) 20%, transparent)); }
   .xychart-tip-text { fill: var(--bg); font-size: ${TIP.fontSize}px; font-weight: ${TIP.fontWeight}; }
   .xychart-tip-ptr { fill: var(--_text); }
   .xychart-bar-group:hover .xychart-tip,
-  .xychart-dot-group:hover .xychart-tip { opacity: 1; }` : ''
+  .xychart-dot-group:hover .xychart-tip { opacity: 1; }`
+    : ''
 
   const colorVarsBlock = colorVarDefs.length > 0 ? `\n  svg {\n${colorVarDefs.join('\n')}\n  }` : ''
 
@@ -341,7 +362,6 @@ ${seriesRules.join('\n')}${tipRules}
   return { style, defs: '' }
 }
 
-
 // ============================================================================
 // Bar path with all corners rounded
 // ============================================================================
@@ -352,14 +372,14 @@ function roundedTopBarPath(x: number, y: number, w: number, h: number, radius: n
     return `M${r(x)},${r(y)} h${r(w)} v${r(h)} h${r(-w)} Z`
   }
   return [
-    `M${r(x)},${r(y + rr)}`,                                   // start below top-left
-    `Q${r(x)},${r(y)} ${r(x + rr)},${r(y)}`,                   // top-left
-    `L${r(x + w - rr)},${r(y)}`,                                // top edge
-    `Q${r(x + w)},${r(y)} ${r(x + w)},${r(y + rr)}`,           // top-right
-    `L${r(x + w)},${r(y + h - rr)}`,                            // right edge
-    `Q${r(x + w)},${r(y + h)} ${r(x + w - rr)},${r(y + h)}`,   // bottom-right
-    `L${r(x + rr)},${r(y + h)}`,                                // bottom edge
-    `Q${r(x)},${r(y + h)} ${r(x)},${r(y + h - rr)}`,           // bottom-left
+    `M${r(x)},${r(y + rr)}`, // start below top-left
+    `Q${r(x)},${r(y)} ${r(x + rr)},${r(y)}`, // top-left
+    `L${r(x + w - rr)},${r(y)}`, // top edge
+    `Q${r(x + w)},${r(y)} ${r(x + w)},${r(y + rr)}`, // top-right
+    `L${r(x + w)},${r(y + h - rr)}`, // right edge
+    `Q${r(x + w)},${r(y + h)} ${r(x + w - rr)},${r(y + h)}`, // bottom-right
+    `L${r(x + rr)},${r(y + h)}`, // bottom edge
+    `Q${r(x)},${r(y + h)} ${r(x)},${r(y + h - rr)}`, // bottom-left
     'Z',
   ].join(' ')
 }
@@ -374,15 +394,15 @@ function roundedRightBarPath(x: number, y: number, w: number, h: number, radius:
     return `M${r(x)},${r(y)} h${r(w)} v${r(h)} h${r(-w)} Z`
   }
   return [
-    `M${r(x + rr)},${r(y)}`,                                    // start after top-left
-    `L${r(x + w - rr)},${r(y)}`,                                // top edge
-    `Q${r(x + w)},${r(y)} ${r(x + w)},${r(y + rr)}`,           // top-right
-    `L${r(x + w)},${r(y + h - rr)}`,                            // right edge
-    `Q${r(x + w)},${r(y + h)} ${r(x + w - rr)},${r(y + h)}`,   // bottom-right
-    `L${r(x + rr)},${r(y + h)}`,                                // bottom edge
-    `Q${r(x)},${r(y + h)} ${r(x)},${r(y + h - rr)}`,           // bottom-left
-    `L${r(x)},${r(y + rr)}`,                                    // left edge
-    `Q${r(x)},${r(y)} ${r(x + rr)},${r(y)}`,                   // top-left
+    `M${r(x + rr)},${r(y)}`, // start after top-left
+    `L${r(x + w - rr)},${r(y)}`, // top edge
+    `Q${r(x + w)},${r(y)} ${r(x + w)},${r(y + rr)}`, // top-right
+    `L${r(x + w)},${r(y + h - rr)}`, // right edge
+    `Q${r(x + w)},${r(y + h)} ${r(x + w - rr)},${r(y + h)}`, // bottom-right
+    `L${r(x + rr)},${r(y + h)}`, // bottom edge
+    `Q${r(x)},${r(y + h)} ${r(x)},${r(y + h - rr)}`, // bottom-left
+    `L${r(x)},${r(y + rr)}`, // left edge
+    `Q${r(x)},${r(y)} ${r(x + rr)},${r(y)}`, // top-left
     'Z',
   ].join(' ')
 }
@@ -442,10 +462,10 @@ function smoothCurvePath(points: Array<{ x: number; y: number }>): string {
   // 3. Compute first derivatives (slopes) at each knot
   const slopes = new Array<number>(n).fill(0)
   for (let i = 0; i < n - 1; i++) {
-    slopes[i] = delta[i]! - h[i]! * (2 * c[i]! + c[i + 1]!) / 3
+    slopes[i] = delta[i]! - (h[i]! * (2 * c[i]! + c[i + 1]!)) / 3
   }
   // Slope at last point: derivative of last segment at its end
-  slopes[n - 1] = delta[n - 2]! + h[n - 2]! * (c[n - 2]!) / 3
+  slopes[n - 1] = delta[n - 2]! + (h[n - 2]! * c[n - 2]!) / 3
 
   // 4. Convert to cubic Bezier — control points strictly between endpoints in x
   let path = `M${r(points[0]!.x)},${r(points[0]!.y)}`
@@ -468,16 +488,23 @@ function smoothCurvePath(points: Array<{ x: number; y: number }>): string {
 /**
  * Multi-value tooltip: category label on top, each series value below with legend text label.
  */
-function multiTooltipAbove(cx: number, topY: number, label: string, entries: Array<{ text: string; legendLabel: string }>): string {
+function multiTooltipAbove(
+  cx: number,
+  topY: number,
+  label: string,
+  entries: Array<{ text: string; legendLabel: string }>,
+): string {
   const lineH = 20
   const padY = 6
   const labelGap = 10
   const headingW = estimateTextWidth(label, TIP.fontSize, 600)
-  const maxRowW = Math.max(...entries.map(e => {
-    const legendW = estimateTextWidth(e.legendLabel, TIP.fontSize, TIP.fontWeight)
-    const valW = estimateTextWidth(e.text, TIP.fontSize, TIP.fontWeight)
-    return legendW + labelGap + valW
-  }))
+  const maxRowW = Math.max(
+    ...entries.map(e => {
+      const legendW = estimateTextWidth(e.legendLabel, TIP.fontSize, TIP.fontWeight)
+      const valW = estimateTextWidth(e.text, TIP.fontSize, TIP.fontWeight)
+      return legendW + labelGap + valW
+    }),
+  )
   const bgW = Math.max(headingW, maxRowW) + TIP.padX * 2
   const bgH = padY + lineH + entries.length * lineH + padY
 
@@ -539,11 +566,5 @@ function r(n: number): string {
 }
 
 function escapeXml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
-
-

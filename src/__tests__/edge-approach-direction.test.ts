@@ -11,9 +11,9 @@
  * but approaches horizontally, creating an awkward bend at the arrowhead.
  */
 
-import { describe, it, expect } from 'bun:test'
-import { parseMermaid } from '../parser.ts'
+import { describe, expect, it } from 'bun:test'
 import { layoutGraphSync } from '../layout.ts'
+import { parseMermaid } from '../parser.ts'
 
 interface Point {
   x: number
@@ -68,12 +68,12 @@ function getApproachSide(
   nodeX: number,
   nodeY: number,
   nodeWidth: number,
-  nodeHeight: number
+  nodeHeight: number,
 ): 'top' | 'bottom' | 'left' | 'right' {
   const cx = nodeX + nodeWidth / 2
   const cy = nodeY + nodeHeight / 2
-  const dx = point.x - cx
-  const dy = point.y - cy
+  const _dx = point.x - cx
+  const _dy = point.y - cy
 
   // Check which edge the point is closest to
   const distTop = Math.abs(point.y - nodeY)
@@ -100,9 +100,7 @@ describe('Edge Approach Direction', () => {
         A --> B`)
       const positioned = layoutGraphSync(parsed, {})
 
-      const edge = positioned.edges.find(
-        (e) => e.source === 'A' && e.target === 'B'
-      )
+      const edge = positioned.edges.find(e => e.source === 'A' && e.target === 'B')
       expect(edge).toBeDefined()
 
       const finalSeg = getFinalSegment(edge!.points)
@@ -119,7 +117,7 @@ describe('Edge Approach Direction', () => {
         Config --> Processor`)
       const positioned = layoutGraphSync(parsed, {})
 
-      const processorNode = positioned.nodes.find((n) => n.id === 'Processor')
+      const processorNode = positioned.nodes.find(n => n.id === 'Processor')
       expect(processorNode).toBeDefined()
 
       // Both edges should approach Processor with vertical final segments
@@ -146,7 +144,7 @@ describe('Edge Approach Direction', () => {
 
       // Check all edges
       for (const edge of positioned.edges) {
-        const targetNode = positioned.nodes.find((n) => n.id === edge.target)
+        const targetNode = positioned.nodes.find(n => n.id === edge.target)
         expect(targetNode).toBeDefined()
 
         const finalSeg = getFinalSegment(edge.points)
@@ -158,7 +156,7 @@ describe('Edge Approach Direction', () => {
           targetNode!.x,
           targetNode!.y,
           targetNode!.width,
-          targetNode!.height
+          targetNode!.height,
         )
 
         // For top/bottom approach, final segment must be vertical
@@ -178,9 +176,7 @@ describe('Edge Approach Direction', () => {
         A --> B`)
       const positioned = layoutGraphSync(parsed, {})
 
-      const edge = positioned.edges.find(
-        (e) => e.source === 'A' && e.target === 'B'
-      )
+      const edge = positioned.edges.find(e => e.source === 'A' && e.target === 'B')
       expect(edge).toBeDefined()
 
       const finalSeg = getFinalSegment(edge!.points)
@@ -251,9 +247,7 @@ describe('Edge Approach Direction', () => {
       const positioned = layoutGraphSync(parsed, {})
 
       // Edge A → B should approach B's top vertically
-      const edgeAB = positioned.edges.find(
-        (e) => e.source === 'A' && e.target === 'B'
-      )
+      const edgeAB = positioned.edges.find(e => e.source === 'A' && e.target === 'B')
       expect(edgeAB).toBeDefined()
 
       const finalSegAB = getFinalSegment(edgeAB!.points)

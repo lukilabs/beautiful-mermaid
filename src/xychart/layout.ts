@@ -1,9 +1,16 @@
-import type {
-  XYChart, PositionedXYChart, PositionedAxis, AxisTick,
-  PositionedBar, PositionedLine, GridLine, PlotArea, LegendItem,
-} from './types.ts'
-import type { RenderOptions } from '../types.ts'
 import { estimateTextWidth } from '../styles.ts'
+import type { RenderOptions } from '../types.ts'
+import type {
+  AxisTick,
+  GridLine,
+  LegendItem,
+  PlotArea,
+  PositionedAxis,
+  PositionedBar,
+  PositionedLine,
+  PositionedXYChart,
+  XYChart,
+} from './types.ts'
 
 // ============================================================================
 // XY Chart layout engine
@@ -44,10 +51,7 @@ const XY = {
 /**
  * Lay out a parsed XY chart by computing pixel coordinates.
  */
-export function layoutXYChart(
-  chart: XYChart,
-  _options: RenderOptions = {}
-): PositionedXYChart {
+export function layoutXYChart(chart: XYChart, _options: RenderOptions = {}): PositionedXYChart {
   if (chart.horizontal) return layoutHorizontal(chart)
   return layoutVertical(chart)
 }
@@ -67,7 +71,7 @@ function layoutVertical(chart: XYChart): PositionedXYChart {
   const yTicks = niceTickValues(yRange.min, yRange.max)
   const maxYLabelWidth = Math.max(
     ...yTicks.map(v => estimateTextWidth(formatTickValue(v), XY.axisLabelFontSize, XY.axisLabelFontWeight)),
-    XY.yLabelWidth
+    XY.yLabelWidth,
   )
 
   // Margins
@@ -98,15 +102,21 @@ function layoutVertical(chart: XYChart): PositionedXYChart {
   // Y-axis ticks
   const yAxisTicks: AxisTick[] = yTicks.map(v => ({
     label: formatTickValue(v),
-    x: left, y: yScale(v),
-    tx: left - XY.tickLength, ty: yScale(v),
-    labelX: left - XY.yLabelGap, labelY: yScale(v),
+    x: left,
+    y: yScale(v),
+    tx: left - XY.tickLength,
+    ty: yScale(v),
+    labelX: left - XY.yLabelGap,
+    labelY: yScale(v),
     textAnchor: 'end' as const,
   }))
 
   // Grid lines (horizontal at each y tick)
   const gridLines: GridLine[] = yTicks.map(v => ({
-    x1: left, y1: yScale(v), x2: left + plotW, y2: yScale(v),
+    x1: left,
+    y1: yScale(v),
+    x2: left + plotW,
+    y2: yScale(v),
   }))
 
   // Category labels for data attributes
@@ -126,25 +136,58 @@ function layoutVertical(chart: XYChart): PositionedXYChart {
   const legend = hasLegend ? buildLegendItems(chart, totalW / 2, legendY, colorMap) : []
 
   // Axis lines
-  const xAxisLine = { x1: left, y1: top + plotH, x2: left + plotW, y2: top + plotH }
+  const xAxisLine = {
+    x1: left,
+    y1: top + plotH,
+    x2: left + plotW,
+    y2: top + plotH,
+  }
   const yAxisLine = { x1: left, y1: top, x2: left, y2: top + plotH }
 
   // Axis titles
   const xAxisObj: PositionedAxis = {
     ticks: xTicks,
     line: xAxisLine,
-    ...(hasXTitle ? { title: { text: chart.xAxis.title!, x: left + plotW / 2, y: totalH - XY.padding } } : {}),
+    ...(hasXTitle
+      ? {
+          title: {
+            text: chart.xAxis.title!,
+            x: left + plotW / 2,
+            y: totalH - XY.padding,
+          },
+        }
+      : {}),
   }
   const yAxisObj: PositionedAxis = {
     ticks: yAxisTicks,
     line: yAxisLine,
-    ...(hasYTitle ? { title: { text: chart.yAxis.title!, x: XY.padding + 4, y: top + plotH / 2, rotate: -90 } } : {}),
+    ...(hasYTitle
+      ? {
+          title: {
+            text: chart.yAxis.title!,
+            x: XY.padding + 4,
+            y: top + plotH / 2,
+            rotate: -90,
+          },
+        }
+      : {}),
   }
 
   // Title
   const titleObj = hasTitle ? { text: chart.title!, x: totalW / 2, y: XY.padding + XY.titleFontSize } : undefined
 
-  return { width: totalW, height: totalH, title: titleObj, xAxis: xAxisObj, yAxis: yAxisObj, plotArea, bars, lines, gridLines, legend }
+  return {
+    width: totalW,
+    height: totalH,
+    title: titleObj,
+    xAxis: xAxisObj,
+    yAxis: yAxisObj,
+    plotArea,
+    bars,
+    lines,
+    gridLines,
+    legend,
+  }
 }
 
 // ============================================================================
@@ -166,7 +209,7 @@ function layoutHorizontal(chart: XYChart): PositionedXYChart {
   const catLabels = getCategoryLabels(chart, dataCount)
   const maxCatLabelWidth = Math.max(
     ...catLabels.map(l => estimateTextWidth(l, XY.axisLabelFontSize, XY.axisLabelFontWeight)),
-    40
+    40,
   )
 
   const top = XY.padding + (hasTitle ? XY.titleHeight : 0) + (hasLegend ? XY.legendHeight : 0)
@@ -194,24 +237,33 @@ function layoutHorizontal(chart: XYChart): PositionedXYChart {
   // X-axis (bottom): value ticks
   const xTicks: AxisTick[] = valueTicks.map(v => ({
     label: formatTickValue(v),
-    x: valueScale(v), y: top + plotH,
-    tx: valueScale(v), ty: top + plotH + XY.tickLength,
-    labelX: valueScale(v), labelY: top + plotH + 18,
+    x: valueScale(v),
+    y: top + plotH,
+    tx: valueScale(v),
+    ty: top + plotH + XY.tickLength,
+    labelX: valueScale(v),
+    labelY: top + plotH + 18,
     textAnchor: 'middle' as const,
   }))
 
   // Y-axis (left): category ticks
   const yTicks: AxisTick[] = catLabels.map((label, i) => ({
     label,
-    x: left, y: catScale(i),
-    tx: left - XY.tickLength, ty: catScale(i),
-    labelX: left - XY.yLabelGap, labelY: catScale(i),
+    x: left,
+    y: catScale(i),
+    tx: left - XY.tickLength,
+    ty: catScale(i),
+    labelX: left - XY.yLabelGap,
+    labelY: catScale(i),
     textAnchor: 'end' as const,
   }))
 
   // Grid lines (vertical at each value tick)
   const gridLines: GridLine[] = valueTicks.map(v => ({
-    x1: valueScale(v), y1: top, x2: valueScale(v), y2: top + plotH,
+    x1: valueScale(v),
+    y1: top,
+    x2: valueScale(v),
+    y2: top + plotH,
   }))
 
   // Global color index map
@@ -225,13 +277,14 @@ function layoutHorizontal(chart: XYChart): PositionedXYChart {
     const usable = bandHeight * (1 - XY.barPadRatio)
     const rawBarH = barCount > 1 ? (usable - (barCount - 1) * XY.barGroupGap) / barCount : usable
     const singleBarH = Math.min(rawBarH, XY.maxBarWidth)
-    const groupH = barCount > 1
-      ? singleBarH * barCount + XY.barGroupGap * (barCount - 1)
-      : singleBarH
+    const groupH = barCount > 1 ? singleBarH * barCount + XY.barGroupGap * (barCount - 1) : singleBarH
     let bIdx = 0
     let seriesArrayIdx = 0
     for (const s of chart.series) {
-      if (s.type !== 'bar') { seriesArrayIdx++; continue }
+      if (s.type !== 'bar') {
+        seriesArrayIdx++
+        continue
+      }
       for (let i = 0; i < s.data.length; i++) {
         const cy = catScale(i)
         const groupTop = cy - groupH / 2
@@ -259,26 +312,60 @@ function layoutHorizontal(chart: XYChart): PositionedXYChart {
   let lineIdx = 0
   let lineSeriesIdx = 0
   for (const s of chart.series) {
-    if (s.type !== 'line') { lineSeriesIdx++; continue }
-    const points = s.data.map((v, i) => ({ x: valueScale(v), y: catScale(i), value: v, label: catLabels[i]! }))
-    lines.push({ points, seriesIndex: lineIdx, colorIndex: colorMap[lineSeriesIdx]! })
+    if (s.type !== 'line') {
+      lineSeriesIdx++
+      continue
+    }
+    const points = s.data.map((v, i) => ({
+      x: valueScale(v),
+      y: catScale(i),
+      value: v,
+      label: catLabels[i]!,
+    }))
+    lines.push({
+      points,
+      seriesIndex: lineIdx,
+      colorIndex: colorMap[lineSeriesIdx]!,
+    })
     lineIdx++
     lineSeriesIdx++
   }
 
-  const xAxisLine = { x1: left, y1: top + plotH, x2: left + plotW, y2: top + plotH }
+  const xAxisLine = {
+    x1: left,
+    y1: top + plotH,
+    x2: left + plotW,
+    y2: top + plotH,
+  }
   const yAxisLine = { x1: left, y1: top, x2: left, y2: top + plotH }
 
   // In horizontal mode, the "y-axis" title describes values (bottom) and "x-axis" title describes categories (left)
   const xAxisObj: PositionedAxis = {
     ticks: xTicks,
     line: xAxisLine,
-    ...(hasYTitle ? { title: { text: chart.yAxis.title!, x: left + plotW / 2, y: totalH - XY.padding } } : {}),
+    ...(hasYTitle
+      ? {
+          title: {
+            text: chart.yAxis.title!,
+            x: left + plotW / 2,
+            y: totalH - XY.padding,
+          },
+        }
+      : {}),
   }
   const yAxisObj: PositionedAxis = {
     ticks: yTicks,
     line: yAxisLine,
-    ...(hasXTitle ? { title: { text: chart.xAxis.title!, x: XY.padding + 4, y: top + plotH / 2, rotate: -90 } } : {}),
+    ...(hasXTitle
+      ? {
+          title: {
+            text: chart.xAxis.title!,
+            x: XY.padding + 4,
+            y: top + plotH / 2,
+            rotate: -90,
+          },
+        }
+      : {}),
   }
 
   const titleObj = hasTitle ? { text: chart.title!, x: totalW / 2, y: XY.padding + XY.titleFontSize } : undefined
@@ -287,7 +374,19 @@ function layoutHorizontal(chart: XYChart): PositionedXYChart {
   const legendY = XY.padding + (hasTitle ? XY.titleHeight : 0) + XY.legendHeight / 2
   const legend = hasLegend ? buildLegendItems(chart, totalW / 2, legendY, colorMap) : []
 
-  return { width: totalW, height: totalH, horizontal: true, title: titleObj, xAxis: xAxisObj, yAxis: yAxisObj, plotArea, bars, lines, gridLines, legend }
+  return {
+    width: totalW,
+    height: totalH,
+    horizontal: true,
+    title: titleObj,
+    xAxis: xAxisObj,
+    yAxis: yAxisObj,
+    plotArea,
+    bars,
+    lines,
+    gridLines,
+    legend,
+  }
 }
 
 // ============================================================================
@@ -318,16 +417,24 @@ function buildXTicks(chart: XYChart, xScale: (i: number) => number, axisY: numbe
   const labels = getCategoryLabels(chart, count)
   return labels.map((label, i) => ({
     label,
-    x: xScale(i), y: axisY,
-    tx: xScale(i), ty: axisY + XY.tickLength,
-    labelX: xScale(i), labelY: axisY + 18,
+    x: xScale(i),
+    y: axisY,
+    tx: xScale(i),
+    ty: axisY + XY.tickLength,
+    labelX: xScale(i),
+    labelY: axisY + 18,
     textAnchor: 'middle' as const,
   }))
 }
 
 function layoutBars(
-  chart: XYChart, xScale: (i: number) => number, yScale: (v: number) => number,
-  bandWidth: number, yMin: number, catLabels: string[], colorMap: number[],
+  chart: XYChart,
+  xScale: (i: number) => number,
+  yScale: (v: number) => number,
+  bandWidth: number,
+  yMin: number,
+  catLabels: string[],
+  colorMap: number[],
 ): PositionedBar[] {
   const barSeries = chart.series.filter(s => s.type === 'bar')
   const barCount = barSeries.length
@@ -336,15 +443,16 @@ function layoutBars(
   const usable = bandWidth * (1 - XY.barPadRatio)
   const rawBarW = barCount > 1 ? (usable - (barCount - 1) * XY.barGroupGap) / barCount : usable
   const singleBarW = Math.min(rawBarW, XY.maxBarWidth)
-  const groupW = barCount > 1
-    ? singleBarW * barCount + XY.barGroupGap * (barCount - 1)
-    : singleBarW
+  const groupW = barCount > 1 ? singleBarW * barCount + XY.barGroupGap * (barCount - 1) : singleBarW
   const bars: PositionedBar[] = []
 
   let bIdx = 0
   let seriesArrayIdx = 0
   for (const s of chart.series) {
-    if (s.type !== 'bar') { seriesArrayIdx++; continue }
+    if (s.type !== 'bar') {
+      seriesArrayIdx++
+      continue
+    }
     for (let i = 0; i < s.data.length; i++) {
       const cx = xScale(i)
       const groupLeft = cx - groupW / 2
@@ -368,14 +476,32 @@ function layoutBars(
   return bars
 }
 
-function layoutLines(chart: XYChart, xScale: (i: number) => number, yScale: (v: number) => number, catLabels: string[], colorMap: number[]): PositionedLine[] {
+function layoutLines(
+  chart: XYChart,
+  xScale: (i: number) => number,
+  yScale: (v: number) => number,
+  catLabels: string[],
+  colorMap: number[],
+): PositionedLine[] {
   const lines: PositionedLine[] = []
   let lineIdx = 0
   let seriesArrayIdx = 0
   for (const s of chart.series) {
-    if (s.type !== 'line') { seriesArrayIdx++; continue }
-    const points = s.data.map((v, i) => ({ x: xScale(i), y: yScale(v), value: v, label: catLabels[i]! }))
-    lines.push({ points, seriesIndex: lineIdx, colorIndex: colorMap[seriesArrayIdx]! })
+    if (s.type !== 'line') {
+      seriesArrayIdx++
+      continue
+    }
+    const points = s.data.map((v, i) => ({
+      x: xScale(i),
+      y: yScale(v),
+      value: v,
+      label: catLabels[i]!,
+    }))
+    lines.push({
+      points,
+      seriesIndex: lineIdx,
+      colorIndex: colorMap[seriesArrayIdx]!,
+    })
     lineIdx++
     seriesArrayIdx++
   }
@@ -389,7 +515,7 @@ function niceTickValues(min: number, max: number): number[] {
 
   // Find nice interval
   const rawInterval = range / 6
-  const magnitude = Math.pow(10, Math.floor(Math.log10(rawInterval)))
+  const magnitude = 10 ** Math.floor(Math.log10(rawInterval))
   const residual = rawInterval / magnitude
   let niceInterval: number
   if (residual <= 1.5) niceInterval = magnitude
@@ -414,11 +540,19 @@ function formatTickValue(v: number): string {
 /** Build centered legend items for multi-series charts */
 function buildLegendItems(chart: XYChart, centerX: number, y: number, colorMap: number[]): LegendItem[] {
   const items: LegendItem[] = []
-  let barIdx = 0, lineIdx = 0
+  let barIdx = 0,
+    lineIdx = 0
   for (let si = 0; si < chart.series.length; si++) {
     const s = chart.series[si]!
     const label = s.type === 'bar' ? `Bar ${barIdx + 1}` : `Line ${lineIdx + 1}`
-    items.push({ label, x: 0, y, type: s.type, seriesIndex: s.type === 'bar' ? barIdx : lineIdx, colorIndex: colorMap[si]! })
+    items.push({
+      label,
+      x: 0,
+      y,
+      type: s.type,
+      seriesIndex: s.type === 'bar' ? barIdx : lineIdx,
+      colorIndex: colorMap[si]!,
+    })
     if (s.type === 'bar') barIdx++
     else lineIdx++
   }

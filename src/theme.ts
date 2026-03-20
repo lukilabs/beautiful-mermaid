@@ -63,27 +63,27 @@ export const DEFAULTS: Readonly<{ bg: string; fg: string }> = {
 
 export const MIX = {
   /** Primary text: near-full fg */
-  text:         100, // just use --fg directly
+  text: 100, // just use --fg directly
   /** Secondary text (group headers): fg mixed at 60% */
-  textSec:      60,
+  textSec: 60,
   /** Muted text (edge labels, notes): fg mixed at 40% */
-  textMuted:    40,
+  textMuted: 40,
   /** Faint text (de-emphasized): fg mixed at 25% */
-  textFaint:    25,
+  textFaint: 25,
   /** Edge/connector lines: fg mixed at 50% for clear visibility */
-  line:         50,
+  line: 50,
   /** Arrow head fill: fg mixed at 85% for clear visibility */
-  arrow:        85,
+  arrow: 85,
   /** Node fill tint: fg mixed at 3% */
-  nodeFill:     3,
+  nodeFill: 3,
   /** Node/group stroke: fg mixed at 20% */
-  nodeStroke:   20,
+  nodeStroke: 20,
   /** Group header band tint: fg mixed at 5% */
-  groupHeader:  5,
+  groupHeader: 5,
   /** Inner divider strokes: fg mixed at 12% */
-  innerStroke:  12,
+  innerStroke: 12,
   /** Key badge background opacity (ER diagrams) */
-  keyBadge:     10,
+  keyBadge: 10,
 } as const
 
 // ============================================================================
@@ -95,62 +95,103 @@ export const MIX = {
 
 export const THEMES: Record<string, DiagramColors> = {
   'zinc-light': {
-    bg: '#FFFFFF', fg: '#27272A',
+    bg: '#FFFFFF',
+    fg: '#27272A',
   },
   'zinc-dark': {
-    bg: '#18181B', fg: '#FAFAFA',
+    bg: '#18181B',
+    fg: '#FAFAFA',
   },
   'tokyo-night': {
-    bg: '#1a1b26', fg: '#a9b1d6',
-    line: '#3d59a1', accent: '#7aa2f7', muted: '#565f89',
+    bg: '#1a1b26',
+    fg: '#a9b1d6',
+    line: '#3d59a1',
+    accent: '#7aa2f7',
+    muted: '#565f89',
   },
   'tokyo-night-storm': {
-    bg: '#24283b', fg: '#a9b1d6',
-    line: '#3d59a1', accent: '#7aa2f7', muted: '#565f89',
+    bg: '#24283b',
+    fg: '#a9b1d6',
+    line: '#3d59a1',
+    accent: '#7aa2f7',
+    muted: '#565f89',
   },
   'tokyo-night-light': {
-    bg: '#d5d6db', fg: '#343b58',
-    line: '#34548a', accent: '#34548a', muted: '#9699a3',
+    bg: '#d5d6db',
+    fg: '#343b58',
+    line: '#34548a',
+    accent: '#34548a',
+    muted: '#9699a3',
   },
   'catppuccin-mocha': {
-    bg: '#1e1e2e', fg: '#cdd6f4',
-    line: '#585b70', accent: '#cba6f7', muted: '#6c7086',
+    bg: '#1e1e2e',
+    fg: '#cdd6f4',
+    line: '#585b70',
+    accent: '#cba6f7',
+    muted: '#6c7086',
   },
   'catppuccin-latte': {
-    bg: '#eff1f5', fg: '#4c4f69',
-    line: '#9ca0b0', accent: '#8839ef', muted: '#9ca0b0',
+    bg: '#eff1f5',
+    fg: '#4c4f69',
+    line: '#9ca0b0',
+    accent: '#8839ef',
+    muted: '#9ca0b0',
   },
-  'nord': {
-    bg: '#2e3440', fg: '#d8dee9',
-    line: '#4c566a', accent: '#88c0d0', muted: '#616e88',
+  nord: {
+    bg: '#2e3440',
+    fg: '#d8dee9',
+    line: '#4c566a',
+    accent: '#88c0d0',
+    muted: '#616e88',
   },
   'nord-light': {
-    bg: '#eceff4', fg: '#2e3440',
-    line: '#aab1c0', accent: '#5e81ac', muted: '#7b88a1',
+    bg: '#eceff4',
+    fg: '#2e3440',
+    line: '#aab1c0',
+    accent: '#5e81ac',
+    muted: '#7b88a1',
   },
-  'dracula': {
-    bg: '#282a36', fg: '#f8f8f2',
-    line: '#6272a4', accent: '#bd93f9', muted: '#6272a4',
+  dracula: {
+    bg: '#282a36',
+    fg: '#f8f8f2',
+    line: '#6272a4',
+    accent: '#bd93f9',
+    muted: '#6272a4',
   },
   'github-light': {
-    bg: '#ffffff', fg: '#1f2328',
-    line: '#d1d9e0', accent: '#0969da', muted: '#59636e',
+    bg: '#ffffff',
+    fg: '#1f2328',
+    line: '#d1d9e0',
+    accent: '#0969da',
+    muted: '#59636e',
   },
   'github-dark': {
-    bg: '#0d1117', fg: '#e6edf3',
-    line: '#3d444d', accent: '#4493f8', muted: '#9198a1',
+    bg: '#0d1117',
+    fg: '#e6edf3',
+    line: '#3d444d',
+    accent: '#4493f8',
+    muted: '#9198a1',
   },
   'solarized-light': {
-    bg: '#fdf6e3', fg: '#657b83',
-    line: '#93a1a1', accent: '#268bd2', muted: '#93a1a1',
+    bg: '#fdf6e3',
+    fg: '#657b83',
+    line: '#93a1a1',
+    accent: '#268bd2',
+    muted: '#93a1a1',
   },
   'solarized-dark': {
-    bg: '#002b36', fg: '#839496',
-    line: '#586e75', accent: '#268bd2', muted: '#586e75',
+    bg: '#002b36',
+    fg: '#839496',
+    line: '#586e75',
+    accent: '#268bd2',
+    muted: '#586e75',
   },
   'one-dark': {
-    bg: '#282c34', fg: '#abb2bf',
-    line: '#4b5263', accent: '#c678dd', muted: '#5c6370',
+    bg: '#282c34',
+    fg: '#abb2bf',
+    line: '#4b5263',
+    accent: '#c678dd',
+    muted: '#5c6370',
   },
 } as const
 
@@ -205,18 +246,17 @@ export function fromShikiTheme(theme: ShikiThemeLike): DiagramColors {
 
   // Helper: find a token color by scope name
   const tokenColor = (scope: string): string | undefined =>
-    theme.tokenColors?.find(t =>
-      Array.isArray(t.scope) ? t.scope.includes(scope) : t.scope === scope
-    )?.settings?.foreground
+    theme.tokenColors?.find(t => (Array.isArray(t.scope) ? t.scope.includes(scope) : t.scope === scope))?.settings
+      ?.foreground
 
   return {
     bg: c['editor.background'] ?? (dark ? '#1e1e1e' : '#ffffff'),
     fg: c['editor.foreground'] ?? (dark ? '#d4d4d4' : '#333333'),
-    line:    c['editorLineNumber.foreground'] ?? undefined,
-    accent:  c['focusBorder'] ?? tokenColor('keyword') ?? undefined,
-    muted:   tokenColor('comment') ?? c['editorLineNumber.foreground'] ?? undefined,
+    line: c['editorLineNumber.foreground'] ?? undefined,
+    accent: c.focusBorder ?? tokenColor('keyword') ?? undefined,
+    muted: tokenColor('comment') ?? c['editorLineNumber.foreground'] ?? undefined,
     surface: c['editor.selectionBackground'] ?? undefined,
-    border:  c['editorWidget.border'] ?? undefined,
+    border: c['editorWidget.border'] ?? undefined,
   }
 }
 
@@ -264,7 +304,9 @@ export function buildStyleBlock(font: string, hasMonoFont: boolean): string {
     '<style>',
     `  ${fontImports.join('\n  ')}`,
     `  text { font-family: '${font}', system-ui, sans-serif; }`,
-    ...(hasMonoFont ? [`  .mono { font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', ui-monospace, monospace; }`] : []),
+    ...(hasMonoFont
+      ? [`  .mono { font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', ui-monospace, monospace; }`]
+      : []),
     `  svg {${derivedVars}`,
     `  }`,
     '</style>',
@@ -278,22 +320,19 @@ export function buildStyleBlock(font: string, hasMonoFont: boolean): string {
  *
  * @param transparent - If true, omits the background style for transparent SVGs
  */
-export function svgOpenTag(
-  width: number,
-  height: number,
-  colors: DiagramColors,
-  transparent?: boolean,
-): string {
+export function svgOpenTag(width: number, height: number, colors: DiagramColors, transparent?: boolean): string {
   // Build the style string with only the provided color variables
   const vars = [
     `--bg:${colors.bg}`,
     `--fg:${colors.fg}`,
-    colors.line    ? `--line:${colors.line}` : '',
-    colors.accent  ? `--accent:${colors.accent}` : '',
-    colors.muted   ? `--muted:${colors.muted}` : '',
+    colors.line ? `--line:${colors.line}` : '',
+    colors.accent ? `--accent:${colors.accent}` : '',
+    colors.muted ? `--muted:${colors.muted}` : '',
     colors.surface ? `--surface:${colors.surface}` : '',
-    colors.border  ? `--border:${colors.border}` : '',
-  ].filter(Boolean).join(';')
+    colors.border ? `--border:${colors.border}` : '',
+  ]
+    .filter(Boolean)
+    .join(';')
 
   const bgStyle = transparent ? '' : ';background:var(--bg)'
 

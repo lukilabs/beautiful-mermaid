@@ -7,11 +7,11 @@
  *
  * Test data: 44 ASCII files + 22 Unicode files = 66 total.
  */
-import { describe, it, expect } from 'bun:test'
-import { renderMermaidAscii } from '../ascii/index.ts'
-import { hasDiagonalLines, DIAGONAL_CHARS } from '../ascii/validate.ts'
+import { describe, expect, it } from 'bun:test'
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { renderMermaidAscii } from '../ascii/index.ts'
+import { DIAGONAL_CHARS, hasDiagonalLines } from '../ascii/validate.ts'
 
 // ============================================================================
 // Test case parser — matches Go's testutil.ReadTestCase format
@@ -74,7 +74,7 @@ function parseTestCase(content: string): TestCase {
     }
   }
 
-  tc.mermaid = mermaidLines.join('\n') + '\n'
+  tc.mermaid = `${mermaidLines.join('\n')}\n`
 
   // Strip final trailing newline (matches Go's strings.TrimSuffix(expected, "\n"))
   let expected = expectedLines.join('\n')
@@ -97,7 +97,7 @@ function parseTestCase(content: string): TestCase {
  */
 function normalizeWhitespace(s: string): string {
   const lines = s.split('\n')
-  let normalized = lines.map(l => l.trimEnd())
+  const normalized = lines.map(l => l.trimEnd())
 
   // Remove leading blank lines
   while (normalized.length > 0 && normalized[0] === '') {
@@ -121,7 +121,9 @@ function visualizeWhitespace(s: string): string {
 // ============================================================================
 
 function runGoldenTests(dir: string, useAscii: boolean): void {
-  const files = readdirSync(dir).filter(f => f.endsWith('.txt')).sort()
+  const files = readdirSync(dir)
+    .filter(f => f.endsWith('.txt'))
+    .sort()
 
   for (const file of files) {
     const testName = file.replace('.txt', '')
@@ -199,7 +201,7 @@ describe('Diagonal validation', () => {
 
   it('ASCII output should never contain diagonal characters', () => {
     // Test all ASCII golden files
-    const files = readdirSync(asciiDir).filter((f) => f.endsWith('.txt'))
+    const files = readdirSync(asciiDir).filter(f => f.endsWith('.txt'))
     for (const file of files) {
       const content = readFileSync(join(asciiDir, file), 'utf-8')
       const { mermaid, paddingX, paddingY } = parseTestCase(content)
@@ -218,7 +220,7 @@ describe('Diagonal validation', () => {
 
   it('Unicode output should never contain diagonal characters', () => {
     // Test all Unicode golden files
-    const files = readdirSync(unicodeDir).filter((f) => f.endsWith('.txt'))
+    const files = readdirSync(unicodeDir).filter(f => f.endsWith('.txt'))
     for (const file of files) {
       const content = readFileSync(join(unicodeDir, file), 'utf-8')
       const { mermaid, paddingX, paddingY } = parseTestCase(content)

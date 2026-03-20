@@ -2,11 +2,11 @@
 // State pseudo-state renderers — UML start and end states
 // ============================================================================
 
-import type { Canvas, DrawingCoord, Direction } from '../types.ts'
-import { Up, Down, Left, Right, UpperLeft, UpperRight, LowerLeft, LowerRight } from '../types.ts'
 import { mkCanvas } from '../canvas.ts'
-import type { ShapeRenderer, ShapeDimensions, ShapeRenderOptions } from './types.ts'
 import { dirEquals } from '../edge-routing.ts'
+import type { Canvas, Direction, DrawingCoord } from '../types.ts'
+import { Down, Left, Right, Up } from '../types.ts'
+import type { ShapeDimensions, ShapeRenderer, ShapeRenderOptions } from './types.ts'
 
 /**
  * State start pseudo-state renderer — filled circle in rounded box.
@@ -40,7 +40,7 @@ export const stateStartRenderer: ShapeRenderer = {
     const { width, height } = dimensions
     const canvas = mkCanvas(width - 1, height - 1)
 
-    const centerX = Math.floor(width / 2)  // = 2
+    const centerX = Math.floor(width / 2) // = 2
 
     if (!options.useAscii) {
       // Unicode rounded box with filled circle: ╭───╮ │ ● │ ╰───╯
@@ -71,21 +71,17 @@ export const stateStartRenderer: ShapeRenderer = {
       canvas[centerX]![1] = '*'
       canvas[4]![1] = '|'
 
-      canvas[0]![2] = '\''
+      canvas[0]![2] = "'"
       canvas[1]![2] = '-'
       canvas[2]![2] = '-'
       canvas[3]![2] = '-'
-      canvas[4]![2] = '\''
+      canvas[4]![2] = "'"
     }
 
     return canvas
   },
 
-  getAttachmentPoint(
-    dir: Direction,
-    dimensions: ShapeDimensions,
-    baseCoord: DrawingCoord
-  ): DrawingCoord {
+  getAttachmentPoint(dir: Direction, dimensions: ShapeDimensions, baseCoord: DrawingCoord): DrawingCoord {
     const { width, height } = dimensions
     const centerX = baseCoord.x + Math.floor(width / 2)
     const centerY = baseCoord.y + Math.floor(height / 2)
@@ -132,7 +128,7 @@ export const stateEndRenderer: ShapeRenderer = {
     const { width, height } = dimensions
     const canvas = mkCanvas(width - 1, height - 1)
 
-    const centerX = Math.floor(width / 2)  // = 2
+    const centerX = Math.floor(width / 2) // = 2
 
     if (!options.useAscii) {
       // Unicode double-bordered box with bullseye: ╔═══╗ ║ ◎ ║ ╚═══╝
@@ -173,11 +169,7 @@ export const stateEndRenderer: ShapeRenderer = {
     return canvas
   },
 
-  getAttachmentPoint(
-    dir: Direction,
-    dimensions: ShapeDimensions,
-    baseCoord: DrawingCoord
-  ): DrawingCoord {
+  getAttachmentPoint(dir: Direction, dimensions: ShapeDimensions, baseCoord: DrawingCoord): DrawingCoord {
     const { width, height } = dimensions
     const centerX = baseCoord.x + Math.floor(width / 2)
     const centerY = baseCoord.y + Math.floor(height / 2)

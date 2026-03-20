@@ -7,16 +7,13 @@
 // and handles subgraph bounding boxes.
 // ============================================================================
 
-import type {
-  GridCoord, DrawingCoord, Direction, AsciiGraph, AsciiNode, AsciiSubgraph,
-} from './types.ts'
-import { gridKey } from './types.ts'
-import { mkCanvas, setCanvasSizeToGrid, setRoleCanvasSizeToGrid } from './canvas.ts'
-import { determinePath, determineLabelLine } from './edge-routing.ts'
-import { analyzeEdgeBundles, processBundles } from './edge-bundling.ts'
+import { setCanvasSizeToGrid, setRoleCanvasSizeToGrid } from './canvas.ts'
 import { drawBox } from './draw.ts'
-import { maxLineWidth, lineCount } from './multiline-utils.ts'
+import { analyzeEdgeBundles, processBundles } from './edge-bundling.ts'
+import { determineLabelLine, determinePath } from './edge-routing.ts'
 import { getShapeDimensions } from './shapes/index.ts'
+import type { AsciiGraph, AsciiNode, AsciiSubgraph, Direction, DrawingCoord, GridCoord } from './types.ts'
+import { gridKey } from './types.ts'
 
 // ============================================================================
 // Grid coordinate → drawing coordinate conversion
@@ -27,14 +24,8 @@ import { getShapeDimensions } from './shapes/index.ts'
  * Sums column widths up to the target column, and row heights up to the target row,
  * then centers within the cell.
  */
-export function gridToDrawingCoord(
-  graph: AsciiGraph,
-  c: GridCoord,
-  dir?: Direction,
-): DrawingCoord {
-  const target: GridCoord = dir
-    ? { x: c.x + dir.x, y: c.y + dir.y }
-    : c
+export function gridToDrawingCoord(graph: AsciiGraph, c: GridCoord, dir?: Direction): DrawingCoord {
+  const target: GridCoord = dir ? { x: c.x + dir.x, y: c.y + dir.y } : c
 
   let x = 0
   for (let col = 0; col < target.x; col++) {
@@ -414,14 +405,14 @@ export function createMapping(graph: AsciiGraph): void {
   // (e.g., `subgraph s; A-->B; end; X-->A` - A shouldn't be a root, X should).
   const rootNodes = initialRoots.filter(node => {
     const nodeSg = getNodeSubgraph(graph, node)
-    if (!nodeSg) return true  // external nodes: keep as roots
+    if (!nodeSg) return true // external nodes: keep as roots
 
     // Check if this subgraph node has incoming edges from outside its subgraph
     for (const edge of graph.edges) {
       if (edge.to === node) {
         const sourceSg = getNodeSubgraph(graph, edge.from)
         if (sourceSg !== nodeSg) {
-          return false  // has external incoming edge → not a root
+          return false // has external incoming edge → not a root
         }
       }
     }
@@ -453,9 +444,8 @@ export function createMapping(graph: AsciiGraph): void {
 
   // Place external root nodes
   for (const node of externalRootNodes) {
-    const requested: GridCoord = dir === 'LR'
-      ? { x: 0, y: highestPositionPerLevel[0]! }
-      : { x: highestPositionPerLevel[0]!, y: 0 }
+    const requested: GridCoord =
+      dir === 'LR' ? { x: 0, y: highestPositionPerLevel[0]! } : { x: highestPositionPerLevel[0]!, y: 0 }
     reserveSpotInGrid(graph, graph.nodes[node.index]!, requested)
     highestPositionPerLevel[0] = highestPositionPerLevel[0]! + 4
   }
@@ -464,9 +454,10 @@ export function createMapping(graph: AsciiGraph): void {
   if (shouldSeparate && subgraphRootNodes.length > 0) {
     const subgraphLevel = 4
     for (const node of subgraphRootNodes) {
-      const requested: GridCoord = dir === 'LR'
-        ? { x: subgraphLevel, y: highestPositionPerLevel[subgraphLevel]! }
-        : { x: highestPositionPerLevel[subgraphLevel]!, y: subgraphLevel }
+      const requested: GridCoord =
+        dir === 'LR'
+          ? { x: subgraphLevel, y: highestPositionPerLevel[subgraphLevel]! }
+          : { x: highestPositionPerLevel[subgraphLevel]!, y: subgraphLevel }
       reserveSpotInGrid(graph, graph.nodes[node.index]!, requested)
       highestPositionPerLevel[subgraphLevel] = highestPositionPerLevel[subgraphLevel]! + 4
     }
@@ -481,7 +472,7 @@ export function createMapping(graph: AsciiGraph): void {
   while (placedCount < graph.nodes.length) {
     const prevCount = placedCount
     for (const node of graph.nodes) {
-      if (node.gridCoord === null) continue  // skip unplaced nodes
+      if (node.gridCoord === null) continue // skip unplaced nodes
       const gc = node.gridCoord
 
       for (const child of getChildren(graph, node)) {
@@ -491,9 +482,8 @@ export function createMapping(graph: AsciiGraph): void {
         // Use subgraph direction only if both are in the same subgraph with override
         const parentSg = getNodeSubgraph(graph, node)
         const childSg = getNodeSubgraph(graph, child)
-        const edgeDir = (parentSg && parentSg === childSg && parentSg.direction)
-          ? parentSg.direction
-          : graph.config.graphDirection
+        const edgeDir =
+          parentSg && parentSg === childSg && parentSg.direction ? parentSg.direction : graph.config.graphDirection
 
         const childLevel = edgeDir === 'LR' ? gc.x + 4 : gc.y + 4
 
@@ -508,9 +498,8 @@ export function createMapping(graph: AsciiGraph): void {
           highestPosition = highestPositionPerLevel[childLevel]!
         }
 
-        const requested: GridCoord = edgeDir === 'LR'
-          ? { x: childLevel, y: highestPosition }
-          : { x: highestPosition, y: childLevel }
+        const requested: GridCoord =
+          edgeDir === 'LR' ? { x: childLevel, y: highestPosition } : { x: highestPosition, y: childLevel }
         reserveSpotInGrid(graph, graph.nodes[child.index]!, requested, edgeDir)
 
         // Only update level tracker for same-direction placements

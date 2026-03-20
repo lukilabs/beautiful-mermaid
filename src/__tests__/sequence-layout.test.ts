@@ -5,9 +5,9 @@
  * These tests call parseSequenceDiagram + layoutSequenceDiagram directly
  * to inspect Y coordinates, rather than checking SVG output.
  */
-import { describe, it, expect } from 'bun:test'
-import { parseSequenceDiagram } from '../sequence/parser.ts'
+import { describe, expect, it } from 'bun:test'
 import { layoutSequenceDiagram } from '../sequence/layout.ts'
+import { parseSequenceDiagram } from '../sequence/parser.ts'
 
 /** Helper: parse and layout a sequence diagram from source lines */
 function layout(source: string) {
@@ -462,7 +462,7 @@ describe('sequence layout – render clearance', () => {
     const msgAfter = result.messages[2]!
 
     // Default offset 28: baseline clearance = (msg.y - 6) - (msg.y - 28 + 14) = 8
-    const baselineClearance = (msgAfter.y - 6) - (divider.y + 14)
+    const baselineClearance = msgAfter.y - 6 - (divider.y + 14)
     expect(baselineClearance).toBe(8)
   })
 })

@@ -10,13 +10,12 @@
 // ============================================================================
 
 import { parseSequenceDiagram } from '../sequence/parser.ts'
-import type { SequenceDiagram, Block } from '../sequence/types.ts'
-import type { Canvas, AsciiConfig, RoleCanvas, CharRole, AsciiTheme, ColorMode } from './types.ts'
-import { mkCanvas, mkRoleCanvas, canvasToString, increaseSize, increaseRoleCanvasSize, setRole } from './canvas.ts'
-import { splitLines, maxLineWidth, lineCount } from './multiline-utils.ts'
+import { canvasToString, increaseRoleCanvasSize, increaseSize, mkCanvas, mkRoleCanvas, setRole } from './canvas.ts'
+import { lineCount, maxLineWidth, splitLines } from './multiline-utils.ts'
+import type { AsciiConfig, AsciiTheme, CharRole, ColorMode } from './types.ts'
 
 /** Classify a box-drawing character as 'border' or 'text'. */
-function classifyBoxChar(ch: string): CharRole {
+function _classifyBoxChar(ch: string): CharRole {
   if (/^[┌┐└┘├┤┬┴┼│─╭╮╰╯+\-|]$/.test(ch)) return 'border'
   return 'text'
 }
@@ -26,8 +25,16 @@ function classifyBoxChar(ch: string): CharRole {
  *
  * Pipeline: parse → layout (columns + rows) → draw onto canvas → string.
  */
-export function renderSequenceAscii(text: string, config: AsciiConfig, colorMode?: ColorMode, theme?: AsciiTheme): string {
-  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0 && !l.startsWith('%%'))
+export function renderSequenceAscii(
+  text: string,
+  config: AsciiConfig,
+  colorMode?: ColorMode,
+  theme?: AsciiTheme,
+): string {
+  const lines = text
+    .split('\n')
+    .map(l => l.trim())
+    .filter(l => l.length > 0 && !l.startsWith('%%'))
   const diagram = parseSequenceDiagram(lines)
 
   if (diagram.actors.length === 0) return ''
@@ -49,7 +56,9 @@ export function renderSequenceAscii(text: string, config: AsciiConfig, colorMode
   // ---- LAYOUT: compute lifeline X positions ----
 
   const actorIdx = new Map<string, number>()
-  diagram.actors.forEach((a, i) => actorIdx.set(a.id, i))
+  diagram.actors.forEach((a, i) => {
+    actorIdx.set(a.id, i)
+  })
 
   const boxPad = 1
   // Use max line width for multi-line actor labels
@@ -81,11 +90,7 @@ export function renderSequenceAscii(text: string, config: AsciiConfig, colorMode
   // Compute lifeline x-positions (greedy left-to-right)
   const llX: number[] = [halfBox[0]!]
   for (let i = 1; i < diagram.actors.length; i++) {
-    const gap = Math.max(
-      halfBox[i - 1]! + halfBox[i]! + 2,
-      adjMaxWidth[i - 1]! + 2,
-      10,
-    )
+    const gap = Math.max(halfBox[i - 1]! + halfBox[i]! + 2, adjMaxWidth[i - 1]! + 2, 10)
     llX[i] = llX[i - 1]! + gap
   }
 
@@ -98,7 +103,13 @@ export function renderSequenceAscii(text: string, config: AsciiConfig, colorMode
   const blockStartY = new Map<number, number>()
   const blockEndY = new Map<number, number>()
   const divYMap = new Map<string, number>() // "blockIdx:divIdx" → y
-  const notePositions: Array<{ x: number; y: number; width: number; height: number; lines: string[] }> = []
+  const notePositions: Array<{
+    x: number
+    y: number
+    width: number
+    height: number
+    lines: string[]
+  }> = []
 
   let curY = actorBoxH // start right below header boxes
 
@@ -138,8 +149,8 @@ export function renderSequenceAscii(text: string, config: AsciiConfig, colorMode
     } else {
       // Normal message: label row(s) then arrow row
       msgLabelY[m] = curY
-      msgArrowY[m] = curY + msgLineCount  // arrow goes after all label lines
-      curY += msgLineCount + 1  // label lines + arrow row
+      msgArrowY[m] = curY + msgLineCount // arrow goes after all label lines
+      curY += msgLineCount + 1 // label lines + arrow row
     }
 
     // Notes after this message
@@ -169,7 +180,13 @@ export function renderSequenceAscii(text: string, config: AsciiConfig, colorMode
         }
         nx = Math.max(0, nx)
 
-        notePositions.push({ x: nx, y: curY, width: nWidth, height: nHeight, lines: nLines })
+        notePositions.push({
+          x: nx,
+          y: curY,
+          width: nWidth,
+          height: nHeight,
+          lines: nLines,
+        })
         curY += nHeight
       }
     }
@@ -223,7 +240,7 @@ export function renderSequenceAscii(text: string, config: AsciiConfig, colorMode
     const lines = splitLines(label)
     const maxW = maxLineWidth(label)
     const w = maxW + 2 * boxPad + 2
-    const h = lines.length + 2  // lines + top/bottom border
+    const h = lines.length + 2 // lines + top/bottom border
     const left = cx - Math.floor(w / 2)
 
     // Top border
@@ -310,7 +327,7 @@ export function renderSequenceAscii(text: string, config: AsciiConfig, colorMode
       }
 
       // Row 2: arrow-back + horizontal + bottom-right corner
-      const arrowChar = isFilled ? (useAscii ? '<' : '◀') : (useAscii ? '<' : '◁')
+      const arrowChar = isFilled ? (useAscii ? '<' : '◀') : useAscii ? '<' : '◁'
       setC(fromX, y0 + 2, arrowChar, 'arrow')
       for (let x = fromX + 1; x < fromX + loopW; x++) setC(x, y0 + 2, lineChar, 'line')
       setC(fromX + loopW, y0 + 2, useAscii ? '+' : '┘', 'corner')
@@ -338,11 +355,11 @@ export function renderSequenceAscii(text: string, config: AsciiConfig, colorMode
       if (leftToRight) {
         for (let x = fromX + 1; x < toX; x++) setC(x, arrowY, lineChar, 'line')
         // Arrowhead at destination
-        const ah = isFilled ? (useAscii ? '>' : '▶') : (useAscii ? '>' : '▷')
+        const ah = isFilled ? (useAscii ? '>' : '▶') : useAscii ? '>' : '▷'
         setC(toX, arrowY, ah, 'arrow')
       } else {
         for (let x = toX + 1; x < fromX; x++) setC(x, arrowY, lineChar, 'line')
-        const ah = isFilled ? (useAscii ? '<' : '◀') : (useAscii ? '<' : '◁')
+        const ah = isFilled ? (useAscii ? '<' : '◀') : useAscii ? '<' : '◁'
         setC(toX, arrowY, ah, 'arrow')
       }
     }

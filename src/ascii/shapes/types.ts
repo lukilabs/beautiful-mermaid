@@ -2,7 +2,7 @@
 // Shape renderer types — interface for pluggable ASCII shape renderers
 // ============================================================================
 
-import type { Canvas, DrawingCoord, Direction, AsciiNodeShape } from '../types.ts'
+import type { AsciiNodeShape, Canvas, Direction, DrawingCoord } from '../types.ts'
 
 /**
  * Dimensions calculated for a shape, used by layout and rendering.
@@ -50,21 +50,13 @@ export interface ShapeRenderer {
    * Render the shape to a canvas.
    * Returns a standalone canvas containing just the shape.
    */
-  render(
-    label: string,
-    dimensions: ShapeDimensions,
-    options: ShapeRenderOptions
-  ): Canvas
+  render(label: string, dimensions: ShapeDimensions, options: ShapeRenderOptions): Canvas
 
   /**
    * Get the edge attachment point for a given direction.
    * Used by edge routing to determine where edges connect.
    */
-  getAttachmentPoint(
-    dir: Direction,
-    dimensions: ShapeDimensions,
-    baseCoord: DrawingCoord
-  ): DrawingCoord
+  getAttachmentPoint(dir: Direction, dimensions: ShapeDimensions, baseCoord: DrawingCoord): DrawingCoord
 }
 
 /**
