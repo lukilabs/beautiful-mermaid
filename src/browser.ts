@@ -7,18 +7,21 @@
 // Bundled via `Bun.build({ target: 'browser' })` in index.ts.
 // ============================================================================
 
-import { renderMermaidSVGAsync } from './index.ts'
-import { renderMermaidASCII, diagramColorsToAsciiTheme } from './ascii/index.ts'
-import { THEMES } from './theme.ts'
-import { getSeriesColor, CHART_ACCENT_FALLBACK } from './xychart/colors.ts'
+import {
+	diagramColorsToAsciiTheme,
+	renderMermaidASCII,
+} from "./ascii/index.ts";
+import { renderMermaidSVGAsync } from "./index.ts";
+import { THEMES } from "./theme.ts";
+import { CHART_ACCENT_FALLBACK, getSeriesColor } from "./xychart/colors.ts";
 
-declare const window: unknown
+declare const window: unknown;
 
-;(window as Record<string, unknown>).__mermaid = {
-  renderMermaidSVGAsync,
-  renderMermaidASCII,
-  diagramColorsToAsciiTheme,
-  THEMES,
-  getSeriesColor,
-  CHART_ACCENT_FALLBACK,
-}
+(window as Record<string, unknown>).__mermaid = {
+	renderMermaidSVGAsync,
+	renderMermaidASCII,
+	diagramColorsToAsciiTheme,
+	THEMES,
+	getSeriesColor,
+	CHART_ACCENT_FALLBACK,
+};

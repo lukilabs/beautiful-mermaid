@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 420" width="700" height="420" style="--bg:#FFFFFF;--fg:#27272A;background:var(--bg)">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap');
+  text { font-family: 'Inter', system-ui, sans-serif; }
+  svg {
+    /* Derived from --bg and --fg (overridable via --line, --accent, etc.) */
+    --_text:          var(--fg);
+    --_text-sec:      var(--muted, color-mix(in srgb, var(--fg) 60%, var(--bg)));
+    --_text-muted:    var(--muted, color-mix(in srgb, var(--fg) 40%, var(--bg)));
+    --_text-faint:    color-mix(in srgb, var(--fg) 25%, var(--bg));
+    --_line:          var(--line, color-mix(in srgb, var(--fg) 50%, var(--bg)));
+    --_arrow:         var(--accent, color-mix(in srgb, var(--fg) 85%, var(--bg)));
+    --_node-fill:     var(--surface, color-mix(in srgb, var(--fg) 3%, var(--bg)));
+    --_node-stroke:   var(--border, color-mix(in srgb, var(--fg) 20%, var(--bg)));
+    --_group-fill:    var(--bg);
+    --_group-hdr:     color-mix(in srgb, var(--fg) 5%, var(--bg));
+    --_inner-stroke:  color-mix(in srgb, var(--fg) 12%, var(--bg));
+    --_key-badge:     color-mix(in srgb, var(--fg) 10%, var(--bg));
+  }
+</style>
+<defs>
+  <marker id="c4-arrow" viewBox="0 0 8 10" refX="8" refY="5" markerWidth="8" markerHeight="10" orient="auto">
+    <path d="M 0 0 L 8 5 L 0 10 Z" fill="var(--_arrow)" />
+  </marker>
+</defs>
+<text x="350" y="24" text-anchor="middle" dy="0.35em" font-size="16" font-weight="700" fill="var(--_text)">System Context diagram for Internet Banking System</text>
+<circle cx="350" cy="48" r="14" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+<rect x="270" y="64" width="160" height="106" rx="6" ry="6" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+<text x="350" y="111" text-anchor="middle" dy="0.35em" font-size="13" font-weight="600" fill="var(--_text)">Banking Customer</text>
+<text x="350" y="129" text-anchor="middle" dy="0.35em" font-size="11" font-weight="400" fill="var(--_text-sec)">A customer of the bank</text>
+<rect x="170" y="230" width="200" height="100" rx="6" ry="6" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+<text x="270" y="274" text-anchor="middle" dy="0.35em" font-size="13" font-weight="600" fill="var(--_text)">Internet Banking System</text>
+<text x="270" y="292" text-anchor="middle" dy="0.35em" font-size="11" font-weight="400" fill="var(--_text-sec)">Allows customers to view information about their bank accounts</text>
+<rect x="470" y="230" width="180" height="100" rx="6" ry="6" fill="var(--_text-muted)" stroke="var(--_node-stroke)" stroke-width="1" />
+<text x="560" y="274" text-anchor="middle" dy="0.35em" font-size="13" font-weight="600" fill="var(--_text)">E-mail System</text>
+<text x="560" y="292" text-anchor="middle" dy="0.35em" font-size="11" font-weight="400" fill="var(--_text-sec)">The internal Microsoft Exchange e-mail system</text>
+<polyline points="310,170 270,230" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#c4-arrow)" />
+<rect x="270.701" y="191" width="38.598" height="18" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="0.5" />
+<text x="290" y="200" text-anchor="middle" dy="0.35em" font-size="11" font-weight="400" fill="var(--_text-muted)">Uses</text>
+<polyline points="370,280 470,280" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#c4-arrow)" />
+<rect x="366.546" y="271" width="106.90800000000002" height="18" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="0.5" />
+<text x="420" y="280" text-anchor="middle" dy="0.35em" font-size="11" font-weight="400" fill="var(--_text-muted)">Sends e-mails using</text>
+</svg>

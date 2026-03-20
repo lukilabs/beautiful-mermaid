@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 680" width="760" height="680" style="--bg:#FFFFFF;--fg:#27272A;background:var(--bg)">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap');
+  text { font-family: 'Inter', system-ui, sans-serif; }
+  svg {
+    /* Derived from --bg and --fg (overridable via --line, --accent, etc.) */
+    --_text:          var(--fg);
+    --_text-sec:      var(--muted, color-mix(in srgb, var(--fg) 60%, var(--bg)));
+    --_text-muted:    var(--muted, color-mix(in srgb, var(--fg) 40%, var(--bg)));
+    --_text-faint:    color-mix(in srgb, var(--fg) 25%, var(--bg));
+    --_line:          var(--line, color-mix(in srgb, var(--fg) 50%, var(--bg)));
+    --_arrow:         var(--accent, color-mix(in srgb, var(--fg) 85%, var(--bg)));
+    --_node-fill:     var(--surface, color-mix(in srgb, var(--fg) 3%, var(--bg)));
+    --_node-stroke:   var(--border, color-mix(in srgb, var(--fg) 20%, var(--bg)));
+    --_group-fill:    var(--bg);
+    --_group-hdr:     color-mix(in srgb, var(--fg) 5%, var(--bg));
+    --_inner-stroke:  color-mix(in srgb, var(--fg) 12%, var(--bg));
+    --_key-badge:     color-mix(in srgb, var(--fg) 10%, var(--bg));
+  }
+</style>
+<defs>
+<marker id="archimate-arrow-filled" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L10,4 L0,8 Z" fill="var(--_line)" /></marker>
+<marker id="archimate-arrow-open" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L10,4 L0,8" fill="none" stroke="var(--_line)" stroke-width="1.25" /></marker>
+<marker id="archimate-triangle-open" markerWidth="12" markerHeight="10" refX="11" refY="5" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L12,5 L0,10 Z" fill="var(--bg)" stroke="var(--_line)" stroke-width="1" /></marker>
+<marker id="archimate-diamond-filled" markerWidth="12" markerHeight="8" refX="1" refY="4" orient="auto" markerUnits="userSpaceOnUse"><path d="M6,0 L12,4 L6,8 L0,4 Z" fill="var(--_line)" /></marker>
+<marker id="archimate-diamond-open" markerWidth="12" markerHeight="8" refX="1" refY="4" orient="auto" markerUnits="userSpaceOnUse"><path d="M6,0 L12,4 L6,8 L0,4 Z" fill="var(--bg)" stroke="var(--_line)" stroke-width="1" /></marker>
+<marker id="archimate-circle-filled" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto" markerUnits="userSpaceOnUse"><circle cx="4" cy="4" r="3" fill="var(--_line)" /></marker>
+</defs>
+<rect x="20" y="20" width="720" height="180" rx="4" ry="4" fill="color-mix(in srgb, #F0C040 12%, var(--bg))" stroke="color-mix(in srgb, #F0C040 30%, var(--_node-stroke))" stroke-width="1" />
+<text x="28" y="36" font-size="11" font-weight="600" fill="var(--_text-muted)">Business</text>
+<rect x="20" y="220" width="720" height="180" rx="4" ry="4" fill="color-mix(in srgb, #4488CC 12%, var(--bg))" stroke="color-mix(in srgb, #4488CC 30%, var(--_node-stroke))" stroke-width="1" />
+<text x="28" y="236" font-size="11" font-weight="600" fill="var(--_text-muted)">Application</text>
+<rect x="20" y="420" width="720" height="220" rx="4" ry="4" fill="color-mix(in srgb, #44AA66 12%, var(--bg))" stroke="color-mix(in srgb, #44AA66 30%, var(--_node-stroke))" stroke-width="1" />
+<text x="28" y="436" font-size="11" font-weight="600" fill="var(--_text-muted)">Technology</text>
+<polyline points="170,75 220,75" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#archimate-arrow-open)" />
+<polyline points="380,75 440,75" fill="none" stroke="var(--_line)" stroke-width="1" stroke-dasharray="6 4" marker-end="url(#archimate-arrow-open)" />
+<polyline points="380,65 600,65" fill="none" stroke="var(--_line)" stroke-width="1" stroke-dasharray="6 4" marker-end="url(#archimate-arrow-open)" />
+<polyline points="105,260 105,100" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#archimate-arrow-open)" />
+<polyline points="170,260 130,100" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#archimate-arrow-open)" />
+<polyline points="450,260 500,100" fill="none" stroke="var(--_line)" stroke-width="1" stroke-dasharray="6 4" marker-end="url(#archimate-arrow-open)" />
+<polyline points="480,260 665,100" fill="none" stroke="var(--_line)" stroke-width="1" stroke-dasharray="6 4" marker-end="url(#archimate-arrow-open)" />
+<polyline points="520,285 570,285" fill="none" stroke="var(--_line)" stroke-width="1" stroke-dasharray="6 4" marker-end="url(#archimate-arrow-filled)" />
+<polyline points="125,460 400,310" fill="none" stroke="var(--_line)" stroke-width="1" marker-start="url(#archimate-circle-filled)" marker-end="url(#archimate-arrow-filled)" />
+<polyline points="380,460 600,310" fill="none" stroke="var(--_line)" stroke-width="1" marker-start="url(#archimate-circle-filled)" marker-end="url(#archimate-arrow-filled)" />
+<polyline points="430,485 190,485" fill="none" stroke="var(--_line)" stroke-width="1" marker-start="url(#archimate-circle-filled)" marker-end="url(#archimate-arrow-filled)" />
+<polyline points="590,485 190,485" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#archimate-arrow-open)" />
+<rect x="40" y="50" width="130" height="50" rx="4" ry="4" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+<text x="105" y="77" text-anchor="middle" dy="0.35em" font-size="13" font-weight="500" fill="var(--_text)">Customer</text>
+<text x="164" y="62" text-anchor="end" font-size="9" font-weight="400" fill="var(--_text-faint)">Actor</text>
+<rect x="220" y="50" width="160" height="50" rx="4" ry="4" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+<text x="300" y="77" text-anchor="middle" dy="0.35em" font-size="13" font-weight="500" fill="var(--_text)">Banking Service</text>
+<text x="374" y="62" text-anchor="end" font-size="9" font-weight="400" fill="var(--_text-faint)">Service</text>
+<rect x="440" y="50" width="120" height="50" rx="4" ry="4" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+<text x="500" y="77" text-anchor="middle" dy="0.35em" font-size="13" font-weight="500" fill="var(--_text)">Payment</text>
+<text x="554" y="62" text-anchor="end" font-size="9" font-weight="400" fill="var(--_text-faint)">Process</text>
+<rect x="600" y="50" width="130" height="50" rx="4" ry="4" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+<text x="665" y="77" text-anchor="middle" dy="0.35em" font-size="13" font-weight="500" fill="var(--_text)">Account Mgmt</text>
+<text x="724" y="62" text-anchor="end" font-size="9" font-weight="400" fill="var(--_text-faint)">Process</text>
+<rect x="40" y="260" width="130" height="50" rx="4" ry="4" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+<text x="105" y="287" text-anchor="middle" dy="0.35em" font-size="13" font-weight="500" fill="var(--_text)">Mobile App</text>
+<text x="164" y="272" text-anchor="end" font-size="9" font-weight="400" fill="var(--_text-faint)">Component</text>
+<rect x="200" y="260" width="130" height="50" rx="4" ry="4" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+<text x="265" y="287" text-anchor="middle" dy="0.35em" font-size="13" font-weight="500" fill="var(--_text)">Web Portal</text>
+<text x="324" y="272" text-anchor="end" font-size="9" font-weight="400" fill="var(--_text-faint)">Component</text>
+<rect x="380" y="260" width="140" height="50" rx="4" ry="4" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+<text x="450" y="287" text-anchor="middle" dy="0.35em" font-size="13" font-weight="500" fill="var(--_text)">Core Banking</text>
+<text x="514" y="272" text-anchor="end" font-size="9" font-weight="400" fill="var(--_text-faint)">Component</text>
+<rect x="570" y="260" width="140" height="50" rx="4" ry="4" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+<text x="640" y="287" text-anchor="middle" dy="0.35em" font-size="13" font-weight="500" fill="var(--_text)">Account Data</text>
+<text x="704" y="272" text-anchor="end" font-size="9" font-weight="400" fill="var(--_text-faint)">Data Object</text>
+<rect x="60" y="460" width="130" height="50" rx="4" ry="4" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+<text x="125" y="487" text-anchor="middle" dy="0.35em" font-size="13" font-weight="500" fill="var(--_text)">App Server</text>
+<text x="184" y="472" text-anchor="end" font-size="9" font-weight="400" fill="var(--_text-faint)">Node</text>
+<rect x="230" y="460" width="150" height="50" rx="4" ry="4" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+<text x="305" y="487" text-anchor="middle" dy="0.35em" font-size="13" font-weight="500" fill="var(--_text)">Database Server</text>
+<text x="374" y="472" text-anchor="end" font-size="9" font-weight="400" fill="var(--_text-faint)">Node</text>
+<rect x="430" y="460" width="120" height="50" rx="4" ry="4" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+<text x="490" y="487" text-anchor="middle" dy="0.35em" font-size="13" font-weight="500" fill="var(--_text)">Docker</text>
+<text x="544" y="472" text-anchor="end" font-size="9" font-weight="400" fill="var(--_text-faint)">Artifact</text>
+<rect x="590" y="460" width="140" height="50" rx="4" ry="4" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="1" />
+<text x="660" y="487" text-anchor="middle" dy="0.35em" font-size="13" font-weight="500" fill="var(--_text)">Load Balancer</text>
+<text x="724" y="472" text-anchor="end" font-size="9" font-weight="400" fill="var(--_text-faint)">Device</text>
+<rect x="172.949" y="66.5" width="44.102" height="17" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="0.5" />
+<text x="195" y="75" text-anchor="middle" dy="0.35em" font-size="11" font-weight="400" fill="var(--_text-muted)">serves</text>
+<rect x="380.227" y="66.5" width="59.54600000000001" height="17" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="0.5" />
+<text x="410" y="75" text-anchor="middle" dy="0.35em" font-size="11" font-weight="400" fill="var(--_text-muted)">realization</text>
+<rect x="460.227" y="56.5" width="59.54600000000001" height="17" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="0.5" />
+<text x="490" y="65" text-anchor="middle" dy="0.35em" font-size="11" font-weight="400" fill="var(--_text-muted)">realization</text>
+<rect x="81.761" y="171.5" width="46.478" height="17" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="0.5" />
+<text x="105" y="180" text-anchor="middle" dy="0.35em" font-size="11" font-weight="400" fill="var(--_text-muted)">serving</text>
+<rect x="126.761" y="171.5" width="46.478" height="17" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="0.5" />
+<text x="150" y="180" text-anchor="middle" dy="0.35em" font-size="11" font-weight="400" fill="var(--_text-muted)">serving</text>
+<rect x="445.227" y="171.5" width="59.54600000000001" height="17" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="0.5" />
+<text x="475" y="180" text-anchor="middle" dy="0.35em" font-size="11" font-weight="400" fill="var(--_text-muted)">realization</text>
+<rect x="542.727" y="171.5" width="59.54600000000001" height="17" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="0.5" />
+<text x="572.5" y="180" text-anchor="middle" dy="0.35em" font-size="11" font-weight="400" fill="var(--_text-muted)">realization</text>
+<rect x="522.355" y="276.5" width="45.29" height="17" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="0.5" />
+<text x="545" y="285" text-anchor="middle" dy="0.35em" font-size="11" font-weight="400" fill="var(--_text-muted)">access</text>
+<rect x="230.945" y="376.5" width="63.11000000000001" height="17" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="0.5" />
+<text x="262.5" y="385" text-anchor="middle" dy="0.35em" font-size="11" font-weight="400" fill="var(--_text-muted)">assignment</text>
+<rect x="458.445" y="376.5" width="63.11000000000001" height="17" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="0.5" />
+<text x="490" y="385" text-anchor="middle" dy="0.35em" font-size="11" font-weight="400" fill="var(--_text-muted)">assignment</text>
+<rect x="278.445" y="476.5" width="63.11000000000001" height="17" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="0.5" />
+<text x="310" y="485" text-anchor="middle" dy="0.35em" font-size="11" font-weight="400" fill="var(--_text-muted)">assignment</text>
+<rect x="366.761" y="476.5" width="46.478" height="17" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="0.5" />
+<text x="390" y="485" text-anchor="middle" dy="0.35em" font-size="11" font-weight="400" fill="var(--_text-muted)">serving</text>
+
+
+
+
+
+
+
+
+
+
+
+
+</svg>

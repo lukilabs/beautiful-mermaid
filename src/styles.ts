@@ -7,46 +7,51 @@
 // contains font metrics, spacing constants, and stroke widths.
 // ============================================================================
 
-import { measureTextWidth } from './text-metrics'
+import { measureTextWidth } from "./text-metrics";
 
 /** Average character width in px at the given font size and weight (proportional font) */
-export function estimateTextWidth(text: string, fontSize: number, fontWeight: number): number {
-  // Delegate to variable-width character measurement for better accuracy
-  // with mixed character sets (Latin narrow/wide, CJK, emoji, etc.)
-  return measureTextWidth(text, fontSize, fontWeight)
+export function estimateTextWidth(
+	text: string,
+	fontSize: number,
+	fontWeight: number,
+): number {
+	// Delegate to variable-width character measurement for better accuracy
+	// with mixed character sets (Latin narrow/wide, CJK, emoji, etc.)
+	return measureTextWidth(text, fontSize, fontWeight);
 }
 
 /** Average character width in px for monospace fonts (uniform glyph width) */
 export function estimateMonoTextWidth(text: string, fontSize: number): number {
-  // Monospace fonts have uniform character width — 0.6 of fontSize matches actual
-  // glyph widths for JetBrains Mono / SF Mono / Fira Code at small sizes (11px).
-  // Previous value of 0.55 underestimated widths, causing class member labels to
-  // extend beyond their box boundaries.
-  return text.length * fontSize * 0.6
+	// Monospace fonts have uniform character width — 0.6 of fontSize matches actual
+	// glyph widths for JetBrains Mono / SF Mono / Fira Code at small sizes (11px).
+	// Previous value of 0.55 underestimated widths, causing class member labels to
+	// extend beyond their box boundaries.
+	return text.length * fontSize * 0.6;
 }
 
 /** Monospace font family used for code-like text (class members, types) */
-export const MONO_FONT = "'JetBrains Mono'" as const
+export const MONO_FONT = "'JetBrains Mono'" as const;
 
 /** Full CSS fallback chain for monospace text */
-export const MONO_FONT_STACK = `${MONO_FONT}, 'SF Mono', 'Fira Code', ui-monospace, monospace` as const
+export const MONO_FONT_STACK =
+	`${MONO_FONT}, 'SF Mono', 'Fira Code', ui-monospace, monospace` as const;
 
 /** Fixed font sizes used in the renderer (in px) */
 export const FONT_SIZES = {
-  /** Node label text */
-  nodeLabel: 13,
-  /** Edge label text */
-  edgeLabel: 11,
-  /** Subgraph header text */
-  groupHeader: 12,
-} as const
+	/** Node label text */
+	nodeLabel: 13,
+	/** Edge label text */
+	edgeLabel: 11,
+	/** Subgraph header text */
+	groupHeader: 12,
+} as const;
 
 /** Font weights used per element type */
 export const FONT_WEIGHTS = {
-  nodeLabel: 500,
-  edgeLabel: 400,
-  groupHeader: 600,
-} as const
+	nodeLabel: 500,
+	edgeLabel: 400,
+	groupHeader: 600,
+} as const;
 
 // ============================================================================
 // Spacing & sizing constants
@@ -55,25 +60,25 @@ export const FONT_WEIGHTS = {
 /** Vertical gap between a subgraph header band and the content area below it (px).
  * Without this, nested subgraph headers sit flush against their parent's header band.
  * Increased from 8 to 12 to provide more clearance for edges routing near headers. */
-export const GROUP_HEADER_CONTENT_PAD = 12
+export const GROUP_HEADER_CONTENT_PAD = 12;
 
 /** Padding inside node shapes */
 export const NODE_PADDING = {
-  /** Horizontal padding inside rectangles/rounded/stadium (increased from 16 for better label fit) */
-  horizontal: 20,
-  /** Vertical padding inside rectangles/rounded/stadium */
-  vertical: 10,
-  /** Extra padding for diamond shapes (they need more space due to rotation) */
-  diamondExtra: 24,
-} as const
+	/** Horizontal padding inside rectangles/rounded/stadium (increased from 16 for better label fit) */
+	horizontal: 20,
+	/** Vertical padding inside rectangles/rounded/stadium */
+	vertical: 10,
+	/** Extra padding for diamond shapes (they need more space due to rotation) */
+	diamondExtra: 24,
+} as const;
 
 /** Stroke widths per element type (in px) */
 export const STROKE_WIDTHS = {
-  outerBox: 1,
-  innerBox: 0.75,
-  /** Edge connector stroke (increased from 0.75 for better visibility) */
-  connector: 1,
-} as const
+	outerBox: 1,
+	innerBox: 0.75,
+	/** Edge connector stroke (increased from 0.75 for better visibility) */
+	connector: 1,
+} as const;
 
 /**
  * Vertical shift applied to all text elements for font-agnostic centering.
@@ -86,11 +91,10 @@ export const STROKE_WIDTHS = {
  * The 0.35em value approximates the distance from alphabetic baseline to visual
  * center of Latin text. Using `em` units ensures it scales with font size.
  */
-export const TEXT_BASELINE_SHIFT = '0.35em' as const
+export const TEXT_BASELINE_SHIFT = "0.35em" as const;
 
 /** Arrow head dimensions — matches spec: 8px wide × ~5px tall */
 export const ARROW_HEAD = {
-  width: 8,
-  height: 5,
-} as const
-
+	width: 8,
+	height: 5,
+} as const;

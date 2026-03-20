@@ -16,60 +16,70 @@
 //   const ascii = renderMermaidASCII('graph LR\n  A --> B')
 // ============================================================================
 
-import { parseMermaid } from '../parser.ts'
-import { convertToAsciiGraph } from './converter.ts'
-import { createMapping } from './grid.ts'
-import { drawGraph } from './draw.ts'
-import { canvasToString, flipCanvasVertically, flipRoleCanvasVertically } from './canvas.ts'
-import { renderSequenceAscii } from './sequence.ts'
-import { renderClassAscii } from './class-diagram.ts'
-import { renderErAscii } from './er-diagram.ts'
-import { renderXYChartAscii } from './xychart.ts'
-import { detectColorMode, DEFAULT_ASCII_THEME, diagramColorsToAsciiTheme } from './ansi.ts'
-import type { AsciiConfig, AsciiTheme, ColorMode } from './types.ts'
+import { parseMermaid } from "../parser.ts";
+import {
+	DEFAULT_ASCII_THEME,
+	detectColorMode,
+	diagramColorsToAsciiTheme,
+} from "./ansi.ts";
+import {
+	canvasToString,
+	flipCanvasVertically,
+	flipRoleCanvasVertically,
+} from "./canvas.ts";
+import { renderClassAscii } from "./class-diagram.ts";
+import { convertToAsciiGraph } from "./converter.ts";
+import { drawGraph } from "./draw.ts";
+import { renderErAscii } from "./er-diagram.ts";
+import { createMapping } from "./grid.ts";
+import { renderSequenceAscii } from "./sequence.ts";
+import type { AsciiConfig, AsciiTheme, ColorMode } from "./types.ts";
+import { renderXYChartAscii } from "./xychart.ts";
 
 // Re-export types for external use
-export type { AsciiTheme, ColorMode }
-export { DEFAULT_ASCII_THEME, detectColorMode, diagramColorsToAsciiTheme }
+export type { AsciiTheme, ColorMode };
+export { DEFAULT_ASCII_THEME, detectColorMode, diagramColorsToAsciiTheme };
 
 export interface AsciiRenderOptions {
-  /** true = ASCII chars (+,-,|,>), false = Unicode box-drawing (┌,─,│,►). Default: false */
-  useAscii?: boolean
-  /** Horizontal spacing between nodes. Default: 5 */
-  paddingX?: number
-  /** Vertical spacing between nodes. Default: 5 */
-  paddingY?: number
-  /** Padding inside node boxes. Default: 1 */
-  boxBorderPadding?: number
-  /**
-   * Color mode for output.
-   * - 'none': No colors (plain text)
-   * - 'auto': Auto-detect (terminal ANSI capabilities, or HTML in browsers)
-   * - 'ansi16': 16-color ANSI
-   * - 'ansi256': 256-color xterm
-   * - 'truecolor': 24-bit RGB
-   * - 'html': HTML <span> tags with inline color styles (for browser rendering)
-   * Default: 'auto'
-   */
-  colorMode?: ColorMode | 'auto'
-  /** Theme colors for ASCII output. Uses default theme if not provided. */
-  theme?: Partial<AsciiTheme>
+	/** true = ASCII chars (+,-,|,>), false = Unicode box-drawing (┌,─,│,►). Default: false */
+	useAscii?: boolean;
+	/** Horizontal spacing between nodes. Default: 5 */
+	paddingX?: number;
+	/** Vertical spacing between nodes. Default: 5 */
+	paddingY?: number;
+	/** Padding inside node boxes. Default: 1 */
+	boxBorderPadding?: number;
+	/**
+	 * Color mode for output.
+	 * - 'none': No colors (plain text)
+	 * - 'auto': Auto-detect (terminal ANSI capabilities, or HTML in browsers)
+	 * - 'ansi16': 16-color ANSI
+	 * - 'ansi256': 256-color xterm
+	 * - 'truecolor': 24-bit RGB
+	 * - 'html': HTML <span> tags with inline color styles (for browser rendering)
+	 * Default: 'auto'
+	 */
+	colorMode?: ColorMode | "auto";
+	/** Theme colors for ASCII output. Uses default theme if not provided. */
+	theme?: Partial<AsciiTheme>;
 }
 
 /**
  * Detect the diagram type from the mermaid source text.
  * Mirrors the detection logic in src/index.ts for the SVG renderer.
  */
-function detectDiagramType(text: string): 'flowchart' | 'sequence' | 'class' | 'er' | 'xychart' {
-  const firstLine = text.trim().split('\n')[0]?.trim().toLowerCase() ?? ''
+function detectDiagramType(
+	text: string,
+): "flowchart" | "sequence" | "class" | "er" | "xychart" {
+	const firstLine = text.trim().split("\n")[0]?.trim().toLowerCase() ?? "";
 
-  if (/^xychart(-beta)?\b/.test(firstLine)) return 'xychart'
-  if (/^sequencediagram\s*$/.test(firstLine)) return 'sequence'
-  if (/^classdiagram\s*$/.test(firstLine)) return 'class'
-  if (/^erdiagram\s*$/.test(firstLine)) return 'er'
+	if (/^xychart(-beta)?\b/.test(firstLine)) return "xychart";
+	if (/^sequencediagram\s*$/.test(firstLine)) return "sequence";
+	if (/^classdiagram\s*$/.test(firstLine)) return "class";
+	if (/^erdiagram\s*$/.test(firstLine)) return "er";
 
-  // Default: flowchart/state (handled by parseMermaid internally)
-  return 'flowchart'
+	// Default: flowchart/state (handled by parseMermaid internally)
+	return "flowchart";
 }
 
 /**
@@ -99,73 +109,72 @@ function detectDiagramType(text: string): 'flowchart' | 'sequence' | 'class' | '
  * ```
  */
 export function renderMermaidASCII(
-  text: string,
-  options: AsciiRenderOptions = {},
+	text: string,
+	options: AsciiRenderOptions = {},
 ): string {
-  const config: AsciiConfig = {
-    useAscii: options.useAscii ?? false,
-    paddingX: options.paddingX ?? 5,
-    paddingY: options.paddingY ?? 5,
-    boxBorderPadding: options.boxBorderPadding ?? 1,
-    graphDirection: 'TD', // default, overridden for flowcharts below
-  }
+	const config: AsciiConfig = {
+		useAscii: options.useAscii ?? false,
+		paddingX: options.paddingX ?? 5,
+		paddingY: options.paddingY ?? 5,
+		boxBorderPadding: options.boxBorderPadding ?? 1,
+		graphDirection: "TD", // default, overridden for flowcharts below
+	};
 
-  // Resolve color mode ('auto' or unset → detect environment, otherwise use specified mode)
-  const colorMode: ColorMode = options.colorMode === 'auto' || options.colorMode === undefined
-    ? detectColorMode()
-    : options.colorMode
+	// Resolve color mode ('auto' or unset → detect environment, otherwise use specified mode)
+	const colorMode: ColorMode =
+		options.colorMode === "auto" || options.colorMode === undefined
+			? detectColorMode()
+			: options.colorMode;
 
-  // Merge user theme with defaults
-  const theme: AsciiTheme = { ...DEFAULT_ASCII_THEME, ...options.theme }
+	// Merge user theme with defaults
+	const theme: AsciiTheme = { ...DEFAULT_ASCII_THEME, ...options.theme };
 
-  const diagramType = detectDiagramType(text)
+	const diagramType = detectDiagramType(text);
 
-  switch (diagramType) {
-    case 'xychart':
-      return renderXYChartAscii(text, config, colorMode, theme)
+	switch (diagramType) {
+		case "xychart":
+			return renderXYChartAscii(text, config, colorMode, theme);
 
-    case 'sequence':
-      return renderSequenceAscii(text, config, colorMode, theme)
+		case "sequence":
+			return renderSequenceAscii(text, config, colorMode, theme);
 
-    case 'class':
-      return renderClassAscii(text, config, colorMode, theme)
+		case "class":
+			return renderClassAscii(text, config, colorMode, theme);
 
-    case 'er':
-      return renderErAscii(text, config, colorMode, theme)
+		case "er":
+			return renderErAscii(text, config, colorMode, theme);
+		default: {
+			// Flowchart + state diagram pipeline (original)
+			const parsed = parseMermaid(text);
 
-    case 'flowchart':
-    default: {
-      // Flowchart + state diagram pipeline (original)
-      const parsed = parseMermaid(text)
+			// Normalize direction for grid layout.
+			// BT is laid out as TD then flipped vertically after drawing.
+			// RL is treated as LR (full RL support not yet implemented).
+			if (parsed.direction === "LR" || parsed.direction === "RL") {
+				config.graphDirection = "LR";
+			} else {
+				config.graphDirection = "TD";
+			}
 
-      // Normalize direction for grid layout.
-      // BT is laid out as TD then flipped vertically after drawing.
-      // RL is treated as LR (full RL support not yet implemented).
-      if (parsed.direction === 'LR' || parsed.direction === 'RL') {
-        config.graphDirection = 'LR'
-      } else {
-        config.graphDirection = 'TD'
-      }
+			const graph = convertToAsciiGraph(parsed, config);
+			createMapping(graph);
+			drawGraph(graph);
 
-      const graph = convertToAsciiGraph(parsed, config)
-      createMapping(graph)
-      drawGraph(graph)
+			// BT: flip the finished canvas vertically so the flow runs bottom→top.
+			// The grid layout ran as TD; flipping + character remapping produces BT.
+			if (parsed.direction === "BT") {
+				flipCanvasVertically(graph.canvas);
+				flipRoleCanvasVertically(graph.roleCanvas);
+			}
 
-      // BT: flip the finished canvas vertically so the flow runs bottom→top.
-      // The grid layout ran as TD; flipping + character remapping produces BT.
-      if (parsed.direction === 'BT') {
-        flipCanvasVertically(graph.canvas)
-        flipRoleCanvasVertically(graph.roleCanvas)
-      }
-
-      return canvasToString(graph.canvas, {
-        roleCanvas: graph.roleCanvas,
-        colorMode,
-        theme,
-      })
-    }
-  }
+			return canvasToString(graph.canvas, {
+				roleCanvas: graph.roleCanvas,
+				colorMode,
+				theme,
+			});
+		}
+	}
 }
 
 /** @deprecated Use `renderMermaidASCII` */
-export const renderMermaidAscii = renderMermaidASCII
+export const renderMermaidAscii = renderMermaidASCII;

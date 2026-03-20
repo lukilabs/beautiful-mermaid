@@ -9,138 +9,143 @@
  *   3. beautiful-mermaid SVG rendering (client-side via bundled renderer)
  */
 
-import { xychartSamples } from './xychart-samples-data.ts'
-import { THEMES } from './src/theme.ts'
-import { createHighlighter } from 'shiki'
+import { createHighlighter } from "shiki";
+import { THEMES } from "./src/theme.ts";
+import { xychartSamples } from "./xychart-samples-data.ts";
 
 function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
+	return text
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;")
+		.replace(/"/g, "&quot;");
 }
 
 function formatDescription(text: string): string {
-  return text.replace(/`([^`]+)`/g, '<code>$1</code>')
+	return text.replace(/`([^`]+)`/g, "<code>$1</code>");
 }
 
 const THEME_LABELS: Record<string, string> = {
-  'zinc-dark': 'Zinc Dark',
-  'tokyo-night': 'Tokyo Night',
-  'tokyo-night-storm': 'Tokyo Storm',
-  'tokyo-night-light': 'Tokyo Light',
-  'catppuccin-mocha': 'Catppuccin',
-  'catppuccin-latte': 'Latte',
-  'nord': 'Nord',
-  'nord-light': 'Nord Light',
-  'dracula': 'Dracula',
-  'github-light': 'GitHub',
-  'github-dark': 'GitHub Dark',
-  'solarized-light': 'Solarized',
-  'solarized-dark': 'Solar Dark',
-  'one-dark': 'One Dark',
-}
+	"zinc-dark": "Zinc Dark",
+	"tokyo-night": "Tokyo Night",
+	"tokyo-night-storm": "Tokyo Storm",
+	"tokyo-night-light": "Tokyo Light",
+	"catppuccin-mocha": "Catppuccin",
+	"catppuccin-latte": "Latte",
+	nord: "Nord",
+	"nord-light": "Nord Light",
+	dracula: "Dracula",
+	"github-light": "GitHub",
+	"github-dark": "GitHub Dark",
+	"solarized-light": "Solarized",
+	"solarized-dark": "Solar Dark",
+	"one-dark": "One Dark",
+};
 
 async function generateHtml(): Promise<string> {
-  const highlighter = await createHighlighter({
-    langs: ['mermaid'],
-    themes: ['github-light'],
-  })
+	const highlighter = await createHighlighter({
+		langs: ["mermaid"],
+		themes: ["github-light"],
+	});
 
-  // Bundle the mermaid renderer for client-side SVG rendering
-  const buildResult = await Bun.build({
-    entrypoints: [new URL('./src/browser.ts', import.meta.url).pathname],
-    target: 'browser',
-    format: 'esm',
-    minify: true,
-  })
-  const bundleJs = await buildResult.outputs[0].text()
+	// Bundle the mermaid renderer for client-side SVG rendering
+	const buildResult = await Bun.build({
+		entrypoints: [new URL("./src/browser.ts", import.meta.url).pathname],
+		target: "browser",
+		format: "esm",
+		minify: true,
+	});
+	const bundleJs = await buildResult.outputs[0].text();
 
-  // Group samples by category for TOC
-  const categories = new Map<string, number[]>()
-  xychartSamples.forEach((sample, i) => {
-    const cat = sample.category ?? 'Other'
-    if (!categories.has(cat)) categories.set(cat, [])
-    categories.get(cat)!.push(i)
-  })
+	// Group samples by category for TOC
+	const categories = new Map<string, number[]>();
+	xychartSamples.forEach((sample, i) => {
+		const cat = sample.category ?? "Other";
+		if (!categories.has(cat)) categories.set(cat, []);
+		categories.get(cat)!.push(i);
+	});
 
-  const tocSections = [...categories.entries()].map(([cat, indices]) => {
-    const items = indices.map(i => {
-      const title = xychartSamples[i]!.title
-      return `<li><a href="#sample-${i}"><span class="toc-num">${i + 1}.</span> ${escapeHtml(title)}</a></li>`
-    }).join('\n            ')
-    return `
+	const tocSections = [...categories.entries()]
+		.map(([cat, indices]) => {
+			const items = indices
+				.map((i) => {
+					const title = xychartSamples[i]!.title;
+					return `<li><a href="#sample-${i}"><span class="toc-num">${i + 1}.</span> ${escapeHtml(title)}</a></li>`;
+				})
+				.join("\n            ");
+			return `
         <div class="toc-category">
           <h3>${escapeHtml(cat)} (${indices.length})</h3>
           <ol start="${indices[0]! + 1}">
             ${items}
           </ol>
-        </div>`
-  }).join('\n')
+        </div>`;
+		})
+		.join("\n");
 
-  // Theme pills
-  const VISIBLE_THEMES = new Set(['dracula', 'solarized-light'])
+	// Theme pills
+	const VISIBLE_THEMES = new Set(["dracula", "solarized-light"]);
 
-  function buildThemePill(key: string, colors: { bg: string; fg: string }, active = false): string {
-    const isDark = parseInt(colors.bg.replace('#', '').slice(0, 2), 16) < 0x80
-    const shadow = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)'
-    const label = key === '' ? 'Default' : (THEME_LABELS[key] ?? key)
-    const activeClass = active ? ' active' : ''
-    return `<button class="theme-pill shadow-minimal${activeClass}" data-theme="${key}"><span class="theme-swatch" style="background:${colors.bg};box-shadow:inset 0 0 0 1px ${shadow}"></span>${escapeHtml(label)}</button>`
-  }
+	function buildThemePill(
+		key: string,
+		colors: { bg: string; fg: string },
+		active = false,
+	): string {
+		const isDark = parseInt(colors.bg.replace("#", "").slice(0, 2), 16) < 0x80;
+		const shadow = isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.1)";
+		const label = key === "" ? "Default" : (THEME_LABELS[key] ?? key);
+		const activeClass = active ? " active" : "";
+		return `<button class="theme-pill shadow-minimal${activeClass}" data-theme="${key}"><span class="theme-swatch" style="background:${colors.bg};box-shadow:inset 0 0 0 1px ${shadow}"></span>${escapeHtml(label)}</button>`;
+	}
 
-  const themeEntries = Object.entries(THEMES)
-  const visiblePills = [
-    '<button class="theme-pill shadow-minimal active" data-theme=""><span class="theme-swatch" style="background:#FFFFFF;box-shadow:inset 0 0 0 1px rgba(0,0,0,0.1)"></span>Default</button>',
-    ...themeEntries
-      .filter(([key]) => VISIBLE_THEMES.has(key))
-      .map(([key, colors]) => buildThemePill(key, colors)),
-  ]
-  const allDropdownPills = [
-    buildThemePill('', { bg: '#FFFFFF', fg: '#27272A' }, true),
-    ...themeEntries.map(([key, colors]) => buildThemePill(key, colors)),
-  ]
-  const totalThemes = allDropdownPills.length
+	const themeEntries = Object.entries(THEMES);
+	const visiblePills = [
+		'<button class="theme-pill shadow-minimal active" data-theme=""><span class="theme-swatch" style="background:#FFFFFF;box-shadow:inset 0 0 0 1px rgba(0,0,0,0.1)"></span>Default</button>',
+		...themeEntries
+			.filter(([key]) => VISIBLE_THEMES.has(key))
+			.map(([key, colors]) => buildThemePill(key, colors)),
+	];
+	const allDropdownPills = [
+		buildThemePill("", { bg: "#FFFFFF", fg: "#27272A" }, true),
+		...themeEntries.map(([key, colors]) => buildThemePill(key, colors)),
+	];
+	const totalThemes = allDropdownPills.length;
 
-  const themePillsHtml = `
+	const themePillsHtml = `
     <div class="theme-pills-inline">
-      ${visiblePills.join('\n      ')}
+      ${visiblePills.join("\n      ")}
     </div>
     <div class="theme-more-wrapper">
       <button class="theme-pill shadow-minimal" id="theme-more-btn">${totalThemes} Themes</button>
       <div class="theme-more-dropdown shadow-modal-small" id="theme-more-dropdown">
-        ${allDropdownPills.join('\n        ')}
+        ${allDropdownPills.join("\n        ")}
       </div>
-    </div>`
+    </div>`;
 
-  // Pre-highlight sources with Shiki
-  const highlightedSources = xychartSamples.map(sample => {
-    const fenced = '```mermaid\n' + sample.source.trim() + '\n```'
-    const html = highlighter.codeToHtml(fenced, {
-      lang: 'mermaid',
-      theme: 'github-light',
-    })
-    return html.replace(
-      /(<code>)<span class="line">.*?<\/span>\n/,
-      '$1'
-    ).replace(
-      /\n<span class="line">.*?<\/span>(<\/code>)/,
-      '$1'
-    )
-  })
+	// Pre-highlight sources with Shiki
+	const highlightedSources = xychartSamples.map((sample) => {
+		const fenced = "```mermaid\n" + sample.source.trim() + "\n```";
+		const html = highlighter.codeToHtml(fenced, {
+			lang: "mermaid",
+			theme: "github-light",
+		});
+		return html
+			.replace(/(<code>)<span class="line">.*?<\/span>\n/, "$1")
+			.replace(/\n<span class="line">.*?<\/span>(<\/code>)/, "$1");
+	});
 
-  // Build sample cards grouped by category
-  let currentCategory = ''
-  const sampleCards = xychartSamples.map((sample, i) => {
-    const cat = sample.category ?? 'Other'
-    let sectionHeader = ''
-    if (cat !== currentCategory) {
-      currentCategory = cat
-      sectionHeader = `\n  <h2 class="section-title" id="cat-${cat.toLowerCase().replace(/[^a-z0-9]+/g, '-')}">${escapeHtml(cat)}</h2>\n`
-    }
+	// Build sample cards grouped by category
+	let currentCategory = "";
+	const sampleCards = xychartSamples
+		.map((sample, i) => {
+			const cat = sample.category ?? "Other";
+			let sectionHeader = "";
+			if (cat !== currentCategory) {
+				currentCategory = cat;
+				sectionHeader = `\n  <h2 class="section-title" id="cat-${cat.toLowerCase().replace(/[^a-z0-9]+/g, "-")}">${escapeHtml(cat)}</h2>\n`;
+			}
 
-    return `${sectionHeader}
+			return `${sectionHeader}
     <section class="sample" id="sample-${i}">
       <div class="sample-header">
         <h2>${escapeHtml(sample.title)}</h2>
@@ -157,16 +162,17 @@ async function generateHtml(): Promise<string> {
           <div class="svg-loading">Rendering&hellip;</div>
         </div>
       </div>
-    </section>`
-  }).join('\n')
+    </section>`;
+		})
+		.join("\n");
 
-  // Build THEMES JSON for client-side use
-  const themesJson = JSON.stringify(THEMES)
+	// Build THEMES JSON for client-side use
+	const themesJson = JSON.stringify(THEMES);
 
-  // Build sources JSON for the parser
-  const sourcesJson = JSON.stringify(xychartSamples.map(s => s.source))
+	// Build sources JSON for the parser
+	const sourcesJson = JSON.stringify(xychartSamples.map((s) => s.source));
 
-  return `<!DOCTYPE html>
+	return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -1046,10 +1052,10 @@ ${bundleJs}
 if (window.__renderAllSvgs) window.__renderAllSvgs(window.__initThemeKey);
   </script>
 </body>
-</html>`
+</html>`;
 }
 
-const html = await generateHtml()
-const outPath = new URL('./xychart-test.html', import.meta.url).pathname
-await Bun.write(outPath, html)
-console.log(`Written to ${outPath} (${(html.length / 1024).toFixed(1)} KB)`)
+const html = await generateHtml();
+const outPath = new URL("./xychart-test.html", import.meta.url).pathname;
+await Bun.write(outPath, html);
+console.log(`Written to ${outPath} (${(html.length / 1024).toFixed(1)} KB)`);
