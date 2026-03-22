@@ -15,6 +15,7 @@
 // Types
 // ============================================================================
 
+
 /**
  * Diagram color configuration.
  *
@@ -298,7 +299,7 @@ export function svgOpenTag(
   const bgStyle = transparent ? '' : ';background:var(--bg)'
 
   return (
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" ` +
-    `width="${width}" height="${height}" style="${vars}${bgStyle}">`
+    f`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" ` +
+    f`width="${width}" height="${height}" style="${vars}${bgStyle}">`
   )
 }
