@@ -110,7 +110,7 @@ export function renderXYChartSvg(
   const yStart = yAnchor - Math.ceil((yAnchor - plotArea.y) / yGap) * yGap;
   for (let y = yStart; y <= plotArea.y + plotArea.height + 0.5; y += yGap) {
     for (let x = xStart; x <= plotArea.x + plotArea.width + 0.5; x += xGap) {
-      parts.push(`<circle cx="${r(x)}" cy="${r(y)}" r="1.5" class="xychart-grid"/>`);
+      parts.push(f`<circle cx="${x}" cy="${y}" r="1.5" class="xychart-grid"/>`);
     }
   }
 
@@ -131,7 +131,7 @@ export function renderXYChartSvg(
       const tip = tooltipAbove(bar.x + bar.width / 2, bar.y, tipText);
       barOverlay.push(
         `<g class="xychart-bar-group">` +
-          `<rect x="${r(bar.x)}" y="${r(bar.y)}" width="${r(bar.width)}" height="${r(bar.height)}" fill="transparent"/>` +
+          f`<rect x="${bar.x}" y="${bar.y}" width="${bar.width}" height="${bar.height}" fill="transparent"/>` +
           `<title>${escapeXml(tipTitle)}</title>` +
           tip +
           `</g>`,
@@ -170,7 +170,7 @@ export function renderXYChartSvg(
 
     for (const line of chart.lines) {
       for (const p of line.points) {
-        const key = r(p.x);
+        const key = f`${p.x}`;
         if (!columns.has(key)) columns.set(key, []);
         columns.get(key)!.push({
           x: p.x,
@@ -191,7 +191,7 @@ export function renderXYChartSvg(
         const topY = Math.min(...entries.map((e) => e.y));
         const botY = Math.max(...entries.map((e) => e.y));
         const hitPad = CHART_FONT.dotRadius * 3;
-        const hitArea = `<rect x="${r(cx - hitPad)}" y="${r(topY - hitPad)}" width="${r(hitPad * 2)}" height="${r(botY - topY + hitPad * 2)}" fill="transparent" class="xychart-hit"/>`;
+        const hitArea = f`<rect x="${cx - hitPad}" y="${topY - hitPad}" width="${hitPad * 2}" height="${botY - topY + hitPad * 2}" fill="transparent" class="xychart-hit"/>`;
         const tipEntries = entries.map((e) => ({
           text: formatTipValue(e.value),
           legendLabel: lineLegendLabels.get(e.seriesIndex) || `Line ${e.seriesIndex + 1}`,
@@ -203,7 +203,7 @@ export function renderXYChartSvg(
         let group = `<g class="xychart-dot-group">${hitArea}`;
         for (const e of entries) {
           const dataAttrs = ` data-value="${e.value}"${e.label ? ` data-label="${escapeXml(e.label)}"` : ''}`;
-          group += `<circle cx="${r(e.x)}" cy="${r(e.y)}" r="${CHART_FONT.dotRadius}" class="xychart-dot xychart-color-${e.colorIndex}"${dataAttrs}/>`;
+          group += f`<circle cx="${e.x}" cy="${e.y}" r="${CHART_FONT.dotRadius}" class="xychart-dot xychart-color-${e.colorIndex}"${dataAttrs}/>`;
         }
         group += `<title>${escapeXml(titleText)}</title>${tip}</g>`;
         dotOverlay.push(group);
@@ -214,11 +214,11 @@ export function renderXYChartSvg(
         const tipTitle = e.label ? `${e.label}: ${tipText}` : tipText;
         const tip = tooltipAbove(cx, e.y - CHART_FONT.dotRadius, tipText);
         const hitArea = sparse
-          ? `<circle cx="${r(cx)}" cy="${r(e.y)}" r="${CHART_FONT.dotRadius * 3}" fill="transparent" class="xychart-hit"/>`
+          ? f`<circle cx="${cx}" cy="${e.y}" r="${CHART_FONT.dotRadius * 3}" fill="transparent" class="xychart-hit"/>`
           : '';
         dotOverlay.push(
           `<g class="xychart-dot-group">${hitArea}` +
-            `<circle cx="${r(e.x)}" cy="${r(e.y)}" r="${CHART_FONT.dotRadius}" class="xychart-dot xychart-color-${e.colorIndex}"${dataAttrs}/>` +
+            f`<circle cx="${e.x}" cy="${e.y}" r="${CHART_FONT.dotRadius}" class="xychart-dot xychart-color-${e.colorIndex}"${dataAttrs}/>` +
             `<title>${escapeXml(tipTitle)}</title>${tip}</g>`,
         );
       } else {
@@ -226,7 +226,7 @@ export function renderXYChartSvg(
         for (const e of entries) {
           const dataAttrs = ` data-value="${e.value}"${e.label ? ` data-label="${escapeXml(e.label)}"` : ''}`;
           parts.push(
-            `<circle cx="${r(e.x)}" cy="${r(e.y)}" r="${CHART_FONT.dotRadius}" class="xychart-dot xychart-color-${e.colorIndex}"${dataAttrs}/>`,
+            f`<circle cx="${e.x}" cy="${e.y}" r="${CHART_FONT.dotRadius}" class="xychart-dot xychart-color-${e.colorIndex}"${dataAttrs}/>`,
           );
         }
       }
@@ -392,17 +392,17 @@ ${seriesRules.join('\n')}${tipRules}
 function roundedTopBarPath(x: number, y: number, w: number, h: number, radius: number): string {
   const rr = Math.min(radius, w / 2, h / 2);
   if (rr <= 0) {
-    return `M${r(x)},${r(y)} h${r(w)} v${r(h)} h${r(-w)} Z`;
+    return f`M${x},${y} h${w} v${h} h${-w} Z`;
   }
   return [
-    `M${r(x)},${r(y + rr)}`, // start below top-left
-    `Q${r(x)},${r(y)} ${r(x + rr)},${r(y)}`, // top-left
-    `L${r(x + w - rr)},${r(y)}`, // top edge
-    `Q${r(x + w)},${r(y)} ${r(x + w)},${r(y + rr)}`, // top-right
-    `L${r(x + w)},${r(y + h - rr)}`, // right edge
-    `Q${r(x + w)},${r(y + h)} ${r(x + w - rr)},${r(y + h)}`, // bottom-right
-    `L${r(x + rr)},${r(y + h)}`, // bottom edge
-    `Q${r(x)},${r(y + h)} ${r(x)},${r(y + h - rr)}`, // bottom-left
+    f`M${x},${y + rr}`, // start below top-left
+    f`Q${x},${y} ${x + rr},${y}`, // top-left
+    f`L${x + w - rr},${y}`, // top edge
+    f`Q${x + w},${y} ${x + w},${y + rr}`, // top-right
+    f`L${x + w},${y + h - rr}`, // right edge
+    f`Q${x + w},${y + h} ${x + w - rr},${y + h}`, // bottom-right
+    f`L${x + rr},${y + h}`, // bottom edge
+    f`Q${x},${y + h} ${x},${y + h - rr}`, // bottom-left
     'Z',
   ].join(' ');
 }
@@ -414,18 +414,18 @@ function roundedTopBarPath(x: number, y: number, w: number, h: number, radius: n
 function roundedRightBarPath(x: number, y: number, w: number, h: number, radius: number): string {
   const rr = Math.min(radius, w / 2, h / 2);
   if (rr <= 0) {
-    return `M${r(x)},${r(y)} h${r(w)} v${r(h)} h${r(-w)} Z`;
+    return f`M${x},${y} h${w} v${h} h${-w} Z`;
   }
   return [
-    `M${r(x + rr)},${r(y)}`, // start after top-left
-    `L${r(x + w - rr)},${r(y)}`, // top edge
-    `Q${r(x + w)},${r(y)} ${r(x + w)},${r(y + rr)}`, // top-right
-    `L${r(x + w)},${r(y + h - rr)}`, // right edge
-    `Q${r(x + w)},${r(y + h)} ${r(x + w - rr)},${r(y + h)}`, // bottom-right
-    `L${r(x + rr)},${r(y + h)}`, // bottom edge
-    `Q${r(x)},${r(y + h)} ${r(x)},${r(y + h - rr)}`, // bottom-left
-    `L${r(x)},${r(y + rr)}`, // left edge
-    `Q${r(x)},${r(y)} ${r(x + rr)},${r(y)}`, // top-left
+    f`M${x + rr},${y}`, // start after top-left
+    f`L${x + w - rr},${y}`, // top edge
+    f`Q${x + w},${y} ${x + w},${y + rr}`, // top-right
+    f`L${x + w},${y + h - rr}`, // right edge
+    f`Q${x + w},${y + h} ${x + w - rr},${y + h}`, // bottom-right
+    f`L${x + rr},${y + h}`, // bottom edge
+    f`Q${x},${y + h} ${x},${y + h - rr}`, // bottom-left
+    f`L${x},${y + rr}`, // left edge
+    f`Q${x},${y} ${x + rr},${y}`, // top-left
     'Z',
   ].join(' ');
 }
@@ -443,9 +443,9 @@ function roundedRightBarPath(x: number, y: number, w: number, h: number, radius:
 
 function smoothCurvePath(points: Array<{ x: number; y: number }>): string {
   if (points.length === 0) return '';
-  if (points.length === 1) return `M${r(points[0]!.x)},${r(points[0]!.y)}`;
+  if (points.length === 1) return f`M${points[0]!.x},${points[0]!.y}`;
   if (points.length === 2) {
-    return `M${r(points[0]!.x)},${r(points[0]!.y)} L${r(points[1]!.x)},${r(points[1]!.y)}`;
+    return f`M${points[0]!.x},${points[0]!.y} L${points[1]!.x},${points[1]!.y}`;
   }
 
   const n = points.length;
@@ -491,14 +491,14 @@ function smoothCurvePath(points: Array<{ x: number; y: number }>): string {
   slopes[n - 1] = delta[n - 2]! + (h[n - 2]! * c[n - 2]!) / 3;
 
   // 4. Convert to cubic Bezier — control points strictly between endpoints in x
-  let path = `M${r(points[0]!.x)},${r(points[0]!.y)}`;
+  let path = f`M${points[0]!.x},${points[0]!.y}`;
   for (let i = 0; i < n - 1; i++) {
     const seg = h[i]! / 3;
     const cp1x = points[i]!.x + seg;
     const cp1y = points[i]!.y + slopes[i]! * seg;
     const cp2x = points[i + 1]!.x - seg;
     const cp2y = points[i + 1]!.y - slopes[i + 1]! * seg;
-    path += ` C${r(cp1x)},${r(cp1y)} ${r(cp2x)},${r(cp2y)} ${r(points[i + 1]!.x)},${r(points[i + 1]!.y)}`;
+    path += f` C${cp1x},${cp1y} ${cp2x},${cp2y} ${points[i + 1]!.x},${points[i + 1]!.y}`;
   }
 
   return path;
@@ -537,22 +537,22 @@ function multiTooltipAbove(
   const ptrX = cx;
   const ptrY = tipY + bgH;
   const ps = TIP.pointerSize;
-  const pointer = `<polygon points="${r(ptrX - ps)},${r(ptrY)} ${r(ptrX + ps)},${r(ptrY)} ${r(ptrX)},${r(ptrY + ps)}" class="xychart-tip xychart-tip-ptr"/>`;
+  const pointer = f`<polygon points="${ptrX - ps},${ptrY} ${ptrX + ps},${ptrY} ${ptrX},${ptrY + ps}" class="xychart-tip xychart-tip-ptr"/>`;
 
-  let svg = `<rect x="${r(bgX)}" y="${r(tipY)}" width="${r(bgW)}" height="${bgH}" rx="${TIP.rx}" class="xychart-tip xychart-tip-bg"/>`;
+  let svg = f`<rect x="${bgX}" y="${tipY}" width="${bgW}" height="${bgH}" rx="${TIP.rx}" class="xychart-tip xychart-tip-bg"/>`;
   svg += pointer;
 
   // Category label (bold, centered)
   let textY = tipY + padY + lineH / 2;
-  svg += `<text x="${r(cx)}" y="${r(textY)}" text-anchor="middle" font-weight="600" font-size="${TIP.fontSize}" dy="${TEXT_BASELINE_SHIFT}" class="xychart-tip xychart-tip-text">${escapeXml(label)}</text>`;
+  svg += f`<text x="${cx}" y="${textY}" text-anchor="middle" font-weight="600" font-size="${TIP.fontSize}" dy="${TEXT_BASELINE_SHIFT}" class="xychart-tip xychart-tip-text">${escapeXml(label)}</text>`;
 
   // Value lines: legend label left-aligned, value right-aligned
   const rowLeft = bgX + TIP.padX;
   const rowRight = bgX + bgW - TIP.padX;
   for (const entry of entries) {
     textY += lineH;
-    svg += `<text x="${r(rowLeft)}" y="${r(textY)}" text-anchor="start" font-size="${TIP.fontSize}" font-weight="${TIP.fontWeight}" dy="${TEXT_BASELINE_SHIFT}" class="xychart-tip xychart-tip-text">${escapeXml(entry.legendLabel)}</text>`;
-    svg += `<text x="${r(rowRight)}" y="${r(textY)}" text-anchor="end" font-size="${TIP.fontSize}" font-weight="${TIP.fontWeight}" dy="${TEXT_BASELINE_SHIFT}" class="xychart-tip xychart-tip-text">${escapeXml(entry.text)}</text>`;
+    svg += f`<text x="${rowLeft}" y="${textY}" text-anchor="start" font-size="${TIP.fontSize}" font-weight="${TIP.fontWeight}" dy="${TEXT_BASELINE_SHIFT}" class="xychart-tip xychart-tip-text">${escapeXml(entry.legendLabel)}</text>`;
+    svg += f`<text x="${rowRight}" y="${textY}" text-anchor="end" font-size="${TIP.fontSize}" font-weight="${TIP.fontWeight}" dy="${TEXT_BASELINE_SHIFT}" class="xychart-tip xychart-tip-text">${escapeXml(entry.text)}</text>`;
   }
 
   return svg;
@@ -570,22 +570,18 @@ function tooltipAbove(cx: number, topY: number, text: string): string {
   const ptrX = cx;
   const ptrY = tipY + bgH;
   const ps = TIP.pointerSize;
-  const pointer = `<polygon points="${r(ptrX - ps)},${r(ptrY)} ${r(ptrX + ps)},${r(ptrY)} ${r(ptrX)},${r(ptrY + ps)}" class="xychart-tip xychart-tip-ptr"/>`;
+  const pointer = f`<polygon points="${ptrX - ps},${ptrY} ${ptrX + ps},${ptrY} ${ptrX},${ptrY + ps}" class="xychart-tip xychart-tip-ptr"/>`;
 
   return (
-    `<rect x="${r(bgX)}" y="${r(tipY)}" width="${r(bgW)}" height="${bgH}" rx="${TIP.rx}" class="xychart-tip xychart-tip-bg"/>` +
+    f`<rect x="${bgX}" y="${tipY}" width="${bgW}" height="${bgH}" rx="${TIP.rx}" class="xychart-tip xychart-tip-bg"/>` +
     pointer +
-    `<text x="${r(textX)}" y="${r(textY)}" text-anchor="middle" dy="${TEXT_BASELINE_SHIFT}" class="xychart-tip xychart-tip-text">${escapeXml(text)}</text>`
+    f`<text x="${textX}" y="${textY}" text-anchor="middle" dy="${TEXT_BASELINE_SHIFT}" class="xychart-tip xychart-tip-text">${escapeXml(text)}</text>`
   );
 }
 
 function formatTipValue(v: number): string {
   if (Number.isInteger(v)) return v.toLocaleString('en-US');
   return v.toFixed(Math.abs(v) < 10 ? 1 : 0);
-}
-
-function r(n: number): string {
-  return f`${n}`;
 }
 
 function escapeXml(text: string): string {
