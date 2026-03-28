@@ -1,0 +1,13 @@
+# 示例 2: 序列图
+sequenceDiagram
+    participant User as 用户
+    participant Client as 客户端
+    participant API as API服务
+    participant DB as 数据库
+
+    User->>Client: 提交请求
+    Client->>API: 发送数据
+    API->>DB: 查询数据
+    DB-->>API: 返回结果
+    API-->>Client: 处理完成
+    Client-->>User: 显示结果

@@ -1,0 +1,120 @@
+graph TB
+    %% ============================================
+    %% ERP 到 OMS 完整业务流程图
+    %% ============================================
+
+    %% 样式定义
+    classDef erp fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    classDef oms fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef wms fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef tms fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    classDef fin fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    classDef decision fill:#fffde7,stroke:#f9a825,stroke-width:2px
+    classDef startEnd fill:#263238,stroke:#455a64,color:#ffffff,stroke-width:3px
+
+    %% 开始节点
+    START([开始]):::startEnd
+
+    %% ============ ERP 模块 ============
+    subgraph ERP ["🖥️ ERP 企业资源规划"]
+        direction TB
+        ERP_ORDER[销售订单录入]:::erp
+        ERP_CUST[客户信息管理]:::erp
+        ERP_PRICE[价格政策]:::erp
+        ERP_CREDIT[信用额度检查]:::erp
+    end
+
+    %% ============ OMS 模块 ============
+    subgraph OMS ["📦 OMS 订单管理系统"]
+        direction TB
+        OMS_RECV[订单接收]:::oms
+        OMS_CHECK[订单审核]:::oms
+        OMS_RULE[规则引擎]:::oms
+        OMS_STOCK[库存锁定]:::oms
+        OMS_PAY[支付处理]:::oms
+        OMS_SPLIT[订单拆分]:::oms
+        OMS_FULFILL[订单履约]:::oms
+    end
+
+    %% ============ WMS 模块 ============
+    subgraph WMS ["🏭 WMS 仓储管理系统"]
+        direction TB
+        WMS_ORDER[出库单接收]:::wms
+        WMS_ALLOC[库存分配]:::wms
+        WMS_PICK[拣货任务]:::wms
+        WMS_CHECK[复核打包]:::wms
+        WMS_SHIP[出库扫描]:::wms
+        WMS_SYNC[库存同步]:::wms
+    end
+
+    %% ============ TMS 模块 ============
+    subgraph TMS ["🚚 TMS 运输管理系统"]
+        direction TB
+        TMS_DISPATCH[物流调度]:::tms
+        TMS_ROUTE[路径规划]:::tms
+        TMS_TRACK[在途跟踪]:::tms
+        TMS_SIGN[签收确认]:::tms
+        TMS_SIGNERR[异常签收]:::tms
+    end
+
+    %% ============ FIN 模块 ============
+    subgraph FIN ["💰 财务管理系统"]
+        direction TB
+        FIN_RECV[收款确认]:::fin
+        FIN_INVOICE[发票开具]:::fin
+        FIN_SETTLE[结算处理]:::fin
+        FIN_AR[应收账款]:::fin
+    end
+
+    %% 结束节点
+    END([流程结束]):::startEnd
+
+    %% ============ 主流程连接 ============
+    START --> ERP_ORDER
+    ERP_ORDER --> ERP_CUST
+    ERP_CUST --> ERP_PRICE
+    ERP_PRICE --> ERP_CREDIT
+    ERP_CREDIT --> OMS_RECV
+
+    OMS_RECV --> OMS_CHECK
+    OMS_CHECK --> OMS_RULE
+
+    OMS_RULE -->|规则通过| OMS_STOCK
+    OMS_RULE -->|规则拒绝| OMS_REJECT{订单拒绝}
+    OMS_REJECT --> END
+
+    OMS_STOCK -->|库存充足| OMS_PAY
+    OMS_STOCK -->|库存不足| OMS_BACK[备货/等待]
+
+    OMS_PAY -->|支付成功| OMS_SPLIT
+    OMS_PAY -->|支付失败| OMS_RETRY{重试?}
+    OMS_RETRY -->|是| OMS_PAY
+    OMS_RETRY -->|否| OMS_CANCEL[订单取消]
+    OMS_CANCEL --> END
+
+    OMS_SPLIT --> OMS_FULFILL
+    OMS_FULFILL --> WMS_ORDER
+
+    WMS_ORDER --> WMS_ALLOC
+    WMS_ALLOC --> WMS_PICK
+    WMS_PICK --> WMS_CHECK
+    WMS_CHECK --> WMS_SHIP
+    WMS_SHIP --> WMS_SYNC
+    WMS_SYNC --> TMS_DISPATCH
+
+    TMS_DISPATCH --> TMS_ROUTE
+    TMS_ROUTE --> TMS_TRACK
+
+    TMS_TRACK --> TMS_SIGN
+
+    TMS_SIGN -->|正常签收| FIN_RECV
+    TMS_SIGN -->|异常| TMS_SIGNERR
+    TMS_SIGNERR --> TMS_TRACK
+
+    FIN_RECV --> FIN_INVOICE
+    FIN_INVOICE --> FIN_SETTLE
+    FIN_SETTLE --> FIN_AR
+    FIN_AR --> END
+
+    %% OMS_BACK 连接到 OMS_RECV (备货完成后重新处理)
+    OMS_BACK -.->|备货完成| OMS_STOCK

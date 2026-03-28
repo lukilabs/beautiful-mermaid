@@ -1,0 +1,63 @@
+sequenceDiagram
+    title ERP-OMS 订单处理时序图
+
+    participant ERP as ERP系统
+    participant OMS as OMS订单系统
+    participant WMS as WMS仓储系统
+    participant TMS as TMS物流系统
+    participant PAY as 支付平台
+    participant FIN as 财务系统
+
+    rect rgb(200, 220, 240)
+        Note over ERP,OMS: 订单录入阶段
+        ERP->>OMS: 1. 提交销售订单
+        OMS->>ERP: 2. 同步客户信息
+        ERP-->>OMS: 3. 返回客户状态
+        OMS->>OMS: 4. 执行规则引擎
+    end
+
+    rect rgb(230, 210, 250)
+        Note over OMS,PAY: 支付处理阶段
+        alt 库存充足
+            OMS->>PAY: 5. 发起支付请求
+            PAY-->>OMS: 6. 支付结果
+        else 库存不足
+            OMS->>OMS: 5a. 等待备货
+            Note right of OMS: 暂停处理
+        end
+    end
+
+    rect rgb(220, 240, 220)
+        Note over OMS,WMS: 订单履约阶段
+        OMS->>WMS: 7. 创建出库单
+        WMS->>WMS: 8. 库存分配
+        WMS->>WMS: 9. 生成拣货任务
+        loop 拣货流程
+            WMS->>WMS: 10. 扫描商品
+            WMS->>WMS: 11. 复核打包
+        end
+        WMS->>OMS: 12. 出库完成通知
+    end
+
+    rect rgb(255, 245, 220)
+        Note over WMS,TMS: 物流发货阶段
+        WMS->>TMS: 13. 推送物流信息
+        TMS->>TMS: 14. 路径规划
+        loop 在途跟踪
+            TMS->>TMS: 15. 更新物流状态
+            TMS-->>OMS: 16. 推送轨迹
+        end
+    end
+
+    rect rgb(255, 230, 235)
+        Note over TMS,FIN: 财务结算阶段
+        TMS->>TMS: 17. 签收确认
+        TMS->>OMS: 18. 签收结果
+        TMS->>FIN: 19. 推送结算数据
+        FIN->>FIN: 20. 开具发票
+        FIN->>ERP: 21. 应收应付核销
+        ERP-->>FIN: 22. 核销结果
+    end
+
+    OMS->>ERP: 23. 订单完成回传
+    ERP-->>OMS: 24. 确认归档

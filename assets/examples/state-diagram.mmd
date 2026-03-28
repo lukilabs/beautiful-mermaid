@@ -1,0 +1,8 @@
+# 示例 3: 状态图
+stateDiagram-v2
+    [*] --> Idle: 初始化
+    Idle --> Loading: 开始加载
+    Loading --> Success: 加载成功
+    Loading --> Error: 加载失败
+    Error --> Loading: 重试
+    Success --> [*]: 完成

@@ -1,0 +1,33 @@
+# 示例 4: 系统架构图
+graph TB
+    subgraph Frontend[前端层]
+        Web[Web应用]
+        Mobile[移动端]
+    end
+    
+    subgraph Gateway[网关层]
+        Nginx[Nginx]
+        LB[负载均衡]
+    end
+    
+    subgraph Backend[后端服务]
+        API1[API服务1]
+        API2[API服务2]
+        API3[API服务3]
+    end
+    
+    subgraph Data[数据层]
+        Redis[(Redis缓存)]
+        MySQL[(MySQL)]
+        MongoDB[(MongoDB)]
+    end
+    
+    Web --> Nginx
+    Mobile --> Nginx
+    Nginx --> LB
+    LB --> API1
+    LB --> API2
+    LB --> API3
+    API1 --> Redis
+    API2 --> MySQL
+    API3 --> MongoDB
