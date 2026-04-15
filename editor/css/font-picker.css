@@ -1,0 +1,95 @@
+.font-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.3rem 0;
+}
+.font-field-label { font-size: 0.8rem; color: var(--fg); flex: 1; }
+.font-select-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 28px;
+  padding: 0 0.5rem;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--fg);
+  font-size: 0.75rem;
+  cursor: pointer;
+  min-width: 120px;
+  justify-content: space-between;
+  transition: border-color 0.15s;
+}
+.font-select-btn:hover { border-color: rgba(255,255,255,0.2); }
+:root.light .font-select-btn:hover { border-color: rgba(0,0,0,0.2); }
+.font-select-caret { color: var(--fg3); font-size: 0.6rem; }
+
+.font-popup {
+  display: none;
+  position: fixed;
+  z-index: 3000;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.5rem;
+  width: 220px;
+  max-height: 320px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.font-popup.open { display: flex; }
+.font-search {
+  height: 32px;
+  padding: 0 0.5rem 0 2rem;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--fg);
+  font-size: 0.8rem;
+  font-family: inherit;
+  outline: none;
+  width: 100%;
+  flex-shrink: 0;
+}
+.font-search:focus { border-color: var(--blue); }
+.font-search-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+.font-search-icon {
+  position: absolute;
+  left: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--fg3);
+  pointer-events: none;
+}
+.font-list {
+  overflow-y: auto;
+  flex: 1;
+}
+.font-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: var(--fg);
+  transition: background 0.12s;
+}
+.font-item:hover { background: var(--bg3); }
+.font-item.active { background: rgba(88,166,255,0.12); color: var(--blue); }
+.font-item-preview { font-size: 1rem; flex-shrink: 0; }
+.font-item-name { flex: 1; }
+.font-section-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fg3);
+  padding: 0.5rem 0.5rem 0.2rem;
+}

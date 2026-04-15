@@ -1,0 +1,41 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0f1117;
+  --bg2: #161b22;
+  --bg3: #1c2128;
+  --border: rgba(255,255,255,0.08);
+  --fg: #e6edf3;
+  --fg2: #8b949e;
+  --fg3: #484f58;
+  --accent: #ff4d4d;
+  --accent2: #ff7070;
+  --blue: #58a6ff;
+  --green: #3fb950;
+  --red: #f85149;
+  --radius: 6px;
+}
+
+:root.light {
+  --bg: #f5f5f7;
+  --bg2: #ffffff;
+  --bg3: #ebebed;
+  --border: rgba(0,0,0,0.09);
+  --fg: #1a1a1a;
+  --fg2: #6b7280;
+  --fg3: #9ca3af;
+  --blue: #2563eb;
+  --green: #16a34a;
+  --red: #dc2626;
+}
+
+html, body { height: 100%; overflow: hidden; }
+
+body {
+  font-family: 'Geist', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}

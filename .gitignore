@@ -8,6 +8,7 @@ site/
 
 # Generated files
 index.html
+editor.html
 
 # IDE
 .idea/

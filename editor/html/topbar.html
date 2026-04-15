@@ -1,0 +1,115 @@
+<div class="topbar">
+  <a href="/beautiful-mermaid/" class="logo">
+    <svg viewBox="0 0 299 300" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M137.879,300L137.875,300C62.3239,300 0.966154,239.232 0.0117188,163.908L0,162.126L137.879,162.126L137.879,300Z" fill="#06367A"/>
+      <path d="M137.879,0L137.875,0C61.729,0 0,61.729 0,137.875L0,137.878L137.879,137.878L137.879,0Z" fill="#FF51FF"/>
+      <path d="M160.558,137.883L160.561,137.883C236.707,137.883 298.436,76.1537 298.436,0.00758561L298.436,0.00562043L160.558,0.00562043L160.558,137.883Z" fill="#007CFF"/>
+      <path d="M160.558,162.123L160.561,162.123C236.112,162.123 297.471,222.891 298.426,298.216L298.436,299.998L160.558,299.998L160.558,162.123Z" fill="#0A377B"/>
+    </svg>
+    <span>Beautiful Mermaid <span class="logo-sub">Live Editor</span></span>
+  </a>
+
+  <div class="topbar-sep"></div>
+
+  <div class="tab-group">
+    <button class="tab active" id="tab-code" data-panel="code">Code</button>
+    <button class="tab" id="tab-config" data-panel="config">Config</button>
+  </div>
+
+  <div class="spacer"></div>
+
+  <button class="btn" id="dark-light-btn" title="Toggle dark/light mode">
+    <svg id="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+    </svg>
+    <svg id="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+      <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+      <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+    </svg>
+  </button>
+
+  <div class="topbar-sep"></div>
+
+  <div class="theme-select-wrap">
+    <label class="theme-select-label" for="theme-select">Theme</label>
+    <select class="theme-select" id="theme-select">
+      {{THEME_OPTIONS}}
+    </select>
+  </div>
+
+  <div class="topbar-sep"></div>
+
+  <div class="export-wrap" id="export-wrap">
+    <button class="btn btn-primary" id="export-main-btn" title="Save PNG (⌘S)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/>
+        <line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      Export Image
+    </button>
+    <button class="btn btn-primary export-chevron" id="export-chevron-btn" title="More export options">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="6 9 12 15 18 9"/>
+      </svg>
+    </button>
+
+    <div class="export-dropdown shadow-dropdown" id="export-dropdown">
+
+      <button class="export-item" id="export-png-btn">
+        <svg class="export-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
+          <polyline points="21 15 16 10 5 21"/>
+        </svg>
+        <span class="export-item-label">Save PNG</span>
+        <span class="export-item-kbd"><kbd>⌘</kbd><kbd>S</kbd></span>
+      </button>
+
+      <button class="export-item" id="export-svg-btn">
+        <svg class="export-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
+          <polyline points="21 15 16 10 5 21"/>
+        </svg>
+        <span class="export-item-label">Save SVG</span>
+        <span class="export-item-kbd"><kbd>⌘</kbd><kbd>⇧</kbd><kbd>S</kbd></span>
+      </button>
+
+      <div class="export-divider"></div>
+
+      <button class="export-item" id="copy-image-btn">
+        <svg class="export-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+        </svg>
+        <span class="export-item-label">Copy Image</span>
+        <span class="export-item-kbd"><kbd>⌘</kbd><kbd>C</kbd></span>
+      </button>
+
+      <button class="export-item" id="copy-link-btn">
+        <svg class="export-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+        </svg>
+        <span class="export-item-label">Copy URL</span>
+        <span class="export-item-kbd"><kbd>⌘</kbd><kbd>⇧</kbd><kbd>C</kbd></span>
+      </button>
+
+      <div class="export-divider"></div>
+
+      <div class="export-size-row">
+        <svg class="export-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/>
+          <line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>
+        </svg>
+        <span class="export-item-label">Size</span>
+        <div class="size-pills" id="size-pills">
+          <button class="size-pill" data-scale="1">1x</button>
+          <button class="size-pill" data-scale="2">2x</button>
+          <button class="size-pill active" data-scale="4">4x</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>

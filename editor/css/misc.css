@@ -1,0 +1,43 @@
+/* Toast */
+.toast {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%) translateY(0);
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.5rem 1rem;
+  font-size: 0.8rem;
+  color: var(--fg);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s, transform 0.2s;
+  z-index: 9999;
+}
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(-4px);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--fg3); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--fg2); }
+
+/* Render spinner overlay */
+.render-spinner {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255,255,255,0.1);
+  border-top-color: var(--blue);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  display: none;
+}
+.render-spinner.visible { display: block; }
+@keyframes spin { to { transform: rotate(360deg); } }
