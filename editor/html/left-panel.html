@@ -1,0 +1,174 @@
+<div class="panel-left" id="panel-left">
+
+  <div class="panel-header">
+    <span class="panel-title" id="editor-panel-title">Source</span>
+    <div class="panel-actions">
+      <button class="icon-btn" id="copy-source-btn" title="Copy source">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+        </svg>
+      </button>
+      <button class="icon-btn" id="clear-btn" title="Clear editor">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"/>
+          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+          <path d="M10 11v6M14 11v6"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Code editor view -->
+  <div class="editor-wrap" id="editor-view">
+    <div class="line-numbers" id="line-numbers">1</div>
+    <textarea
+      class="code-editor"
+      id="code-editor"
+      spellcheck="false"
+      autocomplete="off"
+      autocorrect="off"
+      autocapitalize="off"
+      placeholder="Enter mermaid diagram syntax here…"
+    ></textarea>
+  </div>
+
+  <!-- Config view -->
+  <div class="config-panel" id="config-view">
+
+    <!-- Colors section -->
+    <div class="config-section">
+      <div class="config-section-title">Colors</div>
+      <div class="color-field">
+        <span class="color-field-label">Background</span>
+        <button class="color-edit-btn" data-cfg="bg">
+          <span class="cfg-hex-label" id="cfg-bg-label">—</span>
+          <span class="color-swatch" id="cfg-bg-swatch"></span>
+        </button>
+      </div>
+      <div class="color-field">
+        <span class="color-field-label">Foreground</span>
+        <button class="color-edit-btn" data-cfg="fg">
+          <span class="cfg-hex-label" id="cfg-fg-label">—</span>
+          <span class="color-swatch" id="cfg-fg-swatch"></span>
+        </button>
+      </div>
+      <div class="color-field">
+        <span class="color-field-label">Accent</span>
+        <button class="color-edit-btn" data-cfg="accent">
+          <span class="cfg-hex-label" id="cfg-accent-label">—</span>
+          <span class="color-swatch" id="cfg-accent-swatch"></span>
+        </button>
+      </div>
+      <div class="color-field">
+        <span class="color-field-label">Line</span>
+        <button class="color-edit-btn" data-cfg="line">
+          <span class="cfg-hex-label" id="cfg-line-label">—</span>
+          <span class="color-swatch" id="cfg-line-swatch"></span>
+        </button>
+      </div>
+      <div class="color-field">
+        <span class="color-field-label">Muted</span>
+        <button class="color-edit-btn" data-cfg="muted">
+          <span class="cfg-hex-label" id="cfg-muted-label">—</span>
+          <span class="color-swatch" id="cfg-muted-swatch"></span>
+        </button>
+      </div>
+      <div class="color-field">
+        <span class="color-field-label">Surface</span>
+        <button class="color-edit-btn" data-cfg="surface">
+          <span class="cfg-hex-label" id="cfg-surface-label">—</span>
+          <span class="color-swatch" id="cfg-surface-swatch"></span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Font section -->
+    <div class="config-section">
+      <div class="config-section-title">Typography</div>
+      <div class="font-field">
+        <span class="font-field-label">Font family</span>
+        <button class="font-select-btn" id="font-select-btn">
+          <span id="font-select-label">Default</span>
+          <span class="font-select-caret">▼</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Layout section -->
+    <div class="config-section">
+      <div class="config-section-title">Layout</div>
+      <div class="padding-field">
+        <div class="padding-row">
+          <label>Padding</label>
+          <input class="padding-num" id="cfg-padding" type="number" min="0" max="120" value="24" />
+        </div>
+        <input class="padding-slider" id="cfg-padding-slider" type="range" min="0" max="120" value="24" />
+      </div>
+      <div class="padding-field">
+        <div class="padding-row">
+          <label>Edge stroke</label>
+          <input class="padding-num" id="cfg-edge-stroke" type="number" min="0.25" max="6" step="0.25" value="1" />
+        </div>
+        <input class="padding-slider" id="cfg-edge-stroke-slider" type="range" min="0.25" max="6" step="0.25" value="1" />
+      </div>
+      <div class="padding-field">
+        <div class="padding-row">
+          <label>Node border</label>
+          <input class="padding-num" id="cfg-node-stroke" type="number" min="0.25" max="6" step="0.25" value="1" />
+        </div>
+        <input class="padding-slider" id="cfg-node-stroke-slider" type="range" min="0.25" max="6" step="0.25" value="1" />
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Color picker popup (shared) -->
+  <div class="color-popup" id="color-popup">
+    <div class="color-popup-header">
+      <span class="color-popup-title" id="color-popup-title">Color</span>
+      <button class="color-popup-close" id="color-popup-close">×</button>
+    </div>
+    <div class="color-hex-row">
+      <input type="color" class="color-native" id="color-native-input" />
+      <input type="text" class="color-hex-input" id="color-hex-input" placeholder="#rrggbb" maxlength="9" />
+      <button class="color-clear-btn" id="color-clear-btn">Clear</button>
+    </div>
+    <div class="color-palette-title">Presets</div>
+    <div class="color-palette" id="color-palette"></div>
+  </div>
+
+  <!-- Font picker popup -->
+  <div class="font-popup" id="font-popup">
+    <div class="font-search-wrap">
+      <svg class="font-search-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      <input class="font-search" id="font-search" placeholder="Quick search" />
+    </div>
+    <div class="font-list" id="font-list"></div>
+  </div>
+
+  <div class="status-bar">
+    <span id="status-text">Ready</span>
+    <span id="cursor-pos">Ln 1, Col 1</span>
+  </div>
+
+  <!-- Samples drawer -->
+  <div class="samples-drawer">
+    <div class="samples-header" id="samples-toggle">
+      <span class="panel-title">Sample Diagrams</span>
+      <svg class="samples-toggle-icon open" id="samples-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="18 15 12 9 6 15"/>
+      </svg>
+    </div>
+    <div class="samples-body open" id="samples-body">
+      <div class="samples-inner">
+        <div class="cat-tabs" id="cat-tabs">
+          {{CATEGORY_BUTTONS}}
+        </div>
+        <div class="sample-list" id="sample-list"></div>
+      </div>
+    </div>
+  </div>
+</div>

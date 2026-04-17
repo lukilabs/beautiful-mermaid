@@ -1,0 +1,19 @@
+{
+  "name": "beautiful-mermaid-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for rendering Mermaid diagrams as beautiful SVGs",
+  "type": "module",
+  "main": "index.ts",
+  "bin": {
+    "beautiful-mermaid-mcp": "./index.ts"
+  },
+  "scripts": {
+    "start": "bun run index.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@resvg/resvg-js": "^2.6.2",
+    "beautiful-mermaid": "file:..",
+    "zod": "^4.3.6"
+  }
+}
