@@ -11,18 +11,19 @@ import { measureTextWidth } from './text-metrics'
 
 /** Average character width in px at the given font size and weight (proportional font) */
 export function estimateTextWidth(text: string, fontSize: number, fontWeight: number): number {
-  // Delegate to variable-width character measurement for better accuracy
-  // with mixed character sets (Latin narrow/wide, CJK, emoji, etc.)
-  return measureTextWidth(text, fontSize, fontWeight)
+  // Multi-line labels (containing \n) must return the width of the widest line,
+  // not the combined width of all characters. Treating a newline as a letter
+  // causes massive overestimates that inflate actor widths and break layout.
+  const lines = text.split('\n')
+  if (lines.length === 1) return measureTextWidth(text, fontSize, fontWeight)
+  return Math.max(...lines.map(l => measureTextWidth(l, fontSize, fontWeight)))
 }
 
 /** Average character width in px for monospace fonts (uniform glyph width) */
 export function estimateMonoTextWidth(text: string, fontSize: number): number {
-  // Monospace fonts have uniform character width — 0.6 of fontSize matches actual
-  // glyph widths for JetBrains Mono / SF Mono / Fira Code at small sizes (11px).
-  // Previous value of 0.55 underestimated widths, causing class member labels to
-  // extend beyond their box boundaries.
-  return text.length * fontSize * 0.6
+  // Multi-line: return width of widest line.
+  const lines = text.split('\n')
+  return Math.max(...lines.map(l => l.length * fontSize * 0.6))
 }
 
 /** Monospace font family used for code-like text (class members, types) */

@@ -52,7 +52,7 @@ function mixColors(fg: string, bg: string, pct: number): string {
  */
 export function diagramColorsToAsciiTheme(colors: DiagramColors): AsciiTheme {
   const line = colors.line ?? mixColors(colors.fg, colors.bg, MIX.line)
-  const border = colors.border ?? mixColors(colors.fg, colors.bg, MIX.nodeStroke)
+  const border = colors.border ?? mixColors(line, colors.bg, 60)
   return {
     fg:       colors.fg,
     border,

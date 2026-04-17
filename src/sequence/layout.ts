@@ -1,6 +1,7 @@
 import type { SequenceDiagram, PositionedSequenceDiagram, PositionedActor, Lifeline, PositionedMessage, Activation, PositionedBlock, PositionedNote } from './types.ts'
 import type { RenderOptions } from '../types.ts'
 import { estimateTextWidth, FONT_SIZES, FONT_WEIGHTS } from '../styles.ts'
+import { LINE_HEIGHT_RATIO } from '../text-metrics.ts'
 
 // ============================================================================
 // Sequence diagram layout engine
@@ -43,8 +44,8 @@ const SEQ = {
   dividerExtra: 24,
   /** Note dimensions */
   noteWidth: 60,
-  notePadX: 12,
-  notePadY: 6,
+  notePadX: 14,
+  notePadY: 10,
   noteGap: 10,
 } as const
 
@@ -57,7 +58,7 @@ export function layoutSequenceDiagram(
   _options: RenderOptions = {}
 ): PositionedSequenceDiagram {
   if (diagram.actors.length === 0) {
-    return { width: 0, height: 0, actors: [], lifelines: [], messages: [], activations: [], blocks: [], notes: [] }
+    return { width: 0, height: 0, actors: [], bottomActors: [], lifelines: [], messages: [], activations: [], blocks: [], notes: [] }
   }
 
   // 1. Calculate actor widths and assign horizontal positions (center X)
@@ -96,7 +97,13 @@ export function layoutSequenceDiagram(
   }))
 
   // 3. Stack messages vertically
-  let messageY = actorY + SEQ.actorHeight + SEQ.headerGap
+  //
+  // actor-type participants render their label BELOW the icon at
+  // actorY + actorHeight + 14. That label bleeds into headerGap and collides
+  // with the first message label. Add enough room to clear it.
+  const hasActorType = diagram.actors.some(a => a.type === 'actor')
+  const actorLabelExtra = hasActorType ? (FONT_SIZES.nodeLabel + 16) : 0
+  let messageY = actorY + SEQ.actorHeight + SEQ.headerGap + actorLabelExtra
   const messages: PositionedMessage[] = []
 
   // Pre-scan blocks to determine which message indices need extra vertical
@@ -113,6 +120,26 @@ export function layoutSequenceDiagram(
     for (const div of block.dividers) {
       const prevDiv = extraSpaceBefore.get(div.index) ?? 0
       extraSpaceBefore.set(div.index, Math.max(prevDiv, SEQ.dividerExtra))
+    }
+  }
+
+  // Pre-scan messages: labels are bottom-aligned so the last line sits
+  // LABEL_ARROW_GAP above msg.y. The top of a k-line label is at
+  //   msg.y - LABEL_ARROW_GAP - (k-1) * edgeLineHeight
+  // We must ensure this doesn't overlap the element above (actor boxes for
+  // the first message, or previous arrow for subsequent ones).
+  const edgeLineHeight = FONT_SIZES.edgeLabel * LINE_HEIGHT_RATIO
+  const LABEL_ARROW_GAP = 20  // must match renderer.ts constant
+  for (let mi = 0; mi < diagram.messages.length; mi++) {
+    const msg = diagram.messages[mi]!
+    const lines = msg.label ? msg.label.split('\n').length : 1
+    if (lines > 1) {
+      // For the first message, the effective gap includes the actor label extra.
+      const baseGap = mi === 0 ? SEQ.headerGap + actorLabelExtra : SEQ.messageRowHeight
+      // Keep LABEL_ARROW_GAP clearance above the label top as well (symmetric).
+      const extraNeeded = Math.max(0, Math.ceil((lines - 1) * edgeLineHeight - (baseGap - 2 * LABEL_ARROW_GAP)))
+      const prev = extraSpaceBefore.get(mi) ?? 0
+      extraSpaceBefore.set(mi, Math.max(prev, extraNeeded))
     }
   }
 
@@ -199,11 +226,13 @@ export function layoutSequenceDiagram(
       let noteY = messages[msgIdx]!.y + selfLoopExtra + 8
 
       for (const note of notesForMsg) {
-        const noteW = Math.max(
-          SEQ.noteWidth,
-          estimateTextWidth(note.text, FONT_SIZES.edgeLabel, FONT_WEIGHTS.edgeLabel) + SEQ.notePadX * 2
-        )
-        const noteH = FONT_SIZES.edgeLabel + SEQ.notePadY * 2
+        const noteLines = note.text.split('\n')
+        const maxLineW = Math.max(...noteLines.map(l => estimateTextWidth(l, FONT_SIZES.edgeLabel, FONT_WEIGHTS.edgeLabel)))
+        const noteW = Math.max(SEQ.noteWidth, maxLineW + SEQ.notePadX * 2)
+        const noteLH = FONT_SIZES.edgeLabel * LINE_HEIGHT_RATIO
+        const noteH = noteLines.length === 1
+          ? FONT_SIZES.edgeLabel + SEQ.notePadY * 2
+          : (noteLines.length - 1) * noteLH + FONT_SIZES.edgeLabel + SEQ.notePadY * 2
 
         // X positioning based on actor position and note type
         const firstActorIdx = actorIndex.get(note.actorIds[0] ?? '') ?? 0
@@ -262,7 +291,17 @@ export function layoutSequenceDiagram(
     // Block spans from the Y of startIndex to endIndex messages
     const startMsg = messages[block.startIndex]
     const endMsg = messages[block.endIndex]
-    const blockTop = (startMsg?.y ?? messageY) - SEQ.blockPadTop
+    const startMsgY = startMsg?.y ?? messageY
+
+    // Ensure the block tab never overlaps the first message's label.
+    // Tab box occupies [blockTop, blockTop + TAB_HEIGHT].
+    // Label top sits at startMsgY - LABEL_ARROW_GAP - (k-1)*lineHeight.
+    // We need tab bottom ≤ label top - 4 (4 px clearance).
+    const TAB_HEIGHT = 18 // must match tabHeight in renderer.ts renderBlock()
+    const firstMsgLines = startMsg?.label ? startMsg.label.split('\n').length : 1
+    const labelSpaceNeeded = LABEL_ARROW_GAP + Math.max(0, firstMsgLines - 1) * edgeLineHeight
+    const minBlockTop = startMsgY - TAB_HEIGHT - labelSpaceNeeded - 4
+    const blockTop = Math.min(startMsgY - SEQ.blockPadTop, minBlockTop)
     const blockBottom = (endMsg?.y ?? messageY) + SEQ.blockPadBottom + 12
 
     // Block width spans all actors involved in its messages
@@ -284,41 +323,20 @@ export function layoutSequenceDiagram(
     const blockRight = actorCenterX[maxIdx]! + actorWidths[maxIdx]! / 2 + SEQ.blockPadX
 
     // Position dividers — offset from message Y so the divider label text
-    // (rendered at divider.y + 14 in the renderer) clears the message label
-    // (rendered at msg.y - 6).
+    // (rendered at divider.y + 14 in the renderer) clears the message label.
     //
-    // Default offset 28 gives ~8px baseline clearance, which is sufficient
-    // when the divider label (left-aligned at block edge) and message label
-    // (centered between actors) don't share horizontal space. When they DO
-    // overlap horizontally (e.g. long divider labels like "[Account locked]"
-    // next to centered message labels like "403 Forbidden"), we increase the
-    // offset to 36 so text bounding boxes have ~5px visual clearance.
+    // Message labels are bottom-aligned: label top = msgY - RENDERER_LABEL_GAP - (k-1)*lineHeight.
+    // Divider label baseline = msgY - offset + 14.
+    // We need:  baseline + DIVIDER_CLEARANCE ≤ label_top
+    //   → offset ≥ 14 + RENDERER_LABEL_GAP + (k-1)*lineHeight + DIVIDER_CLEARANCE
+    const RENDERER_LABEL_GAP = 10  // must match LABEL_ARROW_GAP in renderer.ts
+    const DIVIDER_CLEARANCE = 30   // px gap between divider label baseline and msg label top
     const dividers = block.dividers.map(d => {
       const msg = messages[d.index]
       const msgY = msg?.y ?? messageY
-      let offset = 28
-
-      // Dynamic overlap detection: increase offset when the divider label
-      // and message label occupy the same horizontal region, which would
-      // cause vertical text overlap at the default 8px baseline gap.
-      if (d.label && msg?.label) {
-        const divLabelText = `[${d.label}]`
-        const divLabelW = estimateTextWidth(divLabelText, FONT_SIZES.edgeLabel, FONT_WEIGHTS.edgeLabel)
-        const divLabelLeft = blockLeft + 8
-        const divLabelRight = divLabelLeft + divLabelW
-
-        const msgLabelW = estimateTextWidth(msg.label, FONT_SIZES.edgeLabel, FONT_WEIGHTS.edgeLabel)
-        // Self-messages render labels at x1 + 36 (left-aligned); normal
-        // messages center the label between the two actor lifelines.
-        const msgLabelLeft = msg.isSelf
-          ? msg.x1 + 36
-          : (msg.x1 + msg.x2) / 2 - msgLabelW / 2
-        const msgLabelRight = msgLabelLeft + msgLabelW
-
-        if (divLabelRight > msgLabelLeft && divLabelLeft < msgLabelRight) {
-          offset = 36
-        }
-      }
+      const msgLines = msg?.label ? msg.label.split('\n').length : 1
+      const msgLabelTopOffset = RENDERER_LABEL_GAP + Math.max(0, msgLines - 1) * edgeLineHeight
+      const offset = Math.ceil(14 + msgLabelTopOffset + DIVIDER_CLEARANCE)
 
       return { y: msgY - offset, label: d.label }
     })
@@ -386,21 +404,31 @@ export function layoutSequenceDiagram(
   }
 
   // 7. Calculate final lifelines (after shift so X positions are correct)
+  // Lifelines end above the bottom actor row, leaving room for their boxes.
+  const bottomActorY = diagramBottom  // bottom actors start here
   const lifelines: Lifeline[] = diagram.actors.map((a, i) => ({
     actorId: a.id,
     x: actorCenterX[i]!,
     topY: actorY + SEQ.actorHeight,
-    bottomY: diagramBottom - SEQ.padding,
+    bottomY: bottomActorY,
   }))
 
-  // 8. Calculate diagram dimensions from the bounding box
+  // 8. Bottom actor boxes — same actors mirrored at the bottom of the diagram
+  const bottomActors: typeof actors = actors.map(a => ({
+    ...a,
+    y: bottomActorY,
+  }))
+
+  // 9. Calculate diagram dimensions from the bounding box
+  // Height extends past bottom actor boxes.
   const diagramWidth = globalMaxX + shiftX + SEQ.padding
-  const diagramHeight = diagramBottom
+  const diagramHeight = bottomActorY + SEQ.actorHeight + SEQ.padding
 
   return {
     width: Math.max(diagramWidth, 200),
     height: Math.max(diagramHeight, 100),
     actors,
+    bottomActors,
     lifelines,
     messages,
     activations,

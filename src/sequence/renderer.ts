@@ -3,6 +3,10 @@ import type { DiagramColors } from '../theme.ts'
 import { svgOpenTag, buildStyleBlock } from '../theme.ts'
 import { FONT_SIZES, FONT_WEIGHTS, STROKE_WIDTHS, ARROW_HEAD, estimateTextWidth, TEXT_BASELINE_SHIFT } from '../styles.ts'
 import { renderMultilineText, escapeXml as escapeXmlUtil } from '../multiline-utils.ts'
+import { LINE_HEIGHT_RATIO } from '../text-metrics.ts'
+
+/** Gap in px between the last label line's baseline and the arrow line. */
+const LABEL_ARROW_GAP = 10
 
 // ============================================================================
 // Sequence diagram SVG renderer
@@ -69,6 +73,11 @@ export function renderSequenceSvg(
 
   // 6. Actor boxes at top (rendered last so they're on top)
   for (const actor of diagram.actors) {
+    parts.push(renderActor(actor))
+  }
+
+  // 7. Bottom actor boxes (mirrored at the bottom, same style)
+  for (const actor of diagram.bottomActors) {
     parts.push(renderActor(actor))
   }
 
@@ -215,10 +224,17 @@ function renderMessage(msg: PositionedMessage): string {
       `  <line x1="${msg.x1}" y1="${msg.y}" x2="${msg.x2}" y2="${msg.y}" ` +
       `stroke="var(--_line)" stroke-width="${STROKE_WIDTHS.connector}"${dashArray} marker-end="url(#${markerId})" />`
     )
-    // Label above the arrow, centered (supports multi-line)
+    // Label above the arrow, bottom-aligned so every line stays above the arrow.
+    // cy is computed so the last line's baseline lands exactly LABEL_ARROW_GAP px
+    // above msg.y, regardless of how many lines the label has.
     const midX = (msg.x1 + msg.x2) / 2
+    const labelLines = msg.label.split('\n').length
+    const edgeLH = FONT_SIZES.edgeLabel * LINE_HEIGHT_RATIO
+    const labelCY = msg.y - LABEL_ARROW_GAP
+      - FONT_SIZES.edgeLabel * 0.35
+      - ((labelLines - 1) / 2) * edgeLH
     parts.push(
-      '  ' + renderMultilineText(msg.label, midX, msg.y - 10, FONT_SIZES.edgeLabel,
+      '  ' + renderMultilineText(msg.label, midX, labelCY, FONT_SIZES.edgeLabel,
         `font-size="${FONT_SIZES.edgeLabel}" text-anchor="middle" font-weight="${FONT_WEIGHTS.edgeLabel}" fill="var(--_text-muted)"`)
     )
   }
@@ -316,13 +332,13 @@ function renderNote(note: PositionedNote): string {
     `<g class="note"${positionAttr}${actorsAttr}>` +
     // Note body with bg fill and clipped corner
     `\n  <polygon points="${bodyPoints}" ` +
-    `fill="var(--bg)" stroke="var(--_node-stroke)" stroke-width="${STROKE_WIDTHS.innerBox}" />` +
+    `fill="var(--_group-hdr)" stroke="var(--_line)" stroke-width="${STROKE_WIDTHS.innerBox}" />` +
     // Fold triangle (the folded-over corner)
     `\n  <polygon points="${x + w - foldSize},${y} ${x + w},${y + foldSize} ${x + w - foldSize},${y + foldSize}" ` +
-    `fill="var(--_inner-stroke)" stroke="var(--_node-stroke)" stroke-width="${STROKE_WIDTHS.innerBox}" />` +
+    `fill="var(--_line)" stroke="var(--_line)" stroke-width="${STROKE_WIDTHS.innerBox}" />` +
     // Note text (supports multi-line)
     `\n  ${renderMultilineText(note.text, x + w / 2, y + h / 2, FONT_SIZES.edgeLabel,
-      `font-size="${FONT_SIZES.edgeLabel}" text-anchor="middle" font-weight="${FONT_WEIGHTS.edgeLabel}" fill="var(--_text-muted)"`)}` +
+      `font-size="${FONT_SIZES.edgeLabel}" text-anchor="middle" font-weight="${FONT_WEIGHTS.edgeLabel}" fill="var(--_text-sec)"`)}` +
     `\n</g>`
   )
 }

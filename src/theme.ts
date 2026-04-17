@@ -76,8 +76,6 @@ export const MIX = {
   arrow:        85,
   /** Node fill tint: fg mixed at 3% */
   nodeFill:     3,
-  /** Node/group stroke: fg mixed at 20% */
-  nodeStroke:   20,
   /** Group header band tint: fg mixed at 5% */
   groupHeader:  5,
   /** Inner divider strokes: fg mixed at 12% */
@@ -254,7 +252,7 @@ export function buildStyleBlock(font: string, hasMonoFont: boolean): string {
     --_line:          var(--line, color-mix(in srgb, var(--fg) ${MIX.line}%, var(--bg)));
     --_arrow:         var(--accent, color-mix(in srgb, var(--fg) ${MIX.arrow}%, var(--bg)));
     --_node-fill:     var(--surface, color-mix(in srgb, var(--fg) ${MIX.nodeFill}%, var(--bg)));
-    --_node-stroke:   var(--border, color-mix(in srgb, var(--fg) ${MIX.nodeStroke}%, var(--bg)));
+    --_node-stroke:   var(--line, color-mix(in srgb, var(--fg) 30%, var(--bg)));
     --_group-fill:    var(--bg);
     --_group-hdr:     color-mix(in srgb, var(--fg) ${MIX.groupHeader}%, var(--bg));
     --_inner-stroke:  color-mix(in srgb, var(--fg) ${MIX.innerStroke}%, var(--bg));

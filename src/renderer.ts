@@ -475,26 +475,27 @@ function renderHexagon(x: number, y: number, w: number, h: number, fill: string,
 
 // --- Batch 2 shapes ---
 
-/** Cylinder / database: top ellipse cap + body rect + bottom ellipse */
+/** Cylinder / database: top ellipse cap + body rect + bottom front arc */
 function renderCylinder(x: number, y: number, w: number, h: number, fill: string, stroke: string, sw: string): string {
   const ry = 7 // ellipse vertical radius for the cap
   const cx = x + w / 2
+  const rx = w / 2
   const bodyTop = y + ry
   const bodyH = h - 2 * ry
+  const bottomY = y + h - ry
 
   return (
-    // Body rectangle (no top border — covered by top ellipse)
-    `<rect x="${x}" y="${bodyTop}" width="${w}" height="${bodyH}" ` +
-    `fill="${fill}" stroke="none" />` +
+    // Bottom ellipse fill (back arc hidden by body rect on top)
+    `<ellipse cx="${cx}" cy="${bottomY}" rx="${rx}" ry="${ry}" fill="${fill}" stroke="none" />` +
+    // Body rectangle (covers back arc of bottom ellipse)
+    `\n<rect x="${x}" y="${bodyTop}" width="${w}" height="${bodyH}" fill="${fill}" stroke="none" />` +
+    // Bottom front arc (only the visible outline)
+    `\n<path d="M ${x} ${bottomY} A ${rx} ${ry} 0 0 0 ${x + w} ${bottomY}" fill="none" stroke="${stroke}" stroke-width="${sw}" />` +
     // Left and right body borders
-    `\n<line x1="${x}" y1="${bodyTop}" x2="${x}" y2="${bodyTop + bodyH}" stroke="${stroke}" stroke-width="${sw}" />` +
-    `\n<line x1="${x + w}" y1="${bodyTop}" x2="${x + w}" y2="${bodyTop + bodyH}" stroke="${stroke}" stroke-width="${sw}" />` +
-    // Bottom ellipse (half visible)
-    `\n<ellipse cx="${cx}" cy="${y + h - ry}" rx="${w / 2}" ry="${ry}" ` +
-    `fill="${fill}" stroke="${stroke}" stroke-width="${sw}" />` +
+    `\n<line x1="${x}" y1="${bodyTop}" x2="${x}" y2="${bottomY}" stroke="${stroke}" stroke-width="${sw}" />` +
+    `\n<line x1="${x + w}" y1="${bodyTop}" x2="${x + w}" y2="${bottomY}" stroke="${stroke}" stroke-width="${sw}" />` +
     // Top ellipse (full, on top)
-    `\n<ellipse cx="${cx}" cy="${bodyTop}" rx="${w / 2}" ry="${ry}" ` +
-    `fill="${fill}" stroke="${stroke}" stroke-width="${sw}" />`
+    `\n<ellipse cx="${cx}" cy="${bodyTop}" rx="${rx}" ry="${ry}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" />`
   )
 }
 
@@ -572,7 +573,8 @@ function renderNodeLabel(node: PositionedNode, font: string): string {
   }
 
   const cx = node.x + node.width / 2
-  const cy = node.y + node.height / 2
+  // Cylinder body center is shifted down by the top ellipse cap height
+  const cy = node.y + node.height / 2 + (node.shape === 'cylinder' ? 4 : 0)
 
   // Resolve text color — inline styles can override the CSS variable default
   const textColor = escapeAttr(node.inlineStyle?.color ?? 'var(--_text)')

@@ -70,6 +70,8 @@ export interface PositionedSequenceDiagram {
   width: number
   height: number
   actors: PositionedActor[]
+  /** Same actors repeated at the bottom of the diagram (mermaid.live style) */
+  bottomActors: PositionedActor[]
   lifelines: Lifeline[]
   messages: PositionedMessage[]
   activations: Activation[]
