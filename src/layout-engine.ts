@@ -835,6 +835,13 @@ function elkToPositioned(
   // distribute each conflict group across parallel lanes.
   deoverlapEdges(edges, nodeMap)
 
+  // Collapse staircase kinks. After ELK + synthesis, paths sometimes have
+  // a triple of segments shaped like ↓→↓ or →↓→ where both outer segments
+  // travel in the same direction, separated by a short perpendicular jog.
+  // Replace each such triple with a single L-shape (two segments) so the
+  // path reads as one turn instead of three.
+  simplifyStaircasePaths(edges)
+
   // Calculate final bounds including all edge points
   // ELK should include edges in its dimensions, but we verify and expand if needed
   let width = elkResult.width ?? 800
@@ -1714,6 +1721,87 @@ interface SegmentRecord {
   /** First/last segments touch a node boundary; their shift is constrained
    * to the node's side range so the port stays attached. */
   kind: 'first' | 'last' | 'interior'
+}
+
+/**
+ * Collapse "staircase" segment triples where the path turns out and then
+ * turns back the same way (↓→↓ or →↓→ with both outer segments in the same
+ * direction). Each such triple replaces with a single L-shape — two
+ * segments — so the path reads as one turn instead of three.
+ *
+ * Also strips collinear duplicates that ELK occasionally emits.
+ */
+function simplifyStaircasePaths(edges: PositionedEdge[]): void {
+  for (const edge of edges) {
+    edge.points = collapseStaircase(removeCollinearPoints(edge.points))
+  }
+}
+
+function removeCollinearPoints(pts: Point[]): Point[] {
+  if (pts.length < 3) return pts
+  const out: Point[] = [pts[0]!]
+  for (let i = 1; i < pts.length - 1; i++) {
+    const a = out[out.length - 1]!
+    const b = pts[i]!
+    const c = pts[i + 1]!
+    const sameY = Math.abs(a.y - b.y) < SEGMENT_EPSILON && Math.abs(b.y - c.y) < SEGMENT_EPSILON
+    const sameX = Math.abs(a.x - b.x) < SEGMENT_EPSILON && Math.abs(b.x - c.x) < SEGMENT_EPSILON
+    if (!sameX && !sameY) out.push(b)
+  }
+  out.push(pts[pts.length - 1]!)
+  return out
+}
+
+function collapseStaircase(pts: Point[]): Point[] {
+  if (pts.length < 4) return pts
+  const out: Point[] = [pts[0]!]
+  let i = 0
+  while (i + 3 < pts.length) {
+    const p1 = pts[i]!
+    const p2 = pts[i + 1]!
+    const p3 = pts[i + 2]!
+    const p4 = pts[i + 3]!
+
+    const seg1V = Math.abs(p1.x - p2.x) < SEGMENT_EPSILON && Math.abs(p1.y - p2.y) > SEGMENT_EPSILON
+    const seg2H = Math.abs(p2.y - p3.y) < SEGMENT_EPSILON && Math.abs(p2.x - p3.x) > SEGMENT_EPSILON
+    const seg3V = Math.abs(p3.x - p4.x) < SEGMENT_EPSILON && Math.abs(p3.y - p4.y) > SEGMENT_EPSILON
+
+    const seg1H = Math.abs(p1.y - p2.y) < SEGMENT_EPSILON && Math.abs(p1.x - p2.x) > SEGMENT_EPSILON
+    const seg2V = Math.abs(p2.x - p3.x) < SEGMENT_EPSILON && Math.abs(p2.y - p3.y) > SEGMENT_EPSILON
+    const seg3H = Math.abs(p3.y - p4.y) < SEGMENT_EPSILON && Math.abs(p3.x - p4.x) > SEGMENT_EPSILON
+
+    let collapsed = false
+    if (seg1V && seg2H && seg3V) {
+      // ↓→↓ or ↑→↑ — verticals match if both go same way.
+      const dir1 = Math.sign(p2.y - p1.y)
+      const dir3 = Math.sign(p4.y - p3.y)
+      if (dir1 === dir3 && dir1 !== 0) {
+        // Replace p2, p3 with a single corner at (p1.x, p4.y), keeping p4.
+        out.push({ x: p1.x, y: p4.y })
+        out.push(p4)
+        i += 3
+        collapsed = true
+      }
+    } else if (seg1H && seg2V && seg3H) {
+      // →↓→ or ←↑← — horizontals match if both go same way.
+      const dir1 = Math.sign(p2.x - p1.x)
+      const dir3 = Math.sign(p4.x - p3.x)
+      if (dir1 === dir3 && dir1 !== 0) {
+        out.push({ x: p4.x, y: p1.y })
+        out.push(p4)
+        i += 3
+        collapsed = true
+      }
+    }
+
+    if (!collapsed) {
+      out.push(p2)
+      i++
+    }
+  }
+  // Append remaining points.
+  for (let j = i + 1; j < pts.length; j++) out.push(pts[j]!)
+  return removeCollinearPoints(out)
 }
 
 function deoverlapEdges(edges: PositionedEdge[], nodeMap: Map<string, PositionedNode>): void {
