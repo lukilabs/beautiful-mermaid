@@ -199,10 +199,38 @@ function mermaidToElk(
     graph.direction
   )
 
+  // ELK uses each cross-hierarchy edge's LCA (lowest common ancestor) as the
+  // edge's coordinate-space origin, regardless of which level of the input
+  // tree we declare the edge under. Declaring an edge at root level when its
+  // LCA is some deep compound makes ELK return points in the LCA's local
+  // space, which the recursive collector then can't offset correctly. Place
+  // each edge at its LCA in the input so the recursive offset accumulator
+  // picks it up at the right level.
+  //
+  // Port substitution is per-side: the boundary crossed on each side is the
+  // OUTERMOST SEPARATE_CHILDREN subgraph between the leaf and the LCA
+  // (exclusive of the LCA itself). When the LCA is itself SEPARATE, the
+  // edge is internal to LCA's interior and no ports are needed.
 
-  // Track ports per subgraph. Only subgraphs in `subgraphsNeedingSeparate`
-  // produce ports — other subgraphs let cross-hier edges pass through
-  // INCLUDE_CHILDREN routing.
+  /**
+   * Outermost SEPARATE_CHILDREN subgraph on the chain from `startId`
+   * upward, stopping before reaching `stopAt` (exclusive). Returns
+   * undefined when no SEPARATE compound sits in that range.
+   */
+  function outermostSeparateBetween(startId: string | undefined, stopAt: string | undefined): string | undefined {
+    if (!startId) return undefined
+    const chain: string[] = []
+    let cursor: string | undefined = startId
+    while (cursor !== undefined && cursor !== stopAt) {
+      chain.push(cursor)
+      cursor = subgraphParent.get(cursor)
+    }
+    for (let i = chain.length - 1; i >= 0; i--) {
+      if (subgraphsNeedingSeparate.has(chain[i]!)) return chain[i]
+    }
+    return undefined
+  }
+
   const subgraphPorts = new Map<string, Array<{
     portId: string
     edgeIndex: number
@@ -211,59 +239,87 @@ function mermaidToElk(
     side: 'NORTH' | 'SOUTH' | 'EAST' | 'WEST'
   }>>()
 
-  // For each cross-hierarchy edge, the boundary it crosses on each side is the
-  // OUTERMOST subgraph in the source/target chain that's marked
-  // SEPARATE_CHILDREN. Subgraphs at deeper levels of the chain that aren't in
-  // `subgraphsNeedingSeparate` are explicitly set to INCLUDE_CHILDREN below
-  // (see subgraphToElk), so their leaf descendants flatten into the SEPARATE
-  // parent's interior layout — which means a single port on the outermost
-  // SEPARATE_CHILDREN subgraph is enough to route the edge through to the
-  // leaf. (Multiple nested SEPARATE_CHILDREN subgraphs on the same path is
-  // not supported by this single-level port scheme; that case would require
-  // chained ports.)
-  function outermostSeparateOnPath(startId: string | undefined): string | undefined {
-    if (!startId) return undefined
-    const chain: string[] = []
-    let cursor: string | undefined = startId
-    while (cursor !== undefined) { chain.push(cursor); cursor = subgraphParent.get(cursor) }
-    for (let i = chain.length - 1; i >= 0; i--) {
-      if (subgraphsNeedingSeparate.has(chain[i]!)) return chain[i]
-    }
-    return undefined
+  // Cross-hier edges placed at a subgraph's LCA — keyed by subgraph id.
+  const lcaPlacedEdges = new Map<string, ElkExtendedEdge[]>()
+
+  // Plan per cross-hier edge: where it lives, what its source/target IDs are.
+  interface EdgePlan {
+    index: number
+    edge: typeof graph.edges[0]
+    placeAt: string | undefined  // subgraph id or undefined for root
+    sourceId: string  // either edge.source or a port id
+    targetId: string  // either edge.target or a port id
   }
 
-  // Annotate each cross-hier edge with the subgraph (if any) whose port it
-  // attaches to on each side. `undefined` means "the edge attaches directly to
-  // the leaf node, no SEPARATE_CHILDREN subgraph on this side".
-  const crossHierEdgePorts: Array<{
-    sourcePortCompound: string | undefined
-    targetPortCompound: string | undefined
-  }> = crossHierarchyEdges.map(({ sourceSubgraph, targetSubgraph }) => ({
-    sourcePortCompound: outermostSeparateOnPath(sourceSubgraph),
-    targetPortCompound: outermostSeparateOnPath(targetSubgraph),
-  }))
+  const edgePlans: EdgePlan[] = []
+  for (const ce of crossHierarchyEdges) {
+    const lca = lowestCommonAncestor(ce.sourceSubgraph, ce.targetSubgraph, subgraphParent)
 
-  for (let i = 0; i < crossHierarchyEdges.length; i++) {
-    const { index, edge } = crossHierarchyEdges[i]!
-    const { sourcePortCompound, targetPortCompound } = crossHierEdgePorts[i]!
+    // If the LCA itself is SEPARATE, the edge is internal to LCA's interior;
+    // the leaves are visible there directly so we don't need ports.
+    if (lca !== undefined && subgraphsNeedingSeparate.has(lca)) {
+      edgePlans.push({ index: ce.index, edge: ce.edge, placeAt: lca, sourceId: ce.edge.source, targetId: ce.edge.target })
+      continue
+    }
 
-    if (sourcePortCompound) {
-      const sg = subgraphMap.get(sourcePortCompound)!
+    const sourcePort = outermostSeparateBetween(ce.sourceSubgraph, lca)
+    const targetPort = outermostSeparateBetween(ce.targetSubgraph, lca)
+
+    if (sourcePort) {
+      const sg = subgraphMap.get(sourcePort)!
       const side = portSideFor(sg.direction!, /*incoming=*/false)
-      const portId = `${sourcePortCompound}_out_${index}`
-      if (!subgraphPorts.has(sourcePortCompound)) subgraphPorts.set(sourcePortCompound, [])
-      subgraphPorts.get(sourcePortCompound)!.push({
-        portId, edgeIndex: index, direction: 'outgoing', internalNodeId: edge.source, side,
+      const portId = `${sourcePort}_out_${ce.index}`
+      if (!subgraphPorts.has(sourcePort)) subgraphPorts.set(sourcePort, [])
+      subgraphPorts.get(sourcePort)!.push({
+        portId, edgeIndex: ce.index, direction: 'outgoing', internalNodeId: ce.edge.source, side,
       })
     }
-    if (targetPortCompound) {
-      const sg = subgraphMap.get(targetPortCompound)!
+    if (targetPort) {
+      const sg = subgraphMap.get(targetPort)!
       const side = portSideFor(sg.direction!, /*incoming=*/true)
-      const portId = `${targetPortCompound}_in_${index}`
-      if (!subgraphPorts.has(targetPortCompound)) subgraphPorts.set(targetPortCompound, [])
-      subgraphPorts.get(targetPortCompound)!.push({
-        portId, edgeIndex: index, direction: 'incoming', internalNodeId: edge.target, side,
+      const portId = `${targetPort}_in_${ce.index}`
+      if (!subgraphPorts.has(targetPort)) subgraphPorts.set(targetPort, [])
+      subgraphPorts.get(targetPort)!.push({
+        portId, edgeIndex: ce.index, direction: 'incoming', internalNodeId: ce.edge.target, side,
       })
+    }
+
+    edgePlans.push({
+      index: ce.index,
+      edge: ce.edge,
+      placeAt: lca,
+      sourceId: sourcePort ? `${sourcePort}_out_${ce.index}` : ce.edge.source,
+      targetId: targetPort ? `${targetPort}_in_${ce.index}` : ce.edge.target,
+    })
+  }
+
+  // Build the ELK edges from the plans now (before subgraphToElk runs) and
+  // dispatch them to their containing compound. Edges with placeAt=undefined
+  // get held aside for emission at root level after the root graph is built.
+  const rootCrossHierEdges: ElkExtendedEdge[] = []
+  for (const plan of edgePlans) {
+    const elkEdge: ElkExtendedEdge = {
+      id: `e${plan.index}`,
+      sources: [plan.sourceId],
+      targets: [plan.targetId],
+    }
+    if (plan.edge.label) {
+      const metrics = measureMultilineText(plan.edge.label, FONT_SIZES.edgeLabel, FONT_WEIGHTS.edgeLabel)
+      elkEdge.labels = [{
+        text: plan.edge.label,
+        width: metrics.width + 8,
+        height: metrics.height + 6,
+        layoutOptions: {
+          'elk.edgeLabels.inline': 'true',
+          'elk.edgeLabels.placement': 'CENTER',
+        },
+      }]
+    }
+    if (plan.placeAt === undefined) {
+      rootCrossHierEdges.push(elkEdge)
+    } else {
+      if (!lcaPlacedEdges.has(plan.placeAt)) lcaPlacedEdges.set(plan.placeAt, [])
+      lcaPlacedEdges.get(plan.placeAt)!.push(elkEdge)
     }
   }
 
@@ -309,7 +365,7 @@ function mermaidToElk(
 
   // Add subgraphs as compound nodes with children and their internal edges
   for (const sg of graph.subgraphs) {
-    elkGraph.children!.push(subgraphToElk(sg, graph, opts, edgesBySubgraph, subgraphPorts, subgraphsNeedingSeparate))
+    elkGraph.children!.push(subgraphToElk(sg, graph, opts, edgesBySubgraph, subgraphPorts, subgraphsNeedingSeparate, subgraphParent, lcaPlacedEdges))
   }
 
   // Add root-level edges
@@ -334,32 +390,9 @@ function mermaidToElk(
     elkGraph.edges!.push(elkEdge)
   }
 
-  // Cross-hierarchy edges. If a subgraph using SEPARATE_CHILDREN exists on
-  // the source/target path, the edge attaches to that subgraph's port at the
-  // appropriate side; otherwise it uses the leaf node directly and ELK routes
-  // it through the surrounding INCLUDE_CHILDREN layout.
-  for (let i = 0; i < crossHierarchyEdges.length; i++) {
-    const { index, edge } = crossHierarchyEdges[i]!
-    const { sourcePortCompound, targetPortCompound } = crossHierEdgePorts[i]!
-    const elkEdge: ElkExtendedEdge = {
-      id: `e${index}`,
-      sources: [sourcePortCompound ? `${sourcePortCompound}_out_${index}` : edge.source],
-      targets: [targetPortCompound ? `${targetPortCompound}_in_${index}` : edge.target],
-    }
-    if (edge.label) {
-      const metrics = measureMultilineText(edge.label, FONT_SIZES.edgeLabel, FONT_WEIGHTS.edgeLabel)
-      elkEdge.labels = [{
-        text: edge.label,
-        width: metrics.width + 8,
-        height: metrics.height + 6,
-        layoutOptions: {
-          'elk.edgeLabels.inline': 'true',
-          'elk.edgeLabels.placement': 'CENTER',
-        },
-      }]
-    }
-    elkGraph.edges!.push(elkEdge)
-  }
+  // Cross-hierarchy edges whose LCA is root (already prepared in
+  // rootCrossHierEdges) — emit them at the root level here.
+  for (const e of rootCrossHierEdges) elkGraph.edges!.push(e)
 
   return elkGraph
 }
@@ -390,7 +423,9 @@ function subgraphToElk(
     internalNodeId: string
     side: 'NORTH' | 'SOUTH' | 'EAST' | 'WEST'
   }>>,
-  subgraphsNeedingSeparate: Set<string>
+  subgraphsNeedingSeparate: Set<string>,
+  subgraphParent: Map<string, string | undefined>,
+  lcaPlacedEdges: Map<string, ElkExtendedEdge[]>
 ): ElkGraphNode {
   const layoutOptions: LayoutOptions = {
     'elk.algorithm': 'layered',
@@ -412,14 +447,16 @@ function subgraphToElk(
   if (subgraphsNeedingSeparate.has(sg.id)) {
     layoutOptions['elk.hierarchyHandling'] = 'SEPARATE_CHILDREN'
     layoutOptions['elk.portConstraints'] = 'FIXED_SIDE'
-  } else {
-    // Explicit INCLUDE_CHILDREN so this subgraph flattens into its parent's
-    // layout. Without this the subgraph would inherit hierarchyHandling from
-    // its parent — which, for a subgraph nested inside a SEPARATE_CHILDREN
-    // ancestor, would propagate SEPARATE_CHILDREN downward and break ELK's
-    // ability to route cross-hier edges through to leaf nodes.
+  } else if (hasSeparateAncestor(sg.id, subgraphParent, subgraphsNeedingSeparate)) {
+    // Override inherit-from-SEPARATE-parent so this subgraph's leaves flatten
+    // up to its nearest SEPARATE ancestor's interior layout.
     layoutOptions['elk.hierarchyHandling'] = 'INCLUDE_CHILDREN'
   }
+  // Else: leave hierarchyHandling unset and let it inherit from root
+  // (INCLUDE_CHILDREN). Setting it explicitly when no SEPARATE compound is
+  // anywhere in the ancestor chain confuses ELK's router on deeply-nested
+  // diagrams (it produces edges with start/end points well outside the
+  // source/target nodes).
 
   const elkNode: ElkGraphNode = {
     id: sg.id,
@@ -454,7 +491,7 @@ function subgraphToElk(
 
   // Add nested subgraphs recursively
   for (const child of sg.children) {
-    elkNode.children!.push(subgraphToElk(child, graph, opts, edgesBySubgraph, subgraphPorts, subgraphsNeedingSeparate))
+    elkNode.children!.push(subgraphToElk(child, graph, opts, edgesBySubgraph, subgraphPorts, subgraphsNeedingSeparate, subgraphParent, lcaPlacedEdges))
   }
 
   // Add internal edges (edges where both endpoints are in this subgraph)
@@ -492,6 +529,11 @@ function subgraphToElk(
     elkNode.edges!.push(elkEdge)
   }
 
+  // Cross-hierarchy edges whose LCA is this subgraph were placed here so
+  // ELK uses this subgraph's coordinate system for them.
+  const lcaEdges = lcaPlacedEdges.get(sg.id)
+  if (lcaEdges) elkNode.edges!.push(...lcaEdges)
+
   return elkNode
 }
 
@@ -518,6 +560,47 @@ function buildSubgraphParentMap(subgraphs: MermaidSubgraph[]): Map<string, strin
   }
   for (const sg of subgraphs) traverse(sg, undefined)
   return map
+}
+
+/**
+ * True when any ancestor of `sgId` is in `subgraphsNeedingSeparate`. Used to
+ * decide whether a subgraph needs an explicit `INCLUDE_CHILDREN` to override
+ * the SEPARATE_CHILDREN it would otherwise inherit from a SEPARATE ancestor.
+ */
+function hasSeparateAncestor(
+  sgId: string,
+  parentMap: Map<string, string | undefined>,
+  subgraphsNeedingSeparate: Set<string>
+): boolean {
+  let cursor = parentMap.get(sgId)
+  while (cursor !== undefined) {
+    if (subgraphsNeedingSeparate.has(cursor)) return true
+    cursor = parentMap.get(cursor)
+  }
+  return false
+}
+
+/**
+ * Find the lowest common ancestor of two subgraphs in the parent chain.
+ * Returns undefined when the LCA is the (implicit) root level — i.e. neither
+ * chain shares a subgraph ancestor. Either argument can be undefined,
+ * representing a node placed at the root level.
+ */
+function lowestCommonAncestor(
+  a: string | undefined,
+  b: string | undefined,
+  parentMap: Map<string, string | undefined>
+): string | undefined {
+  if (a === undefined || b === undefined) return undefined
+  const aChain = new Set<string>()
+  let cursor: string | undefined = a
+  while (cursor !== undefined) { aChain.add(cursor); cursor = parentMap.get(cursor) }
+  cursor = b
+  while (cursor !== undefined) {
+    if (aChain.has(cursor)) return cursor
+    cursor = parentMap.get(cursor)
+  }
+  return undefined
 }
 
 /** Build an id-keyed map of every subgraph (top-level and nested). */
@@ -886,25 +969,43 @@ function extractEdgesRecursively(
       }
     }
 
-    // Synthesis: ELK leaves the port→leaf section empty when the leaf is
-    // buried inside an INCLUDE_CHILDREN descendant of a SEPARATE_CHILDREN
-    // ancestor — the polyline then stops at the SEPARATE boundary instead
-    // of reaching the leaf. Detect that and extend the polyline ourselves
-    // by adding a turn point + an entry point on the leaf's bounding box,
-    // picking the entry side from the leaf's containing subgraph direction.
-    // The same applies in reverse for source-side internal segments.
-    if (nodeById && allPoints.length > 0) {
-      const targetNode = nodeById.get(originalEdge.target)
-      if (targetNode && !pointTouchesRectBoundary(allPoints[allPoints.length - 1]!, targetNode)) {
-        const approach = allPoints[allPoints.length - 1]!
-        const side = nearestSide(approach, targetNode)
-        allPoints.push(...synthesizeEntrySegment(approach, targetNode, side))
-      }
+    // Synthesis: ELK doesn't always route cross-hierarchy edges where one or
+    // both endpoints are buried inside an INCLUDE_CHILDREN descendant of a
+    // SEPARATE_CHILDREN ancestor. Two cases to handle:
+    //   1. Polyline ends short of the source/target node (port→leaf
+    //      section was empty). Extend with a turn + entry/exit point.
+    //   2. Polyline is empty entirely (ELK gave no sections at all).
+    //      Synthesize the whole edge as a 3-point L between the source
+    //      and target nodes, picking sides geometrically.
+    if (nodeById) {
       const sourceNode = nodeById.get(originalEdge.source)
-      if (sourceNode && !pointTouchesRectBoundary(allPoints[0]!, sourceNode)) {
-        const approach = allPoints[0]!
-        const side = nearestSide(approach, sourceNode)
-        allPoints.unshift(...synthesizeExitSegment(sourceNode, side, approach))
+      const targetNode = nodeById.get(originalEdge.target)
+
+      if (allPoints.length === 0 && sourceNode && targetNode) {
+        const sourceCenter = { x: sourceNode.x + sourceNode.width / 2, y: sourceNode.y + sourceNode.height / 2 }
+        const targetCenter = { x: targetNode.x + targetNode.width / 2, y: targetNode.y + targetNode.height / 2 }
+        const exitSide = nearestSide(targetCenter, sourceNode)
+        const entrySide = nearestSide(sourceCenter, targetNode)
+        const exit = entryPointOnSide(sourceNode, exitSide)
+        const entry = entryPointOnSide(targetNode, entrySide)
+        // The final segment must align with the entry side: horizontal entry
+        // (E/W) → bend vertically first; vertical entry (N/S) → bend
+        // horizontally first.
+        const turn = (entrySide === 'WEST' || entrySide === 'EAST')
+          ? { x: exit.x, y: entry.y }
+          : { x: entry.x, y: exit.y }
+        allPoints.push(exit, turn, entry)
+      } else if (allPoints.length > 0) {
+        if (targetNode && !pointTouchesRectBoundary(allPoints[allPoints.length - 1]!, targetNode)) {
+          const approach = allPoints[allPoints.length - 1]!
+          const side = nearestSide(approach, targetNode)
+          allPoints.push(...synthesizeEntrySegment(approach, targetNode, side))
+        }
+        if (sourceNode && !pointTouchesRectBoundary(allPoints[0]!, sourceNode)) {
+          const approach = allPoints[0]!
+          const side = nearestSide(approach, sourceNode)
+          allPoints.unshift(...synthesizeExitSegment(sourceNode, side, approach))
+        }
       }
     }
 
