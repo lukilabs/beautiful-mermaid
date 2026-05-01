@@ -356,12 +356,13 @@ describe('layoutGraph – nested subgraph with cross-hierarchy edges', () => {
 
 describe('layoutGraph – direction permutations', () => {
   it('LR root with TB-direction nested subgraph keeps the inner content vertical', () => {
+    // Subgraph declared first so `a` parses inside `stack`, not at root.
     const g = layout(`graph LR
-      src[Source] --> a
       subgraph stack [TB Stack]
         direction TB
         a --> b --> c
       end
+      src[Source] --> a
       c --> sink[Sink]`)
 
     const a = node(g, 'a'), b = node(g, 'b'), c = node(g, 'c')
@@ -375,10 +376,9 @@ describe('layoutGraph – direction permutations', () => {
   })
 
   it('TD root with mixed-direction sibling subgraphs preserves each independently', () => {
+    // Subgraphs declared first so l1-l3 and r1-r3 parse inside their
+    // respective subgraphs, not at root.
     const g = layout(`graph TD
-      hub[Hub]
-      hub --> l1
-      hub --> r1
       subgraph leftSide [LR pipeline]
         direction LR
         l1 --> l2 --> l3
@@ -387,6 +387,9 @@ describe('layoutGraph – direction permutations', () => {
         direction BT
         r1 --> r2 --> r3
       end
+      hub[Hub]
+      hub --> l1
+      hub --> r1
       l3 --> tail[Tail]
       r3 --> tail`)
 
@@ -412,9 +415,11 @@ describe('layoutGraph – direction permutations', () => {
     // middle.dir LR != effective parent (root TB) → SEPARATE
     // inner.dir LR == middle.dir LR → inner inherits, no SEPARATE (and is
     // explicitly INCLUDE_CHILDREN so the leaf nodes flatten into middle's
-    // interior layout, where the cross-hier port can reach them)
+    // interior layout, where the cross-hier port can reach them).
+    //
+    // Subgraph declared first so `a` parses as a member of `inner`, not
+    // root level (Mermaid registers a node at the level it first appears).
     const g = layout(`graph TB
-      src[Source] --> a
       subgraph outer [TB Outer]
         direction TB
         subgraph middle [LR Middle]
@@ -425,6 +430,7 @@ describe('layoutGraph – direction permutations', () => {
           end
         end
       end
+      src[Source] --> a
       c --> sink[Sink]`)
 
     const a = node(g, 'a'), b = node(g, 'b'), c = node(g, 'c')
@@ -433,6 +439,16 @@ describe('layoutGraph – direction permutations', () => {
 
     const middle = group(g, 'LR Middle')
     expect(middle.width).toBeGreaterThan(middle.height)
+
+    // The cross-hierarchy edge from `src` must terminate on `a`'s bounding
+    // box, not stop at some interior subgraph boundary.
+    const srcToA = g.edges.find(e => e.source === 'src' && e.target === 'a')!
+    const lastPoint = srcToA.points[srcToA.points.length - 1]!
+    const onLeft   = Math.abs(lastPoint.x - a.x) < 5             && lastPoint.y >= a.y - 5 && lastPoint.y <= a.y + a.height + 5
+    const onRight  = Math.abs(lastPoint.x - (a.x + a.width)) < 5  && lastPoint.y >= a.y - 5 && lastPoint.y <= a.y + a.height + 5
+    const onTop    = Math.abs(lastPoint.y - a.y) < 5             && lastPoint.x >= a.x - 5 && lastPoint.x <= a.x + a.width + 5
+    const onBottom = Math.abs(lastPoint.y - (a.y + a.height)) < 5 && lastPoint.x >= a.x - 5 && lastPoint.x <= a.x + a.width + 5
+    expect(onLeft || onRight || onTop || onBottom).toBe(true)
   })
 
   it('sibling subgraphs with RL and BT directions inside a TB parent each preserve their own direction', () => {
@@ -534,6 +550,80 @@ describe('layoutGraph – direction permutations', () => {
 
     // No horizontal sprawl: the diagram stays narrow even four levels deep.
     expect(g.height).toBeGreaterThan(g.width)
+  })
+
+  it('alternating direction nesting LR/LR/TB/LR/TB (no leaves between layers) preserves each direction', () => {
+    // Direction swaps at every level except the root match:
+    //   root LR → L1 LR (matches root, no SEPARATE) → L2 TB (SEPARATE)
+    //   → L3 LR (SEPARATE) → L4 TB (SEPARATE).
+    // Only the innermost layer has leaf nodes — every intermediate layer is
+    // pure structure. With no cross-hierarchy edges to route through the
+    // SEPARATE_CHILDREN boundaries, the multi-level case lays out cleanly.
+    const g = layout(`graph LR
+      subgraph L1 [Outer LR]
+        direction LR
+        subgraph L2 [Inner TB]
+          direction TB
+          subgraph L3 [Deeper LR]
+            direction LR
+            subgraph L4 [Deepest TB]
+              direction TB
+              a --> b --> c
+            end
+          end
+        end
+      end`)
+
+    const a = node(g, 'a'), b = node(g, 'b'), c = node(g, 'c')
+    // Innermost L4 is TB — a/b/c stack vertically.
+    expect(b.y).toBeGreaterThan(a.y)
+    expect(c.y).toBeGreaterThan(b.y)
+
+    const l1 = group(g, 'Outer LR')
+    const l2 = group(g, 'Inner TB')
+    const l3 = group(g, 'Deeper LR')
+    const l4 = group(g, 'Deepest TB')
+
+    // Each layer fits inside its parent.
+    expect(rectContains(l1, l2)).toBe(true)
+    expect(rectContains(l2, l3)).toBe(true)
+    expect(rectContains(l3, l4)).toBe(true)
+    expect(rectContains(l4, a)).toBe(true)
+  })
+
+  it('alternating direction nesting TB/LR/TB/LR (no leaves between layers) preserves each direction', () => {
+    // Mirror of the previous test starting from TB:
+    //   root TB → L1 TB (matches root) → L2 LR (SEPARATE) → L3 TB (SEPARATE)
+    //   → L4 LR (SEPARATE). Innermost has the chain; intermediates are empty.
+    const g = layout(`graph TB
+      subgraph L1 [Outer TB]
+        direction TB
+        subgraph L2 [Inner LR]
+          direction LR
+          subgraph L3 [Deeper TB]
+            direction TB
+            subgraph L4 [Deepest LR]
+              direction LR
+              a --> b --> c
+            end
+          end
+        end
+      end`)
+
+    const a = node(g, 'a'), b = node(g, 'b'), c = node(g, 'c')
+    // Innermost L4 is LR — a/b/c arrange horizontally.
+    expect(b.x).toBeGreaterThan(a.x)
+    expect(c.x).toBeGreaterThan(b.x)
+
+    const l1 = group(g, 'Outer TB')
+    const l2 = group(g, 'Inner LR')
+    const l3 = group(g, 'Deeper TB')
+    const l4 = group(g, 'Deepest LR')
+
+    expect(rectContains(l1, l2)).toBe(true)
+    expect(rectContains(l2, l3)).toBe(true)
+    expect(rectContains(l3, l4)).toBe(true)
+    expect(rectContains(l4, a)).toBe(true)
   })
 
   it('multiple cross-hierarchy edges into a non-matching direction subgraph keep the LR flow', () => {

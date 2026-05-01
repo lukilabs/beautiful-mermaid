@@ -199,6 +199,7 @@ function mermaidToElk(
     graph.direction
   )
 
+
   // Track ports per subgraph. Only subgraphs in `subgraphsNeedingSeparate`
   // produce ports — other subgraphs let cross-hier edges pass through
   // INCLUDE_CHILDREN routing.
@@ -653,10 +654,17 @@ function elkToPositioned(
       }
     : undefined
 
+  // Build a node-id lookup so the edge extractor can synthesize segments
+  // for any cross-hierarchy edge whose port→leaf internal section ELK left
+  // empty (this happens when the leaf sits inside an INCLUDE_CHILDREN
+  // descendant of a SEPARATE_CHILDREN ancestor — ELK only routes port→leaf
+  // when the leaf is a direct child of the port-bearing subgraph).
+  const nodeById = new Map(nodes.map(n => [n.id, n]))
+
   // Extract edges recursively from all levels (root and subgraphs)
   // Edges are distributed to subgraphs for direction override to work,
   // so we need to collect them from all children with proper offsets
-  extractEdgesRecursively(elkResult, graph, edges, 0, 0, margins)
+  extractEdgesRecursively(elkResult, graph, edges, 0, 0, margins, nodeById)
 
   // Snap same-layer nodes to the same position along the flow axis.
   // ELK's orthogonal routing staggers nodes within a layer to create room for
@@ -832,7 +840,8 @@ function extractEdgesRecursively(
   edges: PositionedEdge[],
   offsetX: number,
   offsetY: number,
-  margins?: MarginInfo
+  margins?: MarginInfo,
+  nodeById?: Map<string, PositionedNode>
 ): void {
   // First pass: collect all edge segments
   const segments = new Map<number, { external?: EdgeSegment; incoming?: EdgeSegment; outgoing?: EdgeSegment }>()
@@ -874,6 +883,29 @@ function extractEdgesRecursively(
         allPoints.push(...seg.incoming.points.slice(1))
       } else {
         allPoints.push(...seg.incoming.points)
+      }
+    }
+
+    // Synthesis: ELK leaves the port→leaf section empty when the leaf is
+    // buried inside an INCLUDE_CHILDREN descendant of a SEPARATE_CHILDREN
+    // ancestor — the polyline then stops at the SEPARATE boundary instead
+    // of reaching the leaf. Detect that and extend the polyline ourselves
+    // by adding a turn point + an entry point on the leaf's bounding box,
+    // picking the entry side from the leaf's containing subgraph direction.
+    // The same applies in reverse for source-side internal segments.
+    if (nodeById && allPoints.length > 0) {
+      const targetNode = nodeById.get(originalEdge.target)
+      if (targetNode && !pointTouchesRectBoundary(allPoints[allPoints.length - 1]!, targetNode)) {
+        const direction = nodeContainerDirection(originalEdge.target, graph)
+        const side = portSideFor(direction, /*incoming=*/true)
+        allPoints.push(...synthesizeEntrySegment(allPoints[allPoints.length - 1]!, targetNode, side))
+      }
+      const sourceNode = nodeById.get(originalEdge.source)
+      if (sourceNode && !pointTouchesRectBoundary(allPoints[0]!, sourceNode)) {
+        const direction = nodeContainerDirection(originalEdge.source, graph)
+        const side = portSideFor(direction, /*incoming=*/false)
+        const exit = synthesizeExitSegment(sourceNode, side, allPoints[0]!)
+        allPoints.unshift(...exit)
       }
     }
 
@@ -981,6 +1013,84 @@ function orthogonalizeEdgePoints(
   }
 
   return result
+}
+
+/**
+ * True when point `p` lies on (or within `tolerance` of) the rectangle's
+ * boundary. The point's other coordinate must also be within the rectangle's
+ * span on that axis (so a point above the rect doesn't count as "on top").
+ */
+function pointTouchesRectBoundary(
+  p: Point,
+  r: { x: number; y: number; width: number; height: number },
+  tolerance = 5
+): boolean {
+  const onLeft   = Math.abs(p.x - r.x) < tolerance              && p.y >= r.y - tolerance && p.y <= r.y + r.height + tolerance
+  const onRight  = Math.abs(p.x - (r.x + r.width)) < tolerance  && p.y >= r.y - tolerance && p.y <= r.y + r.height + tolerance
+  const onTop    = Math.abs(p.y - r.y) < tolerance              && p.x >= r.x - tolerance && p.x <= r.x + r.width + tolerance
+  const onBottom = Math.abs(p.y - (r.y + r.height)) < tolerance && p.x >= r.x - tolerance && p.x <= r.x + r.width + tolerance
+  return onLeft || onRight || onTop || onBottom
+}
+
+/**
+ * Find the direction of the innermost subgraph containing the given node.
+ * Falls back to the root graph direction when the node has no containing
+ * subgraph or the containing subgraph chain has no `direction` directive.
+ *
+ * Used by edge synthesis to pick which side of the source/target node a
+ * synthesized cross-hierarchy edge should enter/exit from.
+ */
+function nodeContainerDirection(nodeId: string, graph: MermaidGraph): Direction {
+  function findInnermost(subs: MermaidSubgraph[]): MermaidSubgraph | undefined {
+    for (const sg of subs) {
+      const deeper = findInnermost(sg.children)
+      if (deeper) return deeper
+      if (sg.nodeIds.includes(nodeId)) return sg
+    }
+    return undefined
+  }
+  const containing = findInnermost(graph.subgraphs)
+  if (containing?.direction) return containing.direction
+  return graph.direction
+}
+
+/**
+ * Compute a coordinate on the named side of the node's bounding box —
+ * the midpoint of that side.
+ */
+function entryPointOnSide(node: PositionedNode, side: 'NORTH' | 'SOUTH' | 'EAST' | 'WEST'): Point {
+  switch (side) {
+    case 'WEST':  return { x: node.x,                   y: node.y + node.height / 2 }
+    case 'EAST':  return { x: node.x + node.width,      y: node.y + node.height / 2 }
+    case 'NORTH': return { x: node.x + node.width / 2,  y: node.y }
+    case 'SOUTH': return { x: node.x + node.width / 2,  y: node.y + node.height }
+  }
+}
+
+/**
+ * Build the [turn, entry] point pair to extend a polyline from `last` to
+ * the chosen `side` of `target`. The turn keeps the final segment aligned
+ * with the entry side (horizontal entry on WEST/EAST, vertical on N/S).
+ */
+function synthesizeEntrySegment(last: Point, target: PositionedNode, side: 'NORTH' | 'SOUTH' | 'EAST' | 'WEST'): Point[] {
+  const entry = entryPointOnSide(target, side)
+  const turn = (side === 'WEST' || side === 'EAST')
+    ? { x: last.x, y: entry.y }   // vertical first, then horizontal entry
+    : { x: entry.x, y: last.y }   // horizontal first, then vertical entry
+  return [turn, entry]
+}
+
+/**
+ * Mirror of synthesizeEntrySegment for the source side: build the
+ * [exit, turn] pair so a polyline exits the source through `side` and
+ * meets `first` orthogonally.
+ */
+function synthesizeExitSegment(source: PositionedNode, side: 'NORTH' | 'SOUTH' | 'EAST' | 'WEST', first: Point): Point[] {
+  const exit = entryPointOnSide(source, side)
+  const turn = (side === 'WEST' || side === 'EAST')
+    ? { x: first.x, y: exit.y }
+    : { x: exit.x, y: first.y }
+  return [exit, turn]
 }
 
 /**
