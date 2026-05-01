@@ -896,16 +896,15 @@ function extractEdgesRecursively(
     if (nodeById && allPoints.length > 0) {
       const targetNode = nodeById.get(originalEdge.target)
       if (targetNode && !pointTouchesRectBoundary(allPoints[allPoints.length - 1]!, targetNode)) {
-        const direction = nodeContainerDirection(originalEdge.target, graph)
-        const side = portSideFor(direction, /*incoming=*/true)
-        allPoints.push(...synthesizeEntrySegment(allPoints[allPoints.length - 1]!, targetNode, side))
+        const approach = allPoints[allPoints.length - 1]!
+        const side = nearestSide(approach, targetNode)
+        allPoints.push(...synthesizeEntrySegment(approach, targetNode, side))
       }
       const sourceNode = nodeById.get(originalEdge.source)
       if (sourceNode && !pointTouchesRectBoundary(allPoints[0]!, sourceNode)) {
-        const direction = nodeContainerDirection(originalEdge.source, graph)
-        const side = portSideFor(direction, /*incoming=*/false)
-        const exit = synthesizeExitSegment(sourceNode, side, allPoints[0]!)
-        allPoints.unshift(...exit)
+        const approach = allPoints[0]!
+        const side = nearestSide(approach, sourceNode)
+        allPoints.unshift(...synthesizeExitSegment(sourceNode, side, approach))
       }
     }
 
@@ -1033,25 +1032,22 @@ function pointTouchesRectBoundary(
 }
 
 /**
- * Find the direction of the innermost subgraph containing the given node.
- * Falls back to the root graph direction when the node has no containing
- * subgraph or the containing subgraph chain has no `direction` directive.
- *
- * Used by edge synthesis to pick which side of the source/target node a
- * synthesized cross-hierarchy edge should enter/exit from.
+ * Pick the side of `node` whose midpoint is closest to `approach`. Used to
+ * synthesize the entry/exit of a cross-hierarchy edge so its corner sits
+ * inside the surrounding subgraph (giving a clean L-shape) rather than on
+ * the subgraph's boundary (which would create a jagged path running along
+ * the edge of the subgraph).
  */
-function nodeContainerDirection(nodeId: string, graph: MermaidGraph): Direction {
-  function findInnermost(subs: MermaidSubgraph[]): MermaidSubgraph | undefined {
-    for (const sg of subs) {
-      const deeper = findInnermost(sg.children)
-      if (deeper) return deeper
-      if (sg.nodeIds.includes(nodeId)) return sg
-    }
-    return undefined
-  }
-  const containing = findInnermost(graph.subgraphs)
-  if (containing?.direction) return containing.direction
-  return graph.direction
+function nearestSide(approach: Point, node: PositionedNode): 'NORTH' | 'SOUTH' | 'EAST' | 'WEST' {
+  const distNorth = Math.abs(approach.y - node.y)
+  const distSouth = Math.abs(approach.y - (node.y + node.height))
+  const distWest  = Math.abs(approach.x - node.x)
+  const distEast  = Math.abs(approach.x - (node.x + node.width))
+  const min = Math.min(distNorth, distSouth, distWest, distEast)
+  if (min === distNorth) return 'NORTH'
+  if (min === distSouth) return 'SOUTH'
+  if (min === distWest)  return 'WEST'
+  return 'EAST'
 }
 
 /**

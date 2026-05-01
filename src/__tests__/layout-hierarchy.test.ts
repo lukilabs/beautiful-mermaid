@@ -65,6 +65,38 @@ function group(graph: PositionedGraph, idOrLabel: string): PositionedGroup {
 }
 
 /**
+ * True when point `p` sits on (or within `tol` of) the rectangle's boundary.
+ * Used to assert that an edge polyline actually terminates at its target
+ * leaf's bounding box rather than stopping short at some interior subgraph
+ * boundary.
+ */
+function pointTouchesRect(p: Point, r: Rect, tol = 5): boolean {
+  const onLeft   = Math.abs(p.x - r.x) < tol             && p.y >= r.y - tol && p.y <= r.y + r.height + tol
+  const onRight  = Math.abs(p.x - (r.x + r.width)) < tol  && p.y >= r.y - tol && p.y <= r.y + r.height + tol
+  const onTop    = Math.abs(p.y - r.y) < tol             && p.x >= r.x - tol && p.x <= r.x + r.width + tol
+  const onBottom = Math.abs(p.y - (r.y + r.height)) < tol && p.x >= r.x - tol && p.x <= r.x + r.width + tol
+  return onLeft || onRight || onTop || onBottom
+}
+
+/**
+ * Assert that the cross-hierarchy edge from `src` to `tgt` exists and its
+ * polyline terminates on `tgt`'s bounding box.
+ */
+function expectEdgeReachesTarget(g: PositionedGraph, src: string, tgt: string): void {
+  const edge = g.edges.find(e => e.source === src && e.target === tgt)
+  expect(edge, `edge ${src} → ${tgt} not found in laid-out graph`).toBeDefined()
+  const last = edge!.points[edge!.points.length - 1]!
+  const target = g.nodes.find(n => n.id === tgt)!
+  expect(
+    pointTouchesRect(last, target),
+    `edge ${src} → ${tgt} ends at (${last.x.toFixed(0)}, ${last.y.toFixed(0)}) which is not on ${tgt}'s bounding box (${target.x.toFixed(0)}, ${target.y.toFixed(0)}, ${target.width.toFixed(0)}x${target.height.toFixed(0)})`
+  ).toBe(true)
+}
+
+/** Need Point alias for the helper above. */
+type Point = { x: number; y: number }
+
+/**
  * Assert that no two leaf nodes overlap. Pretty-prints which pair overlaps so
  * a sample-set failure points directly at the offending nodes.
  */
@@ -550,6 +582,153 @@ describe('layoutGraph – direction permutations', () => {
 
     // No horizontal sprawl: the diagram stays narrow even four levels deep.
     expect(g.height).toBeGreaterThan(g.width)
+  })
+
+  // --------------------------------------------------------------------------
+  // Multi-level workflow tests: subgraphs nested 3+ levels deep with nodes
+  // at every level, and cross-hierarchy edges that cross varying numbers of
+  // subgraph boundaries (1, 2, 3, n). These exercise the edge-synthesis
+  // path that completes the polyline when ELK leaves the port→leaf section
+  // empty (which it does whenever the leaf is buried inside an
+  // INCLUDE_CHILDREN descendant of a SEPARATE_CHILDREN ancestor).
+  // --------------------------------------------------------------------------
+
+  it('3-level nesting, nodes at every level, edges crossing 1 / 2 / 3 boundaries each reach their target', () => {
+    // Structure:
+    //   root: ext1
+    //   outer { mid_a; middle { in_a; inner { deep_a → deep_b } } }
+    // Cross-hierarchy edges at varying depths:
+    //   ext1 → mid_a   (crosses outer boundary only)
+    //   ext1 → in_a    (crosses outer + middle)
+    //   ext1 → deep_a  (crosses outer + middle + inner)
+    //   mid_a → in_a   (one level deeper)
+    //   in_a → mid_a   (one level shallower)
+    const g = layout(`graph TB
+      subgraph outer [Outer]
+        mid_a[mid a]
+        subgraph middle [Middle]
+          in_a[in a]
+          subgraph inner [Inner]
+            deep_a[deep a] --> deep_b[deep b]
+          end
+        end
+      end
+      ext1[Ext 1]
+      ext1 --> mid_a
+      ext1 --> in_a
+      ext1 --> deep_a
+      mid_a --> in_a
+      in_a --> mid_a`)
+
+    expectEdgeReachesTarget(g, 'ext1', 'mid_a')
+    expectEdgeReachesTarget(g, 'ext1', 'in_a')
+    expectEdgeReachesTarget(g, 'ext1', 'deep_a')
+    expectEdgeReachesTarget(g, 'mid_a', 'in_a')
+    expectEdgeReachesTarget(g, 'in_a', 'mid_a')
+
+    // Containment holds at every level.
+    expect(rectContains(group(g, 'Outer'), group(g, 'Middle'))).toBe(true)
+    expect(rectContains(group(g, 'Middle'), group(g, 'Inner'))).toBe(true)
+    expect(rectContains(group(g, 'Outer'), node(g, 'mid_a'))).toBe(true)
+    expect(rectContains(group(g, 'Middle'), node(g, 'in_a'))).toBe(true)
+    expect(rectContains(group(g, 'Inner'), node(g, 'deep_a'))).toBe(true)
+    expect(rectContains(group(g, 'Inner'), node(g, 'deep_b'))).toBe(true)
+
+    expectNoNodeOverlaps(g)
+  })
+
+  it('cross-hierarchy edge between cousin nodes (siblings at the same depth, shared parent) reaches its target', () => {
+    // Two child subgraphs with their own interior chains, both inside a
+    // shared parent. The cross-hier edges l2 → r1 and r2 → l1 must each
+    // exit one child subgraph, traverse the parent's interior, and enter
+    // the other child subgraph.
+    const g = layout(`graph TB
+      subgraph parent [Parent]
+        direction LR
+        subgraph leftChild [Left]
+          l1 --> l2
+        end
+        subgraph rightChild [Right]
+          r1 --> r2
+        end
+      end
+      l2 --> r1
+      r2 --> l1`)
+
+    expectEdgeReachesTarget(g, 'l2', 'r1')
+    expectEdgeReachesTarget(g, 'r2', 'l1')
+
+    expect(rectContains(group(g, 'Parent'), group(g, 'Left'))).toBe(true)
+    expect(rectContains(group(g, 'Parent'), group(g, 'Right'))).toBe(true)
+    expect(rectContains(group(g, 'Left'), node(g, 'l1'))).toBe(true)
+    expect(rectContains(group(g, 'Left'), node(g, 'l2'))).toBe(true)
+    expect(rectContains(group(g, 'Right'), node(g, 'r1'))).toBe(true)
+    expect(rectContains(group(g, 'Right'), node(g, 'r2'))).toBe(true)
+  })
+
+  it('4-level nesting with edges spanning every depth combination', () => {
+    // Edges with every distinct cross-hierarchy depth from a 4-level deep
+    // graph: root↔level1, root↔level4, level1↔level3.
+    const g = layout(`graph TB
+      subgraph L1 [Level 1]
+        l1_node[L1]
+        subgraph L2 [Level 2]
+          l2_node[L2]
+          subgraph L3 [Level 3]
+            l3_node[L3]
+            subgraph L4 [Level 4]
+              l4_node[L4]
+            end
+          end
+        end
+      end
+      root_node[Root]
+      root_node --> l4_node
+      root_node --> l1_node
+      l1_node --> l3_node
+      l4_node --> root_node`)
+
+    expectEdgeReachesTarget(g, 'root_node', 'l4_node')
+    expectEdgeReachesTarget(g, 'root_node', 'l1_node')
+    expectEdgeReachesTarget(g, 'l1_node', 'l3_node')
+    expectEdgeReachesTarget(g, 'l4_node', 'root_node')
+
+    // Full containment chain.
+    expect(rectContains(group(g, 'Level 1'), group(g, 'Level 2'))).toBe(true)
+    expect(rectContains(group(g, 'Level 2'), group(g, 'Level 3'))).toBe(true)
+    expect(rectContains(group(g, 'Level 3'), group(g, 'Level 4'))).toBe(true)
+    expect(rectContains(group(g, 'Level 4'), node(g, 'l4_node'))).toBe(true)
+  })
+
+  it('multi-level direction switches with nodes at varying levels keep edges connected', () => {
+    // Each level alternates direction. Cross-hierarchy edges connect nodes
+    // at different levels. Direction directives interact with edge
+    // synthesis at every depth.
+    const g = layout(`graph TB
+      subgraph L1 [TB Level 1]
+        direction TB
+        l1_a[l1 a]
+        subgraph L2 [LR Level 2]
+          direction LR
+          l2_a[l2 a]
+          subgraph L3 [TB Level 3]
+            direction TB
+            l3_a[l3 a] --> l3_b[l3 b]
+          end
+        end
+      end
+      ext[Ext]
+      ext --> l3_a
+      l1_a --> l3_b
+      l2_a --> l1_a`)
+
+    expectEdgeReachesTarget(g, 'ext', 'l3_a')
+    expectEdgeReachesTarget(g, 'l1_a', 'l3_b')
+    expectEdgeReachesTarget(g, 'l2_a', 'l1_a')
+
+    // The level-3 internal chain still flows TB inside its own subgraph.
+    const l3a = node(g, 'l3_a'), l3b = node(g, 'l3_b')
+    expect(l3b.y).toBeGreaterThan(l3a.y)
   })
 
   it('alternating direction nesting LR/LR/TB/LR/TB (no leaves between layers) preserves each direction', () => {
