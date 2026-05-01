@@ -435,6 +435,107 @@ describe('layoutGraph – direction permutations', () => {
     expect(middle.width).toBeGreaterThan(middle.height)
   })
 
+  it('sibling subgraphs with RL and BT directions inside a TB parent each preserve their own direction', () => {
+    // Both RL and BT differ from the TB root, so both get SEPARATE_CHILDREN
+    // + FIXED_SIDE ports. The cross-hierarchy edges entering each subgraph
+    // respect the direction-specific port side (incoming on EAST for RL,
+    // on SOUTH for BT — those are the "start" sides of each direction).
+    const g = layout(`graph TB
+      subgraph rlGroup [RL row]
+        direction RL
+        rlA --> rlB --> rlC
+      end
+      subgraph btGroup [BT stack]
+        direction BT
+        btA --> btB --> btC
+      end
+      hub[Hub]
+      tail[Tail]
+      hub --> rlA
+      hub --> btA
+      rlC --> tail
+      btC --> tail`)
+
+    const rlA = node(g, 'rlA'), rlB = node(g, 'rlB'), rlC = node(g, 'rlC')
+    const btA = node(g, 'btA'), btB = node(g, 'btB'), btC = node(g, 'btC')
+
+    // RL row: each successor sits to the LEFT of the previous.
+    expect(rlB.x).toBeLessThan(rlA.x)
+    expect(rlC.x).toBeLessThan(rlB.x)
+
+    // BT stack: each successor sits ABOVE the previous.
+    expect(btB.y).toBeLessThan(btA.y)
+    expect(btC.y).toBeLessThan(btB.y)
+
+    // Subgraph aspect ratios reflect each direction.
+    const rlRow = group(g, 'RL row')
+    const btStack = group(g, 'BT stack')
+    expect(rlRow.width).toBeGreaterThan(rlRow.height)
+    expect(btStack.height).toBeGreaterThan(btStack.width)
+  })
+
+  it('RL-direction nested subgraph reverses the flow inside an LR parent', () => {
+    // LR and RL flow along the same axis but in opposite directions. RL
+    // still differs from LR per `directionToElk` (LEFT vs RIGHT), so the
+    // subgraph gets SEPARATE_CHILDREN and the inner content lays out
+    // right-to-left.
+    const g = layout(`graph LR
+      subgraph reverse [RL Reverse]
+        direction RL
+        a --> b --> c
+      end
+      src[Source] --> a
+      c --> sink[Sink]`)
+
+    const a = node(g, 'a'), b = node(g, 'b'), c = node(g, 'c')
+    // Inside the RL subgraph: x decreases along the chain.
+    expect(b.x).toBeLessThan(a.x)
+    expect(c.x).toBeLessThan(b.x)
+  })
+
+  it('four-level nesting with all subgraphs matching the root direction does not sprawl', () => {
+    // Every subgraph declares the same direction as the root. None of them
+    // need SEPARATE_CHILDREN — they all flatten via INCLUDE_CHILDREN. The
+    // cross-hierarchy edge from src to the deepest leaf routes naturally
+    // through the flat layout. A pre-fix layout-engine would have treated
+    // this as "any direction directive present → flip root to SEPARATE"
+    // and produced a sprawl; this test guards that regression at depth.
+    const g = layout(`graph TB
+      subgraph L1 [Level 1]
+        direction TB
+        subgraph L2 [Level 2]
+          direction TB
+          subgraph L3 [Level 3]
+            direction TB
+            subgraph L4 [Level 4]
+              direction TB
+              a --> b --> c
+            end
+          end
+        end
+      end
+      src[Source] --> a
+      c --> sink[Sink]`)
+
+    const a = node(g, 'a'), b = node(g, 'b'), c = node(g, 'c')
+    // Innermost chain stacks vertically.
+    expect(b.y).toBeGreaterThan(a.y)
+    expect(c.y).toBeGreaterThan(b.y)
+
+    // All four levels nest cleanly inside each other.
+    const l1 = group(g, 'Level 1')
+    const l2 = group(g, 'Level 2')
+    const l3 = group(g, 'Level 3')
+    const l4 = group(g, 'Level 4')
+    expect(rectContains(l1, l2)).toBe(true)
+    expect(rectContains(l2, l3)).toBe(true)
+    expect(rectContains(l3, l4)).toBe(true)
+    expect(rectContains(l4, a)).toBe(true)
+
+    // No horizontal sprawl: the diagram stays narrow even four levels deep.
+    expect(g.height).toBeGreaterThan(g.width)
+  })
+
   it('multiple cross-hierarchy edges into a non-matching direction subgraph keep the LR flow', () => {
     // Subgraph declared first so a/b/c parse as members of `row`, not the
     // root level (Mermaid registers a node at the level it first appears).
