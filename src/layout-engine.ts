@@ -772,8 +772,12 @@ function elkToPositioned(
     collectAllSubgraphIds(sg, subgraphIds)
   }
 
-  // Extract nodes and groups recursively
-  extractNodesAndGroups(elkResult, graph, subgraphIds, nodes, groups, 0, 0)
+  // Extract nodes and groups recursively. nodeParent maps each leaf node
+  // to its immediate containing subgraph (or null for root) — used by
+  // alignLayerNodes to keep cross-subgraph nodes from being clustered into
+  // the same layer.
+  const nodeParent = new Map<string, string | null>()
+  extractNodesAndGroups(elkResult, graph, subgraphIds, nodes, groups, 0, 0, null, nodeParent)
 
   // Compute margin positions for cross-hierarchy edge routing.
   // Margins sit outside all group bounding boxes so edges don't cross through subgraphs.
@@ -801,7 +805,7 @@ function elkToPositioned(
   // ELK's orthogonal routing staggers nodes within a layer to create room for
   // edge bends, but this looks bad. We fix it by aligning layers, then let
   // edge bundling and clipping recalculate edge paths from corrected positions.
-  alignLayerNodes(nodes, edges, graph.direction)
+  alignLayerNodes(nodes, edges, graph.direction, nodeParent)
 
   // Bundle fan-out/fan-in edge paths into shared trunks when mergeEdges is enabled
   if (mergeEdges) {
@@ -861,7 +865,9 @@ function extractNodesAndGroups(
   nodes: PositionedNode[],
   groups: PositionedGroup[],
   offsetX: number,
-  offsetY: number
+  offsetY: number,
+  parentSubgraphId: string | null,
+  nodeParent: Map<string, string | null>
 ): void {
   if (!elkNode.children) return
 
@@ -876,7 +882,7 @@ function extractNodesAndGroups(
       const childGroups: PositionedGroup[] = []
 
       // Recursively process children
-      extractNodesAndGroups(child, graph, subgraphIds, nodes, childGroups, x, y)
+      extractNodesAndGroups(child, graph, subgraphIds, nodes, childGroups, x, y, child.id, nodeParent)
 
       const mermaidSg = findSubgraph(graph.subgraphs, child.id)
       groups.push({
@@ -905,11 +911,12 @@ function extractNodesAndGroups(
           height,
           inlineStyle,
         })
+        nodeParent.set(child.id, parentSubgraphId)
       }
 
       // Also check for nested children (shouldn't happen for leaf nodes, but be safe)
       if (child.children && child.children.length > 0) {
-        extractNodesAndGroups(child, graph, subgraphIds, nodes, groups, x, y)
+        extractNodesAndGroups(child, graph, subgraphIds, nodes, groups, x, y, parentSubgraphId, nodeParent)
       }
     }
   }
@@ -1537,7 +1544,8 @@ function resolveEdgeStyle(
 function alignLayerNodes(
   nodes: PositionedNode[],
   edges: PositionedEdge[],
-  direction: Direction
+  direction: Direction,
+  nodeParent: Map<string, string | null>
 ): void {
   if (nodes.length === 0) return
 
@@ -1556,7 +1564,12 @@ function alignLayerNodes(
   // are separated by at least layerSpacing (48px). We use single-linkage
   // clustering: a node joins the current layer if the gap from the previous
   // node (in sorted order) is within threshold, AND it has no direct edge to
-  // any node already in the layer.
+  // any node already in the layer, AND it shares the same containing
+  // subgraph. The parent constraint stops clustering across subgraph
+  // boundaries — ELK lays each subgraph out independently, so co-located
+  // nodes in different subgraphs aren't really in the same layer, and
+  // snapping them together can pull a node out of its parent's content area
+  // (e.g. into the parent's heading bar).
   const THRESHOLD = DEFAULTS.layerSpacing * 0.6
 
   // Sort nodes by flow-axis position
@@ -1576,7 +1589,10 @@ function alignLayerNodes(
     const hasEdgeToLayer = currentLayer.some(n =>
       connectedPairs.has(`${n.id}:${sorted[i]!.id}`)
     )
-    if (gap <= THRESHOLD && !hasEdgeToLayer) {
+    // Check if this node shares its parent subgraph with the layer.
+    const candidateParent = nodeParent.get(sorted[i]!.id) ?? null
+    const sharesParent = currentLayer.every(n => (nodeParent.get(n.id) ?? null) === candidateParent)
+    if (gap <= THRESHOLD && !hasEdgeToLayer && sharesParent) {
       currentLayer.push(sorted[i]!)
     } else {
       layers.push(currentLayer)
