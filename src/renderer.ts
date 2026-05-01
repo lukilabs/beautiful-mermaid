@@ -62,10 +62,14 @@ export function renderSvg(
     parts.push(renderGroup(group, font))
   }
 
-  // 2. Edges (polylines — rendered behind nodes)
-  // Each edge is a <polyline> with semantic data-* attributes
+  // 2. Edges (paths — rendered behind nodes)
+  // Each edge is a <path> with semantic data-* attributes. Where two edges
+  // belonging to distinct source/target pairs cross at right angles, the
+  // horizontal segment renders an arched "hop" so the crossing reads as a
+  // bridge instead of a junction.
+  const crossingMap = buildCrossingMap(graph.edges)
   for (const edge of graph.edges) {
-    parts.push(renderEdge(edge))
+    parts.push(renderEdge(edge, crossingMap.get(edge)))
   }
 
   // 3. Edge labels (positioned at midpoint of edge)
@@ -194,10 +198,10 @@ function renderGroup(group: PositionedGroup, font: string): string {
 // Edge rendering
 // ============================================================================
 
-function renderEdge(edge: PositionedEdge): string {
+function renderEdge(edge: PositionedEdge, crossings?: SegmentCrossing[]): string {
   if (edge.points.length < 2) return ''
 
-  const pathData = pointsToPolylinePath(edge.points)
+  const pathData = buildEdgePathD(edge.points, crossings)
   const dashArray = edge.style === 'dotted' ? ' stroke-dasharray="4 4"' : ''
   const baseStrokeWidth = edge.style === 'thick' ? STROKE_WIDTHS.connector * 2 : STROKE_WIDTHS.connector
   const strokeColor = escapeAttr(edge.inlineStyle?.stroke ?? 'var(--_line)')
@@ -229,14 +233,124 @@ function renderEdge(edge: PositionedEdge): string {
   }
 
   return (
-    `<polyline ${dataAttrs.join(' ')} points="${pathData}" fill="none" stroke="${strokeColor}" ` +
+    `<path ${dataAttrs.join(' ')} d="${pathData}" fill="none" stroke="${strokeColor}" ` +
     `stroke-width="${strokeWidth}"${dashArray}${markers} />`
   )
 }
 
-/** Convert points to SVG polyline points attribute: "x1,y1 x2,y2 ..." */
-function pointsToPolylinePath(points: Point[]): string {
-  return points.map(p => `${p.x},${p.y}`).join(' ')
+/** Half-width of the arc drawn at a hop-over crossing. */
+const HOP_RADIUS = 4
+/** Maximum bump height of the hop-over arc above the segment. */
+const HOP_HEIGHT = 5
+/** Tolerance used when classifying segments and detecting crossings. */
+const CROSSING_EPSILON = 0.5
+
+interface SegmentCrossing {
+  segIndex: number
+  /** x of the crossing along the horizontal segment. */
+  x: number
+  /** y of the crossing — equal to the horizontal segment's y. */
+  y: number
+}
+
+/**
+ * Build the SVG `d` attribute for an edge polyline. Straight runs use M/L
+ * commands; where a crossing falls on a horizontal segment, a quadratic
+ * Bezier hop is inserted so the crossing reads as a bridge rather than a
+ * junction.
+ */
+function buildEdgePathD(points: Point[], crossings?: SegmentCrossing[]): string {
+  const bySegment = new Map<number, SegmentCrossing[]>()
+  if (crossings) {
+    for (const c of crossings) {
+      let arr = bySegment.get(c.segIndex)
+      if (!arr) { arr = []; bySegment.set(c.segIndex, arr) }
+      arr.push(c)
+    }
+  }
+
+  let d = `M${points[0]!.x} ${points[0]!.y}`
+  for (let i = 0; i + 1 < points.length; i++) {
+    const p1 = points[i]!
+    const p2 = points[i + 1]!
+    const segCrossings = bySegment.get(i)
+    if (!segCrossings || segCrossings.length === 0) {
+      d += ` L${p2.x} ${p2.y}`
+      continue
+    }
+    const goingRight = p2.x > p1.x
+    // Sort by traversal order along the segment.
+    segCrossings.sort((a, b) => goingRight ? a.x - b.x : b.x - a.x)
+    for (const c of segCrossings) {
+      const beforeX = goingRight ? c.x - HOP_RADIUS : c.x + HOP_RADIUS
+      const afterX = goingRight ? c.x + HOP_RADIUS : c.x - HOP_RADIUS
+      d += ` L${beforeX} ${c.y}`
+      d += ` Q${c.x} ${c.y - HOP_HEIGHT} ${afterX} ${c.y}`
+    }
+    d += ` L${p2.x} ${p2.y}`
+  }
+  return d
+}
+
+/**
+ * Find every right-angle crossing where one edge's horizontal segment
+ * passes over another edge's vertical segment. Each crossing attaches to
+ * the horizontal segment so that — when emitted — the horizontal arches
+ * over the vertical. Crossings between edges that share a source or target
+ * are skipped: those edges naturally meet near the shared port and a hop
+ * would read as a spurious junction.
+ */
+function buildCrossingMap(edges: PositionedEdge[]): Map<PositionedEdge, SegmentCrossing[]> {
+  interface SegEntry {
+    edge: PositionedEdge
+    segIndex: number
+    axis: 'H' | 'V'
+    pos: number
+    rangeMin: number
+    rangeMax: number
+  }
+  const segs: SegEntry[] = []
+  for (const e of edges) {
+    const pts = e.points
+    for (let si = 0; si + 1 < pts.length; si++) {
+      const p1 = pts[si]!
+      const p2 = pts[si + 1]!
+      const dx = p2.x - p1.x
+      const dy = p2.y - p1.y
+      if (Math.abs(dy) < CROSSING_EPSILON && Math.abs(dx) > CROSSING_EPSILON) {
+        segs.push({ edge: e, segIndex: si, axis: 'H', pos: (p1.y + p2.y) / 2,
+          rangeMin: Math.min(p1.x, p2.x), rangeMax: Math.max(p1.x, p2.x) })
+      } else if (Math.abs(dx) < CROSSING_EPSILON && Math.abs(dy) > CROSSING_EPSILON) {
+        segs.push({ edge: e, segIndex: si, axis: 'V', pos: (p1.x + p2.x) / 2,
+          rangeMin: Math.min(p1.y, p2.y), rangeMax: Math.max(p1.y, p2.y) })
+      }
+    }
+  }
+
+  const result = new Map<PositionedEdge, SegmentCrossing[]>()
+  // Endpoint padding: the crossing must fall strictly inside both segments,
+  // not at a shared corner where two consecutive segments of the same edge
+  // meet — those aren't true crossings.
+  const ENDPOINT_PAD = HOP_RADIUS + 1
+  for (const h of segs) {
+    if (h.axis !== 'H') continue
+    for (const v of segs) {
+      if (v.axis !== 'V') continue
+      if (h.edge === v.edge) continue
+      if (edgesShareEndpoint(h.edge, v.edge)) continue
+      if (v.pos < h.rangeMin + ENDPOINT_PAD || v.pos > h.rangeMax - ENDPOINT_PAD) continue
+      if (h.pos < v.rangeMin + ENDPOINT_PAD || h.pos > v.rangeMax - ENDPOINT_PAD) continue
+      let arr = result.get(h.edge)
+      if (!arr) { arr = []; result.set(h.edge, arr) }
+      arr.push({ segIndex: h.segIndex, x: v.pos, y: h.pos })
+    }
+  }
+  return result
+}
+
+function edgesShareEndpoint(a: PositionedEdge, b: PositionedEdge): boolean {
+  return a.source === b.source || a.source === b.target ||
+         a.target === b.source || a.target === b.target
 }
 
 function renderEdgeLabel(edge: PositionedEdge, font: string): string {
