@@ -126,9 +126,28 @@ interface ElkGraphNode extends ElkNode {
  * needs to cross their boundary (in which case ELK requires INCLUDE_CHILDREN
  * along the path — see computeSubgraphsNeedingSeparate / subgraphToElk).
  */
+/**
+ * Synthesis context: extra data the edge extractor needs to pick
+ * direction-aware entry/exit sides when synthesizing the parts of a
+ * cross-hierarchy edge polyline that ELK leaves empty.
+ */
+interface SynthesisContext {
+  /** Edge index → port compounds and LCA. */
+  edgePlanByIndex: Map<number, {
+    sourcePortCompound: string | undefined
+    targetPortCompound: string | undefined
+    lca: string | undefined
+  }>
+  /** Subgraph id → subgraph (for direction lookups). */
+  subgraphMap: Map<string, MermaidSubgraph>
+  /** Root direction for fallback when no SEPARATE compound is on the path. */
+  rootDirection: Direction
+}
+
 function mermaidToElk(
   graph: MermaidGraph,
-  opts: Required<Pick<RenderOptions, 'font' | 'padding' | 'nodeSpacing' | 'layerSpacing'>>
+  opts: Required<Pick<RenderOptions, 'font' | 'padding' | 'nodeSpacing' | 'layerSpacing'>>,
+  outCtx?: SynthesisContext
 ): ElkGraphNode {
   // Collect all node IDs that belong to subgraphs
   const subgraphNodeIds = new Set<string>()
@@ -242,13 +261,20 @@ function mermaidToElk(
   // Cross-hier edges placed at a subgraph's LCA — keyed by subgraph id.
   const lcaPlacedEdges = new Map<string, ElkExtendedEdge[]>()
 
-  // Plan per cross-hier edge: where it lives, what its source/target IDs are.
+  // Plan per cross-hier edge: where it lives, what its source/target IDs are,
+  // plus the port compounds and LCA so the edge-extraction pass can pick
+  // direction-aware entry/exit sides when synthesizing missing port→leaf
+  // segments. (ELK doesn't route those when the leaf is buried inside an
+  // INCLUDE_CHILDREN descendant of a SEPARATE_CHILDREN ancestor.)
   interface EdgePlan {
     index: number
     edge: typeof graph.edges[0]
     placeAt: string | undefined  // subgraph id or undefined for root
     sourceId: string  // either edge.source or a port id
     targetId: string  // either edge.target or a port id
+    sourcePortCompound: string | undefined
+    targetPortCompound: string | undefined
+    lca: string | undefined
   }
 
   const edgePlans: EdgePlan[] = []
@@ -258,7 +284,11 @@ function mermaidToElk(
     // If the LCA itself is SEPARATE, the edge is internal to LCA's interior;
     // the leaves are visible there directly so we don't need ports.
     if (lca !== undefined && subgraphsNeedingSeparate.has(lca)) {
-      edgePlans.push({ index: ce.index, edge: ce.edge, placeAt: lca, sourceId: ce.edge.source, targetId: ce.edge.target })
+      edgePlans.push({
+        index: ce.index, edge: ce.edge, placeAt: lca,
+        sourceId: ce.edge.source, targetId: ce.edge.target,
+        sourcePortCompound: undefined, targetPortCompound: undefined, lca,
+      })
       continue
     }
 
@@ -290,7 +320,24 @@ function mermaidToElk(
       placeAt: lca,
       sourceId: sourcePort ? `${sourcePort}_out_${ce.index}` : ce.edge.source,
       targetId: targetPort ? `${targetPort}_in_${ce.index}` : ce.edge.target,
+      sourcePortCompound: sourcePort,
+      targetPortCompound: targetPort,
+      lca,
     })
+  }
+
+  // Stash port-compound + LCA info on the synthesis context so the edge
+  // extractor (in elkToPositioned) can pick direction-aware entry sides.
+  if (outCtx) {
+    outCtx.subgraphMap = subgraphMap
+    outCtx.rootDirection = graph.direction
+    for (const p of edgePlans) {
+      outCtx.edgePlanByIndex.set(p.index, {
+        sourcePortCompound: p.sourcePortCompound,
+        targetPortCompound: p.targetPortCompound,
+        lca: p.lca,
+      })
+    }
   }
 
   // Build the ELK edges from the plans now (before subgraphToElk runs) and
@@ -712,7 +759,8 @@ function flattenGroupBounds(groups: PositionedGroup[]): Array<{ x: number; y: nu
 function elkToPositioned(
   elkResult: ElkNode,
   graph: MermaidGraph,
-  mergeEdges: boolean = false
+  mergeEdges: boolean = false,
+  synthesisCtx?: SynthesisContext
 ): PositionedGraph {
   const nodes: PositionedNode[] = []
   const edges: PositionedEdge[] = []
@@ -747,7 +795,7 @@ function elkToPositioned(
   // Extract edges recursively from all levels (root and subgraphs)
   // Edges are distributed to subgraphs for direction override to work,
   // so we need to collect them from all children with proper offsets
-  extractEdgesRecursively(elkResult, graph, edges, 0, 0, margins, nodeById)
+  extractEdgesRecursively(elkResult, graph, edges, 0, 0, margins, nodeById, synthesisCtx)
 
   // Snap same-layer nodes to the same position along the flow axis.
   // ELK's orthogonal routing staggers nodes within a layer to create room for
@@ -924,7 +972,8 @@ function extractEdgesRecursively(
   offsetX: number,
   offsetY: number,
   margins?: MarginInfo,
-  nodeById?: Map<string, PositionedNode>
+  nodeById?: Map<string, PositionedNode>,
+  synthesisCtx?: SynthesisContext
 ): void {
   // First pass: collect all edge segments
   const segments = new Map<number, { external?: EdgeSegment; incoming?: EdgeSegment; outgoing?: EdgeSegment }>()
@@ -969,42 +1018,43 @@ function extractEdgesRecursively(
       }
     }
 
-    // Synthesis: ELK doesn't always route cross-hierarchy edges where one or
-    // both endpoints are buried inside an INCLUDE_CHILDREN descendant of a
+    // Synthesis: ELK doesn't always route cross-hierarchy edges when one or
+    // both endpoints sit inside an INCLUDE_CHILDREN descendant of a
     // SEPARATE_CHILDREN ancestor. Two cases to handle:
     //   1. Polyline ends short of the source/target node (port→leaf
     //      section was empty). Extend with a turn + entry/exit point.
     //   2. Polyline is empty entirely (ELK gave no sections at all).
-    //      Synthesize the whole edge as a 3-point L between the source
-    //      and target nodes, picking sides geometrically.
+    //      Synthesize the whole edge between the source and target nodes.
+    //
+    // Side picking is direction-aware: for a partial polyline whose missing
+    // port→leaf segment is inside a SEPARATE_CHILDREN compound, the natural
+    // entry/exit side matches the compound's flow direction (LR → WEST/EAST,
+    // TB → NORTH/SOUTH). For an empty polyline whose LCA is a SEPARATE
+    // compound (cousin pattern), the entry/exit sides are PERPENDICULAR to
+    // the LCA's flow so the synthesized path doesn't run alongside the
+    // sibling subgraphs' internal flow.
     if (nodeById) {
       const sourceNode = nodeById.get(originalEdge.source)
       const targetNode = nodeById.get(originalEdge.target)
+      const plan = synthesisCtx?.edgePlanByIndex.get(edgeIndex)
 
       if (allPoints.length === 0 && sourceNode && targetNode) {
-        const sourceCenter = { x: sourceNode.x + sourceNode.width / 2, y: sourceNode.y + sourceNode.height / 2 }
-        const targetCenter = { x: targetNode.x + targetNode.width / 2, y: targetNode.y + targetNode.height / 2 }
-        const exitSide = nearestSide(targetCenter, sourceNode)
-        const entrySide = nearestSide(sourceCenter, targetNode)
-        const exit = entryPointOnSide(sourceNode, exitSide)
-        const entry = entryPointOnSide(targetNode, entrySide)
-        // The final segment must align with the entry side: horizontal entry
-        // (E/W) → bend vertically first; vertical entry (N/S) → bend
-        // horizontally first.
-        const turn = (entrySide === 'WEST' || entrySide === 'EAST')
-          ? { x: exit.x, y: entry.y }
-          : { x: entry.x, y: exit.y }
-        allPoints.push(exit, turn, entry)
+        const lcaDir = plan?.lca && synthesisCtx ? synthesisCtx.subgraphMap.get(plan.lca)?.direction : undefined
+        const sides = pickSidesForEmptySynthesis(sourceNode, targetNode, lcaDir)
+        const path = synthesizeFullPath(sourceNode, sides.exit, targetNode, sides.entry)
+        allPoints.push(...path)
       } else if (allPoints.length > 0) {
         if (targetNode && !pointTouchesRectBoundary(allPoints[allPoints.length - 1]!, targetNode)) {
           const approach = allPoints[allPoints.length - 1]!
-          const side = nearestSide(approach, targetNode)
-          allPoints.push(...synthesizeEntrySegment(approach, targetNode, side))
+          const portCompoundDir = plan?.targetPortCompound && synthesisCtx ? synthesisCtx.subgraphMap.get(plan.targetPortCompound)?.direction : undefined
+          const side = pickSideForPartialSynthesis(approach, targetNode, portCompoundDir, /*incoming=*/true)
+          allPoints.push(...synthesizePartialEntry(approach, targetNode, side))
         }
         if (sourceNode && !pointTouchesRectBoundary(allPoints[0]!, sourceNode)) {
           const approach = allPoints[0]!
-          const side = nearestSide(approach, sourceNode)
-          allPoints.unshift(...synthesizeExitSegment(sourceNode, side, approach))
+          const portCompoundDir = plan?.sourcePortCompound && synthesisCtx ? synthesisCtx.subgraphMap.get(plan.sourcePortCompound)?.direction : undefined
+          const side = pickSideForPartialSynthesis(approach, sourceNode, portCompoundDir, /*incoming=*/false)
+          allPoints.unshift(...synthesizePartialExit(sourceNode, side, approach))
         }
       }
     }
@@ -1165,29 +1215,144 @@ function entryPointOnSide(node: PositionedNode, side: 'NORTH' | 'SOUTH' | 'EAST'
 }
 
 /**
- * Build the [turn, entry] point pair to extend a polyline from `last` to
- * the chosen `side` of `target`. The turn keeps the final segment aligned
- * with the entry side (horizontal entry on WEST/EAST, vertical on N/S).
+ * Pick the entry/exit side for a partial-polyline synthesis (port→leaf or
+ * leaf→port). When the port lives on a SEPARATE_CHILDREN compound with a
+ * direction directive, prefer the side that matches that compound's flow
+ * (LR → west/east, TB → north/south). Otherwise fall back to the side that
+ * is geometrically closest to the approach point.
  */
-function synthesizeEntrySegment(last: Point, target: PositionedNode, side: 'NORTH' | 'SOUTH' | 'EAST' | 'WEST'): Point[] {
-  const entry = entryPointOnSide(target, side)
-  const turn = (side === 'WEST' || side === 'EAST')
-    ? { x: last.x, y: entry.y }   // vertical first, then horizontal entry
-    : { x: entry.x, y: last.y }   // horizontal first, then vertical entry
-  return [turn, entry]
+function pickSideForPartialSynthesis(
+  approach: Point,
+  node: PositionedNode,
+  portCompoundDirection: Direction | undefined,
+  incoming: boolean
+): 'NORTH' | 'SOUTH' | 'EAST' | 'WEST' {
+  if (portCompoundDirection) return portSideFor(portCompoundDirection, incoming)
+  return nearestSide(approach, node)
 }
 
 /**
- * Mirror of synthesizeEntrySegment for the source side: build the
- * [exit, turn] pair so a polyline exits the source through `side` and
- * meets `first` orthogonally.
+ * Pick exit + entry sides for a fully-synthesized polyline (when ELK left
+ * the edge with no sections at all). When the LCA is a SEPARATE_CHILDREN
+ * compound with a direction, the path runs PERPENDICULAR to that direction
+ * so it goes through the gap between the LCA's child compounds rather than
+ * along their internal flow axis. Without an LCA direction, fall back to
+ * dominant-axis offset between source and target.
  */
-function synthesizeExitSegment(source: PositionedNode, side: 'NORTH' | 'SOUTH' | 'EAST' | 'WEST', first: Point): Point[] {
+function pickSidesForEmptySynthesis(
+  source: PositionedNode,
+  target: PositionedNode,
+  lcaDirection: Direction | undefined
+): { exit: 'NORTH' | 'SOUTH' | 'EAST' | 'WEST'; entry: 'NORTH' | 'SOUTH' | 'EAST' | 'WEST' } {
+  const sourceCenter = { x: source.x + source.width / 2, y: source.y + source.height / 2 }
+  const targetCenter = { x: target.x + target.width / 2, y: target.y + target.height / 2 }
+  const dx = targetCenter.x - sourceCenter.x
+  const dy = targetCenter.y - sourceCenter.y
+
+  if (lcaDirection === 'LR' || lcaDirection === 'RL') {
+    // LR/RL flow → cross-sibling edges go perpendicular (vertical)
+    const exit = dy >= 0 ? 'SOUTH' : 'NORTH'
+    const entry = dy >= 0 ? 'NORTH' : 'SOUTH'
+    return { exit, entry }
+  }
+  if (lcaDirection === 'TB' || lcaDirection === 'TD' || lcaDirection === 'BT') {
+    // TB/BT flow → cross-sibling edges go perpendicular (horizontal)
+    const exit = dx >= 0 ? 'EAST' : 'WEST'
+    const entry = dx >= 0 ? 'WEST' : 'EAST'
+    return { exit, entry }
+  }
+  // No LCA direction: pick dominant axis of source-target offset.
+  if (Math.abs(dx) > Math.abs(dy)) {
+    const exit = dx >= 0 ? 'EAST' : 'WEST'
+    const entry = dx >= 0 ? 'WEST' : 'EAST'
+    return { exit, entry }
+  }
+  const exit = dy >= 0 ? 'SOUTH' : 'NORTH'
+  const entry = dy >= 0 ? 'NORTH' : 'SOUTH'
+  return { exit, entry }
+}
+
+/**
+ * Synthesize a Z-shaped path from `source` exiting on `exitSide` to
+ * `target` entering on `entrySide`. The middle segment runs perpendicular
+ * to both the exit and entry, in the gap between the two nodes.
+ *
+ * Layout depends on whether exit/entry are parallel (both vertical or both
+ * horizontal) or perpendicular:
+ *   - Both vertical (e.g. SOUTH→NORTH): exit↓ → midY → horizontal across →
+ *     midY → entry↓. 4 points, 2 corners.
+ *   - Both horizontal (e.g. EAST→WEST): exit→ → midX → vertical → midX →
+ *     entry→. 4 points, 2 corners.
+ *   - Perpendicular: a single L works, with the corner placed inside one
+ *     of the source/target's rows so it doesn't run along an edge.
+ */
+function synthesizeFullPath(
+  source: PositionedNode,
+  exitSide: 'NORTH' | 'SOUTH' | 'EAST' | 'WEST',
+  target: PositionedNode,
+  entrySide: 'NORTH' | 'SOUTH' | 'EAST' | 'WEST'
+): Point[] {
+  const exit = entryPointOnSide(source, exitSide)
+  const entry = entryPointOnSide(target, entrySide)
+  const exitVertical = exitSide === 'NORTH' || exitSide === 'SOUTH'
+  const entryVertical = entrySide === 'NORTH' || entrySide === 'SOUTH'
+
+  if (exitVertical && entryVertical) {
+    // Z: exit↓ → midY → horizontal → midY → entry↓
+    const midY = (exit.y + entry.y) / 2
+    return [exit, { x: exit.x, y: midY }, { x: entry.x, y: midY }, entry]
+  }
+  if (!exitVertical && !entryVertical) {
+    // Z: exit→ → midX → vertical → midX → entry→
+    const midX = (exit.x + entry.x) / 2
+    return [exit, { x: midX, y: exit.y }, { x: midX, y: entry.y }, entry]
+  }
+  // Mixed (one vertical, one horizontal): single L. Corner is placed so the
+  // final segment aligns with the entry side.
+  const turn = entryVertical
+    ? { x: entry.x, y: exit.y }   // last segment vertical → bend horizontally first
+    : { x: exit.x, y: entry.y }   // last segment horizontal → bend vertically first
+  return [exit, turn, entry]
+}
+
+/**
+ * Number of pixels by which a partial-synthesis Z-shape steps inward from the
+ * SEPARATE_CHILDREN compound's boundary before turning. Without this offset
+ * the perpendicular segment of the Z would run along the compound's edge.
+ */
+const PARTIAL_SYNTHESIS_OFFSET = 12
+
+/**
+ * Synthesize a Z-shaped [step, turn, entry] sequence to extend an existing
+ * polyline from `last` (which sits on a SEPARATE_CHILDREN compound's
+ * boundary) to the chosen `side` of `target`. The step pulls the path away
+ * from the compound's boundary so the perpendicular turn segment doesn't
+ * run along that boundary.
+ *
+ * For WEST entry the path moves right by OFFSET first, then down/up to the
+ * entry's y, then right to the entry. (Same idea, mirrored, for E/N/S.)
+ */
+function synthesizePartialEntry(last: Point, target: PositionedNode, side: 'NORTH' | 'SOUTH' | 'EAST' | 'WEST'): Point[] {
+  const entry = entryPointOnSide(target, side)
+  if (side === 'WEST' || side === 'EAST') {
+    const stepX = last.x + (side === 'WEST' ? PARTIAL_SYNTHESIS_OFFSET : -PARTIAL_SYNTHESIS_OFFSET)
+    return [{ x: stepX, y: last.y }, { x: stepX, y: entry.y }, entry]
+  }
+  const stepY = last.y + (side === 'NORTH' ? PARTIAL_SYNTHESIS_OFFSET : -PARTIAL_SYNTHESIS_OFFSET)
+  return [{ x: last.x, y: stepY }, { x: entry.x, y: stepY }, entry]
+}
+
+/**
+ * Mirror of synthesizePartialEntry for the source side.
+ */
+function synthesizePartialExit(source: PositionedNode, side: 'NORTH' | 'SOUTH' | 'EAST' | 'WEST', first: Point): Point[] {
   const exit = entryPointOnSide(source, side)
-  const turn = (side === 'WEST' || side === 'EAST')
-    ? { x: first.x, y: exit.y }
-    : { x: exit.x, y: first.y }
-  return [exit, turn]
+  if (side === 'WEST' || side === 'EAST') {
+    const stepX = first.x + (side === 'WEST' ? PARTIAL_SYNTHESIS_OFFSET : -PARTIAL_SYNTHESIS_OFFSET)
+    return [exit, { x: stepX, y: exit.y }, { x: stepX, y: first.y }]
+  }
+  const stepY = first.y + (side === 'NORTH' ? PARTIAL_SYNTHESIS_OFFSET : -PARTIAL_SYNTHESIS_OFFSET)
+  return [exit, { x: exit.x, y: stepY }, { x: first.x, y: stepY }]
 }
 
 /**
@@ -1745,9 +1910,14 @@ export function layoutGraphSync(
   options: RenderOptions = {}
 ): PositionedGraph {
   const opts = { ...DEFAULTS, ...options }
-  const elkGraph = mermaidToElk(graph, opts)
+  const synthesisCtx: SynthesisContext = {
+    edgePlanByIndex: new Map(),
+    subgraphMap: new Map(),
+    rootDirection: graph.direction,
+  }
+  const elkGraph = mermaidToElk(graph, opts, synthesisCtx)
   const result = elkLayoutSync(elkGraph)
-  return elkToPositioned(result, graph, DEFAULTS.mergeEdges)
+  return elkToPositioned(result, graph, DEFAULTS.mergeEdges, synthesisCtx)
 }
 
 /**
