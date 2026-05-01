@@ -828,6 +828,13 @@ function elkToPositioned(
     }
   }
 
+  // Distinct edges (no shared source or target node) must not share a
+  // colinear segment — if two edges meet only mid-air, they're independent
+  // wires and should be drawn in separate channels. Bucket all axis-aligned
+  // segments by (axis, position), find conflicting overlap groups, and
+  // distribute each conflict group across parallel lanes.
+  deoverlapEdges(edges, nodeMap)
+
   // Calculate final bounds including all edge points
   // ELK should include edges in its dimensions, but we verify and expand if needed
   let width = elkResult.width ?? 800
@@ -1675,6 +1682,199 @@ function alignLayerNodes(
       }
     }
   }
+}
+
+// ============================================================================
+// De-overlap — distinct edges (no shared source or target) must not share a
+// colinear segment. After ELK + synthesis + alignment, scan every
+// axis-aligned segment, find groups of overlapping segments from edges with
+// no common endpoint, and shift each conflict group's segments into
+// parallel lanes.
+// ============================================================================
+
+/** Pixels between adjacent lanes when separating overlapping segments. */
+const LANE_SPACING = 8
+/** Tolerance when classifying a segment as horizontal/vertical and when
+ * comparing two segments' positions/ranges for overlap. */
+const SEGMENT_EPSILON = 0.5
+/** Bin width when bucketing segments by position — segments whose positions
+ * differ by less than this end up in the same conflict bucket. */
+const POS_BIN = 1.0
+/** Margin kept inside a node's side when shifting first/last segments so the
+ * port doesn't end up flush with the node's corner. */
+const PORT_SIDE_MARGIN = 4
+
+interface SegmentRecord {
+  edgeIndex: number
+  segIndex: number
+  axis: 'H' | 'V'
+  pos: number
+  rangeMin: number
+  rangeMax: number
+  /** First/last segments touch a node boundary; their shift is constrained
+   * to the node's side range so the port stays attached. */
+  kind: 'first' | 'last' | 'interior'
+}
+
+function deoverlapEdges(edges: PositionedEdge[], nodeMap: Map<string, PositionedNode>): void {
+  // Iterate: shifting an interior segment leaves its connecting first/last
+  // segments at new positions that may themselves overlap with another
+  // edge's first/last. Re-bucket and resolve until no shifts are applied
+  // (or we hit the safety cap).
+  const MAX_PASSES = 6
+  for (let pass = 0; pass < MAX_PASSES; pass++) {
+    if (!deoverlapPass(edges, nodeMap)) return
+  }
+}
+
+function deoverlapPass(edges: PositionedEdge[], nodeMap: Map<string, PositionedNode>): boolean {
+  const allSegs: SegmentRecord[] = []
+  for (let ei = 0; ei < edges.length; ei++) {
+    const pts = edges[ei]!.points
+    if (pts.length < 2) continue
+    for (let si = 0; si + 1 < pts.length; si++) {
+      const p1 = pts[si]!
+      const p2 = pts[si + 1]!
+      const dx = p2.x - p1.x
+      const dy = p2.y - p1.y
+      let axis: 'H' | 'V'
+      let pos: number
+      let rangeMin: number
+      let rangeMax: number
+      if (Math.abs(dy) < SEGMENT_EPSILON && Math.abs(dx) > SEGMENT_EPSILON) {
+        axis = 'H'
+        pos = (p1.y + p2.y) / 2
+        rangeMin = Math.min(p1.x, p2.x)
+        rangeMax = Math.max(p1.x, p2.x)
+      } else if (Math.abs(dx) < SEGMENT_EPSILON && Math.abs(dy) > SEGMENT_EPSILON) {
+        axis = 'V'
+        pos = (p1.x + p2.x) / 2
+        rangeMin = Math.min(p1.y, p2.y)
+        rangeMax = Math.max(p1.y, p2.y)
+      } else {
+        continue
+      }
+      const kind: SegmentRecord['kind'] =
+        si === 0 ? 'first' : (si === pts.length - 2 ? 'last' : 'interior')
+      allSegs.push({ edgeIndex: ei, segIndex: si, axis, pos, rangeMin, rangeMax, kind })
+    }
+  }
+
+  const buckets = new Map<string, SegmentRecord[]>()
+  for (const s of allSegs) {
+    const key = `${s.axis}:${Math.round(s.pos / POS_BIN)}`
+    let arr = buckets.get(key)
+    if (!arr) { arr = []; buckets.set(key, arr) }
+    arr.push(s)
+  }
+
+  let shifted = false
+  for (const bucket of buckets.values()) {
+    if (bucket.length < 2) continue
+    if (resolveBucketConflicts(bucket, edges, nodeMap)) shifted = true
+  }
+  return shifted
+}
+
+function resolveBucketConflicts(
+  bucket: SegmentRecord[],
+  edges: PositionedEdge[],
+  nodeMap: Map<string, PositionedNode>
+): boolean {
+  const conflicts = new Map<number, Set<number>>()
+  for (let i = 0; i < bucket.length; i++) {
+    for (let j = i + 1; j < bucket.length; j++) {
+      const s1 = bucket[i]!
+      const s2 = bucket[j]!
+      // Two segments from the same edge can never share a routing channel
+      // unintentionally (the edge constructed them itself), skip.
+      if (s1.edgeIndex === s2.edgeIndex) continue
+      const overlap = Math.min(s1.rangeMax, s2.rangeMax) - Math.max(s1.rangeMin, s2.rangeMin)
+      if (overlap <= SEGMENT_EPSILON) continue
+      // Edges that share a source or target naturally meet at that node;
+      // overlapping a final approach segment near the shared port is fine.
+      if (edgesShareEndpoint(edges[s1.edgeIndex]!, edges[s2.edgeIndex]!)) continue
+      let cs1 = conflicts.get(i)
+      if (!cs1) { cs1 = new Set(); conflicts.set(i, cs1) }
+      let cs2 = conflicts.get(j)
+      if (!cs2) { cs2 = new Set(); conflicts.set(j, cs2) }
+      cs1.add(j)
+      cs2.add(i)
+    }
+  }
+  if (conflicts.size === 0) return false
+
+  let shifted = false
+  const visited = new Set<number>()
+  for (let i = 0; i < bucket.length; i++) {
+    if (visited.has(i) || !conflicts.has(i)) continue
+    const comp: number[] = []
+    const stack: number[] = [i]
+    while (stack.length > 0) {
+      const cur = stack.pop()!
+      if (visited.has(cur)) continue
+      visited.add(cur)
+      comp.push(cur)
+      const cn = conflicts.get(cur)
+      if (cn) for (const k of cn) if (!visited.has(k)) stack.push(k)
+    }
+    if (comp.length < 2) continue
+    comp.sort((a, b) => {
+      const sa = bucket[a]!
+      const sb = bucket[b]!
+      return sa.edgeIndex - sb.edgeIndex || sa.segIndex - sb.segIndex
+    })
+    const N = comp.length
+    for (let li = 0; li < N; li++) {
+      const offset = (li - (N - 1) / 2) * LANE_SPACING
+      if (Math.abs(offset) < SEGMENT_EPSILON) continue
+      if (applySegmentShift(bucket[comp[li]!]!, edges, nodeMap, offset)) shifted = true
+    }
+  }
+  return shifted
+}
+
+function edgesShareEndpoint(a: PositionedEdge, b: PositionedEdge): boolean {
+  return a.source === b.source || a.source === b.target ||
+         a.target === b.source || a.target === b.target
+}
+
+function applySegmentShift(
+  seg: SegmentRecord,
+  edges: PositionedEdge[],
+  nodeMap: Map<string, PositionedNode>,
+  offset: number
+): boolean {
+  const pts = edges[seg.edgeIndex]!.points
+  let newPos = seg.pos + offset
+  if (seg.kind === 'first' || seg.kind === 'last') {
+    const nodeId = seg.kind === 'first' ? edges[seg.edgeIndex]!.source : edges[seg.edgeIndex]!.target
+    const node = nodeMap.get(nodeId)
+    if (node) newPos = constrainPortPosition(newPos, node, seg.axis)
+  }
+  if (Math.abs(newPos - seg.pos) < SEGMENT_EPSILON) return false
+  if (seg.axis === 'H') {
+    pts[seg.segIndex]!.y = newPos
+    pts[seg.segIndex + 1]!.y = newPos
+  } else {
+    pts[seg.segIndex]!.x = newPos
+    pts[seg.segIndex + 1]!.x = newPos
+  }
+  return true
+}
+
+/**
+ * Clamp the new perpendicular position so a first/last segment's port stays
+ * inside its node's side range. For a vertical segment the port sits on the
+ * node's NORTH or SOUTH side, so x must be inside [node.x, node.x+width].
+ * For a horizontal segment the port sits on EAST/WEST, so y must be inside
+ * [node.y, node.y+height].
+ */
+function constrainPortPosition(pos: number, node: PositionedNode, axis: 'H' | 'V'): number {
+  if (axis === 'H') {
+    return Math.max(node.y + PORT_SIDE_MARGIN, Math.min(node.y + node.height - PORT_SIDE_MARGIN, pos))
+  }
+  return Math.max(node.x + PORT_SIDE_MARGIN, Math.min(node.x + node.width - PORT_SIDE_MARGIN, pos))
 }
 
 // ============================================================================
