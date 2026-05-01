@@ -239,9 +239,11 @@ function renderEdge(edge: PositionedEdge, crossings?: SegmentCrossing[]): string
 }
 
 /** Half-width of the arc drawn at a hop-over crossing. */
-const HOP_RADIUS = 4
-/** Maximum bump height of the hop-over arc above the segment. */
-const HOP_HEIGHT = 5
+const HOP_RADIUS = 5
+/** Maximum bump height of the hop-over arc above the segment. The arc's
+ * apex is HOP_HEIGHT pixels above the segment line so a crossing reads as
+ * a clear bridge rather than a slight blip. */
+const HOP_HEIGHT = 10
 /** Tolerance used when classifying segments and detecting crossings. */
 const CROSSING_EPSILON = 0.5
 
