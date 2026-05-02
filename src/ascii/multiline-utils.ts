@@ -18,12 +18,42 @@ export function splitLines(label: string): string[] {
 }
 
 /**
+ * Return the terminal column width of a single character.
+ * CJK and other fullwidth Unicode code points occupy 2 columns;
+ * all other characters occupy 1.
+ */
+export function charVisualWidth(ch: string): number {
+  const code = ch.codePointAt(0) ?? 0
+  return (
+    (code >= 0x1100 && code <= 0x115f) ||
+    (code >= 0x2e80 && code <= 0x303f) ||
+    (code >= 0x3040 && code <= 0x33ff) ||
+    (code >= 0x3400 && code <= 0x4dbf) ||
+    (code >= 0x4e00 && code <= 0x9fff) ||
+    (code >= 0xac00 && code <= 0xd7af) ||
+    (code >= 0xf900 && code <= 0xfaff) ||
+    (code >= 0xff00 && code <= 0xff60) ||
+    code >= 0x20000
+  ) ? 2 : 1
+}
+
+/**
+ * Return the total terminal column width of a string.
+ * Each fullwidth (CJK) character counts as 2 columns.
+ */
+export function visualWidth(str: string): number {
+  let w = 0
+  for (const ch of str) w += charVisualWidth(ch)
+  return w
+}
+
+/**
  * Get the maximum line width for sizing calculations.
- * Used to determine column widths for multi-line labels.
+ * Uses visual (terminal column) width so CJK characters are measured correctly.
  */
 export function maxLineWidth(label: string): number {
   const lines = splitLines(label)
-  return Math.max(...lines.map(l => l.length), 0)
+  return Math.max(...lines.map(l => visualWidth(l)), 0)
 }
 
 /**
@@ -52,8 +82,8 @@ export function drawMultilineTextCentered(
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!
-    // Center each line horizontally
-    const startX = cx - Math.floor(line.length / 2)
+    // Center each line horizontally using visual (column) width for CJK support
+    const startX = cx - Math.floor(visualWidth(line) / 2)
     // Force overwrite for node labels (they take priority)
     drawText(canvas, { x: startX, y: startY + i }, line, true)
   }
