@@ -288,6 +288,15 @@ interface CrossHierPort {
   side: Side
   /** 'out' = outgoing (source side), 'in' = incoming (target side). */
   direction: 'in' | 'out'
+  /**
+   * Number of compound levels between this port's compound and the source
+   * (for `direction: 'in'`) or the target (for `direction: 'out'`) of the
+   * underlying cross-hier edge. Used as a tiebreaker when several ports
+   * share a side: the closer endpoint goes first along the side, which
+   * matches the natural geographic order in most diagrams (closer leaves
+   * are typically laid out closer to their target compound).
+   */
+  outsideDepth: number
 }
 
 interface CrossHierDecomposition {
@@ -331,8 +340,17 @@ function decomposeCrossHierEdge(
         compoundId: cur,
         side,
         direction: dir,
+        outsideDepth: 0, // filled in after loop
       })
       cur = subgraphParent.get(cur)
+    }
+    // outsideDepth = how many levels out from this port's compound until we
+    // reach the source/target leaf. For the innermost port it's `chain.length`
+    // (every compound in the chain plus the leaf at the LCA's parent side);
+    // for the outermost port it's 1 (the leaf is the next step out at the
+    // LCA level). Lower depth = source/target endpoint is closer.
+    for (let i = 0; i < chain.length; i++) {
+      chain[i]!.outsideDepth = chain.length - i
     }
     return chain
   }
@@ -519,7 +537,7 @@ function mermaidToElk(
   }
 
   // Per-compound: ports owned + sub-edges to lay out at this level.
-  const portsByCompound = new Map<string, ElkPort[]>()
+  const rawPortsByCompound = new Map<string, CrossHierPort[]>()
   // sub-edges owned by a compound (or root if compoundId === null)
   const subEdgesByCompound = new Map<string | null, ElkExtendedEdge[]>()
   function addSubEdge(compoundId: string | null, edge: ElkExtendedEdge): void {
@@ -527,27 +545,17 @@ function mermaidToElk(
     if (!arr) { arr = []; subEdgesByCompound.set(compoundId, arr) }
     arr.push(edge)
   }
-  function addPort(compoundId: string, port: ElkPort): void {
-    let arr = portsByCompound.get(compoundId)
-    if (!arr) { arr = []; portsByCompound.set(compoundId, arr) }
-    arr.push(port)
+  function addRawPort(p: CrossHierPort): void {
+    let arr = rawPortsByCompound.get(p.compoundId)
+    if (!arr) { arr = []; rawPortsByCompound.set(p.compoundId, arr) }
+    arr.push(p)
   }
 
   // Emit ports + sub-edges per decomposition.
   for (const decomp of decompositions) {
-    // Ports
-    for (const p of decomp.srcChain) {
-      addPort(p.compoundId, {
-        id: p.portId,
-        layoutOptions: { 'org.eclipse.elk.port.side': p.side },
-      })
-    }
-    for (const p of decomp.tgtChain) {
-      addPort(p.compoundId, {
-        id: p.portId,
-        layoutOptions: { 'org.eclipse.elk.port.side': p.side },
-      })
-    }
+    // Collect ports for sorting/indexing later.
+    for (const p of decomp.srcChain) addRawPort(p)
+    for (const p of decomp.tgtChain) addRawPort(p)
 
     // Sub-edges. Each is `e${index}_seg${k}` so the extractor can group them
     // back together by parsing the id prefix.
@@ -608,6 +616,34 @@ function mermaidToElk(
       : { id: nextSegId(), sources: [lcaSrc], targets: [lcaTgt] }
     if (decomp.edge.label) lcaEdge.labels = [buildElkLabel(decomp.edge.label)]
     addSubEdge(decomp.lca ?? null, lcaEdge)
+  }
+
+  // Convert raw ports (CrossHierPort) to ELK ports with explicit indices.
+  // ELK port indices increase clockwise: NORTH (l→r), EAST (t→b), SOUTH (r→l),
+  // WEST (b→t). Within each side we order by outsideDepth ascending — the
+  // closer the source/target endpoint, the lower the index, which puts the
+  // closer endpoint at the start of that clockwise traversal. For a TB
+  // compound's NORTH side this means the closer source ends up on the LEFT,
+  // matching where ELK typically places the closer leaf in the parent
+  // layout. Without this hint ELK has no signal inside SEPARATE_CHILDREN
+  // compounds to choose port order — both sub-edges end at the same target,
+  // so internal cross-minimisation gives a tie.
+  const portsByCompound = new Map<string, ElkPort[]>()
+  const SIDE_ORDER: Record<Side, number> = { NORTH: 0, EAST: 1, SOUTH: 2, WEST: 3 }
+  for (const [compoundId, raws] of rawPortsByCompound) {
+    const sorted = [...raws].sort((a, b) => {
+      if (SIDE_ORDER[a.side] !== SIDE_ORDER[b.side]) return SIDE_ORDER[a.side] - SIDE_ORDER[b.side]
+      if (a.outsideDepth !== b.outsideDepth) return a.outsideDepth - b.outsideDepth
+      return a.portId.localeCompare(b.portId) // tiebreaker for determinism
+    })
+    const elkPorts: ElkPort[] = sorted.map((p, idx) => ({
+      id: p.portId,
+      layoutOptions: {
+        'org.eclipse.elk.port.side': p.side,
+        'org.eclipse.elk.port.index': String(idx),
+      },
+    }))
+    portsByCompound.set(compoundId, elkPorts)
   }
 
   // Build ELK input tree.
@@ -709,9 +745,16 @@ function buildSubgraphNode(
       effectiveDirection(sg.id, subgraphMap, subgraphParent, rootDirection)
     )
     if (ownPorts.length > 0) {
-      // FIXED_SIDE keeps each port on its declared side; ELK distributes
-      // multiple ports along the side automatically.
-      layoutOptions['elk.portConstraints'] = 'FIXED_SIDE'
+      // FIXED_ORDER lets us hand ELK an explicit port.index per port, which
+      // we set in mermaidToElk so the port closer to its endpoint sits
+      // earlier in the clockwise traversal. Inside a SEPARATE compound,
+      // ELK can't otherwise tell which order minimises crossings — both
+      // ends of the sub-edges meet at the same internal node — so without
+      // an explicit hint it falls back to declaration order, which can
+      // place a port for a far-away source between the compound and a
+      // closer source's port and force the closer source's edge to cross
+      // through it.
+      layoutOptions['elk.portConstraints'] = 'FIXED_ORDER'
     }
   } else if (sg.direction) {
     // INCLUDE_CHILDREN inheritance carries the parent's direction; if this
