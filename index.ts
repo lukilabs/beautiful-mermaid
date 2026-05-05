@@ -262,18 +262,18 @@ async function generateHtml(): Promise<string> {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" id="theme-color-meta" content="#f9f9fa" />
   <title>Beautiful Mermaid — Mermaid Rendering, Made Beautiful</title>
-  <meta name="description" content="Open source diagram rendering library built for the AI era. Ultra-fast, fully themeable, outputs to SVG and ASCII. Supports Flowchart, State, Sequence, Class, and ER diagrams." />
+  <meta name="description" content="Open source diagram rendering library built for the AI era. Ultra-fast, fully themeable, outputs to SVG and ASCII. Supports Flowchart, State, Sequence, Class, ER, and XY Chart diagrams, with a live Mermaid editor." />
   <link rel="icon" type="image/svg+xml" href="/mermaid/favicon.svg" />
   <link rel="icon" type="image/x-icon" href="/mermaid/favicon.ico" />
   <link rel="apple-touch-icon" href="/mermaid/apple-touch-icon.png" />
   <meta property="og:title" content="Beautiful Mermaid" />
-  <meta property="og:description" content="Open source diagram rendering library built for the AI era. Ultra-fast, fully themeable, outputs to SVG and ASCII." />
+  <meta property="og:description" content="Open source diagram rendering library built for the AI era. Ultra-fast, fully themeable, outputs to SVG and ASCII, with a live Mermaid editor." />
   <meta property="og:image" content="https://agents.craft.do/mermaid/og-image.png" />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://agents.craft.do/mermaid" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Beautiful Mermaid" />
-  <meta name="twitter:description" content="Mermaid rendering, made beautiful. Ultra-fast, fully themeable, outputs to SVG and ASCII." />
+  <meta name="twitter:description" content="Mermaid rendering, made beautiful. Ultra-fast, fully themeable, outputs to SVG and ASCII, with a live editor." />
   <meta name="twitter:image" content="https://agents.craft.do/mermaid/og-image.png" />
   <!-- Plausible Analytics -->
   <script defer data-domain="agents.craft.do/mermaid" src="https://plausible.io/js/script.js"></script>
@@ -424,6 +424,11 @@ async function generateHtml(): Promise<string> {
     }
     .theme-pill:active {
       transform: translateY(0.5px);
+    }
+    .theme-pill svg {
+      width: 14px;
+      height: 14px;
+      flex-shrink: 0;
     }
     .theme-swatch {
       display: inline-block;
@@ -1240,6 +1245,10 @@ async function generateHtml(): Promise<string> {
     </div>
     <button class="contents-btn shadow-minimal" id="contents-btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="3" y1="4" x2="13" y2="4"/><line x1="3" y1="8" x2="13" y2="8"/><line x1="3" y1="12" x2="10" y2="12"/></svg>Contents</button>
     <div class="theme-pills" id="theme-pills">
+      <button type="button" class="theme-pill shadow-minimal" id="random-theme-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
+        Random Theme
+      </button>
       ${themePillsHtml}
     </div>
     <div class="mega-menu shadow-modal-small" id="mega-menu">
@@ -1263,14 +1272,14 @@ async function generateHtml(): Promise<string> {
         <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><g transform="translate(3.4502, 3)" fill="currentColor"><path d="M3.17890888,3.6 L3.17890888,0 L16,0 L16,3.6 L3.17890888,3.6 Z M9.642,7.2 L9.64218223,10.8 L0,10.8 L0,3.6 L16,3.6 L16,7.2 L9.642,7.2 Z M3.17890888,18 L3.178,14.4 L0,14.4 L0,10.8 L16,10.8 L16,18 L3.17890888,18 Z" fill-rule="nonzero"></path></g></svg>
         Use in Craft Agents
       </a>
+      <a href="https://agents.craft.do/mermaid/editor" class="hero-btn hero-btn-secondary">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+        Live Editor
+      </a>
       <a href="https://github.com/lukilabs/beautiful-mermaid" target="_blank" rel="noopener" class="hero-btn hero-btn-secondary">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
         GitHub
       </a>
-      <button type="button" class="hero-btn hero-btn-secondary" id="random-theme-btn">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
-        Random Theme
-      </button>
     </div>
     <div class="hero-meta">
       <p class="meta" id="total-timing">Rendering ${samples.length * 2} samples\u2026</p>
@@ -1471,7 +1480,7 @@ ${bundleJs}
   // -- Set up theme pill click handlers --
   document.getElementById('theme-pills').addEventListener('click', function(e) {
     var pill = e.target.closest('.theme-pill');
-    if (!pill || pill.id === 'theme-more-btn') return;
+    if (!pill || pill.id === 'theme-more-btn' || pill.id === 'random-theme-btn') return;
     applyTheme(pill.getAttribute('data-theme') || '');
     // Close "More" dropdown if a theme was picked from it
     var dd = document.getElementById('theme-more-dropdown');
@@ -1831,6 +1840,7 @@ ${bundleJs}
     <span>&copy; 2026 Craft Docs Limited, Inc. All rights reserved.</span>
     <div class="footer-links">
       <a href="mailto:agents@craft.do">Contact</a>
+      <a href="https://agents.craft.do/mermaid/editor">Live Editor</a>
       <a href="https://github.com/lukilabs/beautiful-mermaid" target="_blank" rel="noopener noreferrer">
         <svg viewBox="0 0 24 24" fill="currentColor">
           <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>

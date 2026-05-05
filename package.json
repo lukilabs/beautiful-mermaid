@@ -44,7 +44,7 @@
     "dev": "bun run dev.ts",
     "bench": "bun run bench.ts",
     "build": "tsup",
-    "build:samples": "bun run index.ts && mkdir -p site && mv index.html site/ && cp -r public/* site/",
+    "build:samples": "bun run index.ts && bun run editor.ts && rm -rf site && mkdir -p site/editor && cp index.html site/ && cp editor.html site/ && cp editor.html site/editor/index.html && cp -r public/* site/",
     "deploy": "bun run build:samples && wrangler pages deploy site --project-name craft-agents-mermaid",
     "xychart-test": "bun run xychart-test.ts",
     "prepublishOnly": "npm run build"
