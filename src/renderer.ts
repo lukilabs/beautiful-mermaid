@@ -63,11 +63,14 @@ export function renderSvg(
   }
 
   // 2. Edges (paths — rendered behind nodes)
-  // Each edge is a <path> with semantic data-* attributes. Where two edges
-  // belonging to distinct source/target pairs cross at right angles, the
-  // horizontal segment renders an arched "hop" so the crossing reads as a
-  // bridge instead of a junction.
-  const crossingMap = buildCrossingMap(graph.edges)
+  // Each edge is a <path> with semantic data-* attributes. When RENDER_HOPS
+  // is on, right-angle crossings between unrelated edges render an arched
+  // "hop" on the horizontal segment so the crossing reads as a bridge
+  // rather than a junction. Toggle by flipping RENDER_HOPS at the top of
+  // this file.
+  const crossingMap = RENDER_HOPS
+    ? buildCrossingMap(graph.edges)
+    : new Map<PositionedEdge, SegmentCrossing[]>()
   for (const edge of graph.edges) {
     parts.push(renderEdge(edge, crossingMap.get(edge)))
   }
@@ -237,6 +240,17 @@ function renderEdge(edge: PositionedEdge, crossings?: SegmentCrossing[]): string
     `stroke-width="${strokeWidth}"${dashArray}${markers} />`
   )
 }
+
+/**
+ * Toggle for the hop-over arcs at right-angle edge crossings. When `true`,
+ * each crossing where a horizontal edge segment passes over an unrelated
+ * vertical edge segment is drawn as a small Bezier arch ("hop"), so the
+ * crossing reads as a bridge rather than a junction. Set to `false` to
+ * skip the crossing-detection pass entirely and emit straight L commands
+ * everywhere — useful when the layout is dense enough that hops add visual
+ * noise rather than clarity.
+ */
+const RENDER_HOPS = true
 
 /** Half-width of the arc drawn at a hop-over crossing. */
 const HOP_RADIUS = 5
