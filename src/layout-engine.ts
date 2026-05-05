@@ -395,6 +395,8 @@ interface MermaidToElkResult {
   elkGraph: ElkGraphNode
   /** The decomposed cross-hier edges, in graph.edges order. Used during extraction to assemble polylines. */
   decompositions: CrossHierDecomposition[]
+  /** Raw cross-hier ports per compound (used by the second-pass index refinement). */
+  rawPortsByCompound: Map<string, CrossHierPort[]>
 }
 
 function buildElkLabel(text: string): NonNullable<ElkExtendedEdge['labels']>[0] {
@@ -422,7 +424,17 @@ function buildInternalElkEdge(index: number, edge: MermaidEdge): ElkExtendedEdge
 
 function mermaidToElk(
   graph: MermaidGraph,
-  opts: Required<Pick<RenderOptions, 'font' | 'padding' | 'nodeSpacing' | 'layerSpacing'>>
+  opts: Required<Pick<RenderOptions, 'font' | 'padding' | 'nodeSpacing' | 'layerSpacing'>>,
+  /**
+   * Optional per-port index override. When supplied, each port's
+   * `org.eclipse.elk.port.index` is set from this map instead of the
+   * default outsideDepth-based heuristic. Used by `layoutGraphSync`'s
+   * second pass: after the first ELK pass we know where each cross-hier
+   * edge actually attaches, so we can sort ports along each side by the
+   * outward-side perpendicular coordinate to remove crossings the
+   * default heuristic couldn't predict.
+   */
+  portIndexOverride?: Map<string, number>
 ): MermaidToElkResult {
   // Index data
   const subgraphNodeIds = new Set<string>()
@@ -620,21 +632,25 @@ function mermaidToElk(
 
   // Convert raw ports (CrossHierPort) to ELK ports with explicit indices.
   // ELK port indices increase clockwise: NORTH (l→r), EAST (t→b), SOUTH (r→l),
-  // WEST (b→t). Within each side we order by outsideDepth ascending — the
-  // closer the source/target endpoint, the lower the index, which puts the
-  // closer endpoint at the start of that clockwise traversal. For a TB
-  // compound's NORTH side this means the closer source ends up on the LEFT,
-  // matching where ELK typically places the closer leaf in the parent
-  // layout. Without this hint ELK has no signal inside SEPARATE_CHILDREN
-  // compounds to choose port order — both sub-edges end at the same target,
-  // so internal cross-minimisation gives a tie.
+  // WEST (b→t). When `portIndexOverride` is supplied (second pass), we use
+  // those indices directly. Otherwise we sort by outsideDepth ascending
+  // within each side — the closer source/target endpoint comes first, which
+  // is the best blind heuristic since both sub-edges in a SEPARATE compound
+  // end at the same internal node and ELK has no internal cross-min signal
+  // to break the tie.
   const portsByCompound = new Map<string, ElkPort[]>()
   const SIDE_ORDER: Record<Side, number> = { NORTH: 0, EAST: 1, SOUTH: 2, WEST: 3 }
   for (const [compoundId, raws] of rawPortsByCompound) {
     const sorted = [...raws].sort((a, b) => {
       if (SIDE_ORDER[a.side] !== SIDE_ORDER[b.side]) return SIDE_ORDER[a.side] - SIDE_ORDER[b.side]
-      if (a.outsideDepth !== b.outsideDepth) return a.outsideDepth - b.outsideDepth
-      return a.portId.localeCompare(b.portId) // tiebreaker for determinism
+      if (portIndexOverride) {
+        const ai = portIndexOverride.get(a.portId) ?? 0
+        const bi = portIndexOverride.get(b.portId) ?? 0
+        if (ai !== bi) return ai - bi
+      } else if (a.outsideDepth !== b.outsideDepth) {
+        return a.outsideDepth - b.outsideDepth
+      }
+      return a.portId.localeCompare(b.portId)
     })
     const elkPorts: ElkPort[] = sorted.map((p, idx) => ({
       id: p.portId,
@@ -701,7 +717,7 @@ function mermaidToElk(
     elkGraph.edges!.push(e)
   }
 
-  return { elkGraph, decompositions }
+  return { elkGraph, decompositions, rawPortsByCompound }
 }
 
 function buildSubgraphNode(
@@ -1145,6 +1161,163 @@ function calculatePathMidpoint(points: Point[]): Point {
 }
 
 // ============================================================================
+// Second-pass port indexing
+//
+// After the first ELK pass, every cross-hier port has a known position,
+// and so does every leaf and every other port. We use that to recompute
+// port indices on each compound's boundary, sorted by where the port's
+// OUTSIDE neighbour ended up — i.e., the position of the next step
+// outward along the cross-hier chain. Sorting by perpendicular coordinate
+// (x for NORTH/SOUTH ports, y for EAST/WEST) puts each port directly
+// underneath / next to its outward neighbour, which is the order that
+// yields the fewest crossings between cross-hier sub-edges entering the
+// same compound side. The first pass's outsideDepth heuristic is just a
+// blind fallback — when the actual positions disagree with it, the
+// second pass corrects course.
+// ============================================================================
+
+function computePortIndicesFromLayout(
+  elkResult: ElkNode,
+  rawPortsByCompound: Map<string, CrossHierPort[]>,
+  decompositions: CrossHierDecomposition[]
+): Map<string, number> {
+  // 1. Walk ELK output and collect global positions for every port and
+  //    every node center. Ports live as `node.ports[]` per ELK schema.
+  const portPositions = new Map<string, Point>()
+  const nodeCenters = new Map<string, Point>()
+  function walk(elkNode: ElkNode, offsetX: number, offsetY: number): void {
+    if (!elkNode.children) return
+    for (const child of elkNode.children) {
+      const x = (child.x ?? 0) + offsetX
+      const y = (child.y ?? 0) + offsetY
+      const w = child.width ?? 0
+      const h = child.height ?? 0
+      nodeCenters.set(child.id, { x: x + w / 2, y: y + h / 2 })
+      const ports = (child as ElkGraphNode).ports
+      if (ports) {
+        for (const p of ports) {
+          // ELK fills in port.x/.y after layout; these are relative to the node.
+          const pAny = p as ElkPort & { x?: number; y?: number }
+          const px = pAny.x ?? 0
+          const py = pAny.y ?? 0
+          portPositions.set(p.id, { x: x + px, y: y + py })
+        }
+      }
+      walk(child, x, y)
+    }
+  }
+  walk(elkResult, 0, 0)
+
+  // 2. For each cross-hier port, find the position of the OUTWARD
+  //    neighbour — the next step along the chain, away from this port's
+  //    compound. The outward neighbour is either another port (one
+  //    compound out) or the source/target leaf if we're already at the
+  //    outermost step in the chain.
+  const outwardPos = new Map<string, Point>()
+  function lookup(id: string): Point | undefined {
+    return portPositions.get(id) ?? nodeCenters.get(id)
+  }
+  for (const decomp of decompositions) {
+    for (let i = 0; i < decomp.srcChain.length; i++) {
+      const port = decomp.srcChain[i]!
+      const targetId = i + 1 < decomp.srcChain.length
+        ? decomp.srcChain[i + 1]!.portId
+        : (decomp.tgtChain.length > 0
+          ? decomp.tgtChain[decomp.tgtChain.length - 1]!.portId
+          : decomp.edge.target)
+      const pos = lookup(targetId)
+      if (pos) outwardPos.set(port.portId, pos)
+    }
+    for (let i = 0; i < decomp.tgtChain.length; i++) {
+      const port = decomp.tgtChain[i]!
+      const sourceId = i + 1 < decomp.tgtChain.length
+        ? decomp.tgtChain[i + 1]!.portId
+        : (decomp.srcChain.length > 0
+          ? decomp.srcChain[decomp.srcChain.length - 1]!.portId
+          : decomp.edge.source)
+      const pos = lookup(sourceId)
+      if (pos) outwardPos.set(port.portId, pos)
+    }
+  }
+
+  // 3. Per compound, sort ports along each side by the outward neighbour's
+  //    perpendicular coordinate. Clockwise sense matters: for SOUTH and
+  //    WEST sides, ELK indices increase right-to-left and bottom-to-top
+  //    respectively, so we reverse the comparator.
+  const newIndices = new Map<string, number>()
+  const SIDE_ORDER: Record<Side, number> = { NORTH: 0, EAST: 1, SOUTH: 2, WEST: 3 }
+  for (const raws of rawPortsByCompound.values()) {
+    const sorted = [...raws].sort((a, b) => {
+      if (SIDE_ORDER[a.side] !== SIDE_ORDER[b.side]) return SIDE_ORDER[a.side] - SIDE_ORDER[b.side]
+      const aPos = outwardPos.get(a.portId)
+      const bPos = outwardPos.get(b.portId)
+      if (aPos && bPos) {
+        const reverse = a.side === 'SOUTH' || a.side === 'WEST'
+        const k1 = (a.side === 'NORTH' || a.side === 'SOUTH') ? aPos.x : aPos.y
+        const k2 = (a.side === 'NORTH' || a.side === 'SOUTH') ? bPos.x : bPos.y
+        const diff = reverse ? k2 - k1 : k1 - k2
+        if (Math.abs(diff) > 0.5) return diff
+      }
+      if (a.outsideDepth !== b.outsideDepth) return a.outsideDepth - b.outsideDepth
+      return a.portId.localeCompare(b.portId)
+    })
+    sorted.forEach((p, idx) => newIndices.set(p.portId, idx))
+  }
+  return newIndices
+}
+
+/** True iff at least one compound has 2+ ports on the same side — the only case where indices can affect crossings. */
+function hasReorderableSide(rawPortsByCompound: Map<string, CrossHierPort[]>): boolean {
+  for (const raws of rawPortsByCompound.values()) {
+    const counts = new Map<Side, number>()
+    for (const p of raws) counts.set(p.side, (counts.get(p.side) ?? 0) + 1)
+    for (const c of counts.values()) if (c > 1) return true
+  }
+  return false
+}
+
+/**
+ * Count right-angle crossings between distinct edges. Mirrors the renderer's
+ * hop-detection logic: a crossing is a horizontal segment of one edge passing
+ * over a vertical segment of another, with the intersection strictly inside
+ * both segments (HOP_RADIUS+1 padding from each endpoint, matching the
+ * renderer so the count predicts the number of hops we'll draw). Same-edge
+ * intersections don't count.
+ */
+function countRightAngleCrossings(edges: ReadonlyArray<PositionedEdge>): number {
+  interface Seg { edgeIdx: number; axis: 'H' | 'V'; pos: number; rangeMin: number; rangeMax: number }
+  const segs: Seg[] = []
+  const EPS = 0.5
+  for (let ei = 0; ei < edges.length; ei++) {
+    const pts = edges[ei]!.points
+    for (let si = 0; si + 1 < pts.length; si++) {
+      const p1 = pts[si]!
+      const p2 = pts[si + 1]!
+      const dx = p2.x - p1.x
+      const dy = p2.y - p1.y
+      if (Math.abs(dy) < EPS && Math.abs(dx) > EPS) {
+        segs.push({ edgeIdx: ei, axis: 'H', pos: (p1.y + p2.y) / 2, rangeMin: Math.min(p1.x, p2.x), rangeMax: Math.max(p1.x, p2.x) })
+      } else if (Math.abs(dx) < EPS && Math.abs(dy) > EPS) {
+        segs.push({ edgeIdx: ei, axis: 'V', pos: (p1.x + p2.x) / 2, rangeMin: Math.min(p1.y, p2.y), rangeMax: Math.max(p1.y, p2.y) })
+      }
+    }
+  }
+  const PAD = 6 // matches renderer's HOP_RADIUS+1
+  let count = 0
+  for (const h of segs) {
+    if (h.axis !== 'H') continue
+    for (const v of segs) {
+      if (v.axis !== 'V') continue
+      if (h.edgeIdx === v.edgeIdx) continue
+      if (v.pos < h.rangeMin + PAD || v.pos > h.rangeMax - PAD) continue
+      if (h.pos < v.rangeMin + PAD || h.pos > v.rangeMax - PAD) continue
+      count++
+    }
+  }
+  return count
+}
+
+// ============================================================================
 // Public API
 // ============================================================================
 
@@ -1154,9 +1327,35 @@ export function layoutGraphSync(
 ): PositionedGraph {
   const opts = { ...DEFAULTS, ...options }
 
-  const { elkGraph, decompositions } = mermaidToElk(graph, opts)
-  const elkResult = elkLayoutSync(elkGraph)
-  const extracted = elkToPositioned(elkResult, graph, decompositions)
+  // Pass 1: default port indices.
+  const pass1 = mermaidToElk(graph, opts)
+  const r1 = elkLayoutSync(pass1.elkGraph)
+  const ext1 = elkToPositioned(r1, graph, pass1.decompositions)
+  let extracted = ext1
+  let elkResult = r1
+
+  // Pass 2 only runs when (a) there's a compound with multiple ports on the
+  // same side (otherwise port indices can't affect anything) AND (b) pass 1
+  // actually has right-angle crossings between distinct edges (otherwise
+  // there's nothing to fix). When both hold, we recompute port indices from
+  // pass 1's positions and re-run ELK. We accept the second pass only if
+  // its crossing count is strictly lower — pass 2 can shift compound sizes
+  // and shuffle root-level placement, so blindly preferring it sometimes
+  // makes things worse.
+  if (hasReorderableSide(pass1.rawPortsByCompound)) {
+    const crossings1 = countRightAngleCrossings(ext1.edges)
+    if (crossings1 > 0) {
+      const newIndices = computePortIndicesFromLayout(r1, pass1.rawPortsByCompound, pass1.decompositions)
+      const pass2 = mermaidToElk(graph, opts, newIndices)
+      const r2 = elkLayoutSync(pass2.elkGraph)
+      const ext2 = elkToPositioned(r2, graph, pass2.decompositions)
+      const crossings2 = countRightAngleCrossings(ext2.edges)
+      if (crossings2 < crossings1) {
+        extracted = ext2
+        elkResult = r2
+      }
+    }
+  }
 
   // Shape-aware endpoint clipping (diamonds, etc.) on every edge.
   for (const edge of extracted.edges) {
