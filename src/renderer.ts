@@ -312,9 +312,12 @@ function buildEdgePathD(points: Point[], crossings?: SegmentCrossing[]): string 
  * Find every right-angle crossing where one edge's horizontal segment
  * passes over another edge's vertical segment. Each crossing attaches to
  * the horizontal segment so that — when emitted — the horizontal arches
- * over the vertical. Crossings between edges that share a source or target
- * are skipped: those edges naturally meet near the shared port and a hop
- * would read as a spurious junction.
+ * over the vertical. ENDPOINT_PAD filters out crossings within HOP_RADIUS+1
+ * of either segment's endpoint, which covers the "spurious junction" case
+ * where two edges sharing a port meet near it — without falsely skipping
+ * a real interior crossing between two edges that just happen to share an
+ * endpoint somewhere else (e.g. `ext1→in_a` and `mid_a→in_a` crossing in
+ * the middle of the diagram, far from `in_a`).
  */
 function buildCrossingMap(edges: PositionedEdge[]): Map<PositionedEdge, SegmentCrossing[]> {
   interface SegEntry {
@@ -346,14 +349,15 @@ function buildCrossingMap(edges: PositionedEdge[]): Map<PositionedEdge, SegmentC
   const result = new Map<PositionedEdge, SegmentCrossing[]>()
   // Endpoint padding: the crossing must fall strictly inside both segments,
   // not at a shared corner where two consecutive segments of the same edge
-  // meet — those aren't true crossings.
+  // meet — those aren't true crossings. The pad is also what stops fan-out
+  // edges from drawing a hop right at a shared port, since the crossing
+  // there sits within HOP_RADIUS of both endpoints.
   const ENDPOINT_PAD = HOP_RADIUS + 1
   for (const h of segs) {
     if (h.axis !== 'H') continue
     for (const v of segs) {
       if (v.axis !== 'V') continue
       if (h.edge === v.edge) continue
-      if (edgesShareEndpoint(h.edge, v.edge)) continue
       if (v.pos < h.rangeMin + ENDPOINT_PAD || v.pos > h.rangeMax - ENDPOINT_PAD) continue
       if (h.pos < v.rangeMin + ENDPOINT_PAD || h.pos > v.rangeMax - ENDPOINT_PAD) continue
       let arr = result.get(h.edge)
@@ -362,11 +366,6 @@ function buildCrossingMap(edges: PositionedEdge[]): Map<PositionedEdge, SegmentC
     }
   }
   return result
-}
-
-function edgesShareEndpoint(a: PositionedEdge, b: PositionedEdge): boolean {
-  return a.source === b.source || a.source === b.target ||
-         a.target === b.source || a.target === b.target
 }
 
 function renderEdgeLabel(edge: PositionedEdge, font: string): string {
