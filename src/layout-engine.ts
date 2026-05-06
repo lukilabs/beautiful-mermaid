@@ -631,35 +631,74 @@ function mermaidToElk(
   }
 
   // Convert raw ports (CrossHierPort) to ELK ports with explicit indices.
-  // ELK port indices increase clockwise: NORTH (l→r), EAST (t→b), SOUTH (r→l),
-  // WEST (b→t). When `portIndexOverride` is supplied (second pass), we use
-  // those indices directly. Otherwise we sort by outsideDepth ascending
-  // within each side — the closer source/target endpoint comes first, which
-  // is the best blind heuristic since both sub-edges in a SEPARATE compound
-  // end at the same internal node and ELK has no internal cross-min signal
-  // to break the tie.
+  // `port.index` is per side, restarting at 0 on each side. Empirically all
+  // sides number their ports in the natural "first along the perimeter"
+  // sense — NORTH/SOUTH left-to-right, EAST/WEST top-to-bottom. When
+  // `portIndexOverride` is supplied (second pass), we use those indices
+  // directly. Otherwise we sort by outsideDepth ascending within each side
+  // — the closer source/target endpoint comes first, which is the best
+  // blind heuristic when both sub-edges in a SEPARATE compound end at the
+  // same internal node.
   const portsByCompound = new Map<string, ElkPort[]>()
-  const SIDE_ORDER: Record<Side, number> = { NORTH: 0, EAST: 1, SOUTH: 2, WEST: 3 }
   for (const [compoundId, raws] of rawPortsByCompound) {
-    const sorted = [...raws].sort((a, b) => {
-      if (SIDE_ORDER[a.side] !== SIDE_ORDER[b.side]) return SIDE_ORDER[a.side] - SIDE_ORDER[b.side]
-      if (portIndexOverride) {
-        const ai = portIndexOverride.get(a.portId) ?? 0
-        const bi = portIndexOverride.get(b.portId) ?? 0
-        if (ai !== bi) return ai - bi
-      } else if (a.outsideDepth !== b.outsideDepth) {
-        return a.outsideDepth - b.outsideDepth
-      }
-      return a.portId.localeCompare(b.portId)
-    })
-    const elkPorts: ElkPort[] = sorted.map((p, idx) => ({
-      id: p.portId,
-      layoutOptions: {
-        'org.eclipse.elk.port.side': p.side,
-        'org.eclipse.elk.port.index': String(idx),
-      },
-    }))
+    // Group by side and sort each side independently.
+    const bySide = new Map<Side, CrossHierPort[]>()
+    for (const p of raws) {
+      let arr = bySide.get(p.side)
+      if (!arr) { arr = []; bySide.set(p.side, arr) }
+      arr.push(p)
+    }
+    const elkPorts: ElkPort[] = []
+    for (const [side, sidePorts] of bySide) {
+      sidePorts.sort((a, b) => {
+        if (portIndexOverride) {
+          const ai = portIndexOverride.get(a.portId) ?? 0
+          const bi = portIndexOverride.get(b.portId) ?? 0
+          if (ai !== bi) return ai - bi
+        } else if (a.outsideDepth !== b.outsideDepth) {
+          return a.outsideDepth - b.outsideDepth
+        }
+        return a.portId.localeCompare(b.portId)
+      })
+      sidePorts.forEach((p, idx) => {
+        elkPorts.push({
+          id: p.portId,
+          layoutOptions: {
+            'org.eclipse.elk.port.side': side,
+            'org.eclipse.elk.port.index': String(idx),
+          },
+        })
+      })
+    }
     portsByCompound.set(compoundId, elkPorts)
+  }
+
+  // Sub-edge order matters for SEPARATE compound port placement: ELK fans
+  // out a leaf's outgoing edges in the order they appear in the parent's
+  // edges array, and the resulting fan-out positions become the port
+  // positions on the boundary. (Internal model order overrides port.index
+  // for compound port placement.) For each compound, sort its sub-edges so
+  // that the sub-edge ending at the compound's earliest-indexed port comes
+  // first, the next-indexed port comes second, etc. Sub-edges with no port
+  // on this compound (LCA-level segments) are placed last.
+  const portIndexOf = new Map<string, number>()
+  for (const elkPorts of portsByCompound.values()) {
+    for (const p of elkPorts) {
+      const idxStr = p.layoutOptions?.['org.eclipse.elk.port.index']
+      if (idxStr !== undefined) portIndexOf.set(p.id, parseInt(idxStr, 10))
+    }
+  }
+  for (const [compoundId, edges] of subEdgesByCompound) {
+    if (compoundId === null) continue // root has no boundary ports
+    const compoundPortIds = new Set<string>()
+    for (const p of portsByCompound.get(compoundId) ?? []) compoundPortIds.add(p.id)
+    function sortKey(edge: ElkExtendedEdge): number {
+      // Find a port on this compound that this edge connects to.
+      for (const s of edge.sources) if (compoundPortIds.has(s)) return portIndexOf.get(s) ?? 1e9
+      for (const t of edge.targets) if (compoundPortIds.has(t)) return portIndexOf.get(t) ?? 1e9
+      return 1e9 // not a port-attached sub-edge
+    }
+    edges.sort((a, b) => sortKey(a) - sortKey(b))
   }
 
   // Build ELK input tree.
@@ -1208,60 +1247,53 @@ function computePortIndicesFromLayout(
   }
   walk(elkResult, 0, 0)
 
-  // 2. For each cross-hier port, find the position of the OUTWARD
-  //    neighbour — the next step along the chain, away from this port's
-  //    compound. The outward neighbour is either another port (one
-  //    compound out) or the source/target leaf if we're already at the
-  //    outermost step in the chain.
+  // 2. For each cross-hier port, look up the position of the FINAL leaf
+  //    on the OPPOSITE end of its cross-hier edge:
+  //      - Outgoing port (source side) → look up the target leaf's centre.
+  //      - Incoming port (target side) → look up the source leaf's centre.
+  //    Using the leaf rather than the next-compound port avoids a circular
+  //    dependency: next-compound positions are themselves derived from pass
+  //    1's port indices, so sorting by them just reproduces pass 1's order.
+  //    Leaf positions are constrained by graph structure, so they break the
+  //    cycle and let pass 2 actually propose a different order.
   const outwardPos = new Map<string, Point>()
-  function lookup(id: string): Point | undefined {
-    return portPositions.get(id) ?? nodeCenters.get(id)
-  }
   for (const decomp of decompositions) {
-    for (let i = 0; i < decomp.srcChain.length; i++) {
-      const port = decomp.srcChain[i]!
-      const targetId = i + 1 < decomp.srcChain.length
-        ? decomp.srcChain[i + 1]!.portId
-        : (decomp.tgtChain.length > 0
-          ? decomp.tgtChain[decomp.tgtChain.length - 1]!.portId
-          : decomp.edge.target)
-      const pos = lookup(targetId)
-      if (pos) outwardPos.set(port.portId, pos)
+    const targetPos = nodeCenters.get(decomp.edge.target)
+    const sourcePos = nodeCenters.get(decomp.edge.source)
+    for (const port of decomp.srcChain) {
+      if (targetPos) outwardPos.set(port.portId, targetPos)
     }
-    for (let i = 0; i < decomp.tgtChain.length; i++) {
-      const port = decomp.tgtChain[i]!
-      const sourceId = i + 1 < decomp.tgtChain.length
-        ? decomp.tgtChain[i + 1]!.portId
-        : (decomp.srcChain.length > 0
-          ? decomp.srcChain[decomp.srcChain.length - 1]!.portId
-          : decomp.edge.source)
-      const pos = lookup(sourceId)
-      if (pos) outwardPos.set(port.portId, pos)
+    for (const port of decomp.tgtChain) {
+      if (sourcePos) outwardPos.set(port.portId, sourcePos)
     }
   }
 
-  // 3. Per compound, sort ports along each side by the outward neighbour's
-  //    perpendicular coordinate. Clockwise sense matters: for SOUTH and
-  //    WEST sides, ELK indices increase right-to-left and bottom-to-top
-  //    respectively, so we reverse the comparator.
+  // 3. Per compound, group ports by side and sort each side independently
+  //    by the outward neighbour's perpendicular coordinate (x for NORTH/SOUTH,
+  //    y for EAST/WEST). Indices restart at 0 per side and increase in the
+  //    natural perpendicular direction.
   const newIndices = new Map<string, number>()
-  const SIDE_ORDER: Record<Side, number> = { NORTH: 0, EAST: 1, SOUTH: 2, WEST: 3 }
   for (const raws of rawPortsByCompound.values()) {
-    const sorted = [...raws].sort((a, b) => {
-      if (SIDE_ORDER[a.side] !== SIDE_ORDER[b.side]) return SIDE_ORDER[a.side] - SIDE_ORDER[b.side]
-      const aPos = outwardPos.get(a.portId)
-      const bPos = outwardPos.get(b.portId)
-      if (aPos && bPos) {
-        const reverse = a.side === 'SOUTH' || a.side === 'WEST'
-        const k1 = (a.side === 'NORTH' || a.side === 'SOUTH') ? aPos.x : aPos.y
-        const k2 = (a.side === 'NORTH' || a.side === 'SOUTH') ? bPos.x : bPos.y
-        const diff = reverse ? k2 - k1 : k1 - k2
-        if (Math.abs(diff) > 0.5) return diff
-      }
-      if (a.outsideDepth !== b.outsideDepth) return a.outsideDepth - b.outsideDepth
-      return a.portId.localeCompare(b.portId)
-    })
-    sorted.forEach((p, idx) => newIndices.set(p.portId, idx))
+    const bySide = new Map<Side, CrossHierPort[]>()
+    for (const p of raws) {
+      let arr = bySide.get(p.side)
+      if (!arr) { arr = []; bySide.set(p.side, arr) }
+      arr.push(p)
+    }
+    for (const sidePorts of bySide.values()) {
+      sidePorts.sort((a, b) => {
+        const aPos = outwardPos.get(a.portId)
+        const bPos = outwardPos.get(b.portId)
+        if (aPos && bPos) {
+          const k1 = (a.side === 'NORTH' || a.side === 'SOUTH') ? aPos.x : aPos.y
+          const k2 = (a.side === 'NORTH' || a.side === 'SOUTH') ? bPos.x : bPos.y
+          if (Math.abs(k1 - k2) > 0.5) return k1 - k2
+        }
+        if (a.outsideDepth !== b.outsideDepth) return a.outsideDepth - b.outsideDepth
+        return a.portId.localeCompare(b.portId)
+      })
+      sidePorts.forEach((p, idx) => newIndices.set(p.portId, idx))
+    }
   }
   return newIndices
 }
