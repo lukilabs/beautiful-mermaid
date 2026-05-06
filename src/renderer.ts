@@ -107,11 +107,11 @@ function arrowMarkerDefs(): string {
     `  <marker id="arrowhead" markerWidth="${w}" markerHeight="${h}" refX="${refX}" refY="${h / 2}" orient="auto">` +
     `\n    <polygon points="0 0, ${w} ${h / 2}, 0 ${h}" ${arrowStyle} />` +
     `\n  </marker>` +
-    // Reverse arrow (marker-start) — refX=1 so it sits at the line start with slight offset, auto-start-reverse flips it
-    `\n  <marker id="arrowhead-start" markerWidth="${w}" markerHeight="${h}" refX="1" refY="${h / 2}" orient="auto-start-reverse">` +
-    `\n    <polygon points="${w} 0, 0 ${h / 2}, ${w} ${h}" ${arrowStyle} />` +
+    // Reverse arrow (marker-start) — uses the same polygon and refX as marker-end, auto-start-reverse flips it automatically at the start of the line.
+    `\n  <marker id="arrowhead-start" markerWidth="${w}" markerHeight="${h}" refX="${refX}" refY="${h / 2}" orient="auto-start-reverse">` +
+    `\n    <polygon points="0 0, ${w} ${h / 2}, 0 ${h}" ${arrowStyle} />` +
     `\n  </marker>`
-  )
+  );
 }
 
 /**
