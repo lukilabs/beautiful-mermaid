@@ -8,7 +8,7 @@
 // ============================================================================
 
 import type {
-  GridCoord, DrawingCoord, Direction, AsciiGraph, AsciiNode, AsciiSubgraph,
+  GridCoord, DrawingCoord, Direction, AsciiEdge, AsciiGraph, AsciiNode, AsciiSubgraph,
 } from './types.ts'
 import { gridKey } from './types.ts'
 import { mkCanvas, setCanvasSizeToGrid, setRoleCanvasSizeToGrid } from './canvas.ts'
@@ -377,21 +377,245 @@ export function offsetDrawingForSubgraphs(graph: AsciiGraph): void {
 }
 
 // ============================================================================
-// Main layout orchestrator
+// Width-constrained layout
 // ============================================================================
 
+function estimateNodeWidth(graph: AsciiGraph, node: AsciiNode): number {
+  const dims = getShapeDimensions(node.shape, node.displayLabel, {
+    useAscii: graph.config.useAscii,
+    padding: graph.config.boxBorderPadding,
+  })
+  return dims.width
+}
+
+function rebuildReservedGrid(graph: AsciiGraph): void {
+  graph.grid.clear()
+  for (const node of graph.nodes) {
+    if (!node.gridCoord) continue
+    for (let dx = 0; dx < 3; dx++) {
+      for (let dy = 0; dy < 3; dy++) {
+        const reserved: GridCoord = { x: node.gridCoord.x + dx, y: node.gridCoord.y + dy }
+        graph.grid.set(gridKey(reserved), node)
+      }
+    }
+  }
+}
+
 /**
- * createMapping performs the full grid layout:
- * 1. Place root nodes on the grid
- * 2. Place child nodes level by level
- * 3. Compute column widths and row heights
- * 4. Run A* pathfinding for all edges
- * 5. Determine label placement
- * 6. Convert grid coords → drawing coords
- * 7. Generate node box drawings
- * 8. Calculate subgraph bounding boxes
+ * Re-pack wide LR layouts into vertical bands before column widths and edge
+ * routing are computed. This makes maxWidth influence placement rather than
+ * shrinking rendered output after the fact.
  */
-export function createMapping(graph: AsciiGraph): void {
+function rebalanceLevelsForMaxWidth(graph: AsciiGraph): void {
+  const maxW = graph.config.maxWidth
+  if (!maxW || maxW <= 0) return
+
+  if (graph.config.graphDirection === 'TD') {
+    const levels = new Map<number, AsciiNode[]>()
+    for (const node of graph.nodes) {
+      if (!node.gridCoord) continue
+      const level = node.gridCoord.y
+      const nodes = levels.get(level)
+      if (nodes) nodes.push(node)
+      else levels.set(level, [node])
+    }
+
+    const sortedLevels = [...levels.keys()].sort((a, b) => a - b)
+    if (sortedLevels.length <= 1) return
+
+    const estimatedGap = graph.config.paddingX
+    let levelOffset = 0
+
+    for (const level of sortedLevels) {
+      const nodes = (levels.get(level) ?? []).slice().sort((a, b) => (a.gridCoord?.x ?? 0) - (b.gridCoord?.x ?? 0))
+      if (nodes.length === 0) continue
+
+      const bands: AsciiNode[][] = []
+      let currentBand: AsciiNode[] = []
+      let currentBandWidth = 0
+
+      for (const node of nodes) {
+        const nodeWidth = estimateNodeWidth(graph, node)
+        const nextWidth = currentBandWidth === 0 ? nodeWidth : currentBandWidth + estimatedGap + nodeWidth
+        if (currentBand.length > 0 && nextWidth > maxW) {
+          bands.push(currentBand)
+          currentBand = []
+          currentBandWidth = 0
+        }
+
+        currentBand.push(node)
+        currentBandWidth = currentBandWidth === 0 ? nodeWidth : currentBandWidth + estimatedGap + nodeWidth
+      }
+
+      if (currentBand.length > 0) bands.push(currentBand)
+
+      if (bands.length === 1) {
+        for (const node of nodes) {
+          node.gridCoord!.y = level + levelOffset
+        }
+        continue
+      }
+
+      for (let bandIdx = 0; bandIdx < bands.length; bandIdx++) {
+        const band = bands[bandIdx]!
+        for (let idx = 0; idx < band.length; idx++) {
+          const node = band[idx]!
+          node.gridCoord!.x = idx * 4
+          node.gridCoord!.y = level + levelOffset + bandIdx * 4
+        }
+      }
+
+      levelOffset += (bands.length - 1) * 4
+    }
+
+    rebuildReservedGrid(graph)
+    return
+  }
+
+  if (graph.config.graphDirection !== 'LR') return
+
+  const levels = new Map<number, AsciiNode[]>()
+  let maxPerpendicular = 0
+  for (const node of graph.nodes) {
+    if (!node.gridCoord) continue
+    const level = node.gridCoord.x
+    const nodes = levels.get(level)
+    if (nodes) nodes.push(node)
+    else levels.set(level, [node])
+    maxPerpendicular = Math.max(maxPerpendicular, node.gridCoord.y)
+  }
+
+  const sortedLevels = [...levels.keys()].sort((a, b) => a - b)
+  if (sortedLevels.length <= 1) return
+
+  const estimatedGap = graph.config.paddingX
+  const bandStep = maxPerpendicular + 8
+  let bandIndex = 0
+  let bandWidth = 0
+  let levelIndexInBand = 0
+
+  for (const level of sortedLevels) {
+    const nodes = levels.get(level) ?? []
+    let levelWidth = 0
+    for (const node of nodes) {
+      levelWidth = Math.max(levelWidth, estimateNodeWidth(graph, node))
+    }
+
+    const nextWidth = bandWidth === 0 ? levelWidth : bandWidth + estimatedGap + levelWidth
+    if (bandWidth > 0 && nextWidth > maxW) {
+      bandIndex++
+      bandWidth = 0
+      levelIndexInBand = 0
+    }
+
+    const newLevel = levelIndexInBand * 4
+    for (const node of nodes) {
+      node.gridCoord!.x = newLevel
+      node.gridCoord!.y += bandIndex * bandStep
+    }
+
+    bandWidth = bandWidth === 0 ? levelWidth : bandWidth + estimatedGap + levelWidth
+    levelIndexInBand++
+  }
+
+  rebuildReservedGrid(graph)
+}
+
+function computePrimaryLevels(graph: AsciiGraph): Map<string, number> {
+  const levels = new Map<string, number>()
+  for (const node of graph.nodes) {
+    levels.set(node.name, 0)
+  }
+
+  const maxIterations = Math.max(0, graph.nodes.length - 1)
+  for (let i = 0; i < maxIterations; i++) {
+    let changed = false
+
+    for (const edge of graph.edges) {
+      const parentSg = getNodeSubgraph(graph, edge.from)
+      const childSg = getNodeSubgraph(graph, edge.to)
+      const edgeDir = (parentSg && parentSg === childSg && parentSg.direction)
+        ? parentSg.direction
+        : graph.config.graphDirection
+
+      if (edgeDir !== graph.config.graphDirection) continue
+
+      const nextLevel = (levels.get(edge.from.name) ?? 0) + 4
+      if (nextLevel > (levels.get(edge.to.name) ?? 0)) {
+        levels.set(edge.to.name, nextLevel)
+        changed = true
+      }
+    }
+
+    if (!changed) break
+  }
+
+  return levels
+}
+
+function clearGridPlacement(graph: AsciiGraph): void {
+  graph.grid.clear()
+  graph.columnWidth.clear()
+  graph.rowHeight.clear()
+
+  for (const node of graph.nodes) {
+    node.gridCoord = null
+    node.drawingCoord = null
+    node.drawing = null
+    node.drawn = false
+  }
+
+  for (const edge of graph.edges) {
+    edge.path = []
+    edge.labelLine = []
+    edge.startDir = { x: 0, y: 0 }
+    edge.endDir = { x: 0, y: 0 }
+    delete edge.bundle
+  }
+
+  graph.bundles = []
+  graph.offsetX = 0
+  graph.offsetY = 0
+}
+
+function measurePlacedNodeLayoutWidth(graph: AsciiGraph): number {
+  const columnWidth = new Map<number, number>()
+  let maxColumn = -1
+
+  for (const node of graph.nodes) {
+    if (!node.gridCoord) continue
+
+    const dims = getShapeDimensions(node.shape, node.displayLabel, {
+      useAscii: graph.config.useAscii,
+      padding: graph.config.boxBorderPadding,
+    })
+
+    for (let idx = 0; idx < dims.gridColumns.length; idx++) {
+      const xCoord = node.gridCoord.x + idx
+      const current = columnWidth.get(xCoord) ?? 0
+      columnWidth.set(xCoord, Math.max(current, dims.gridColumns[idx]!))
+      maxColumn = Math.max(maxColumn, xCoord)
+    }
+
+    if (node.gridCoord.x > 0) {
+      const padCoord = node.gridCoord.x - 1
+      const current = columnWidth.get(padCoord) ?? 0
+      columnWidth.set(padCoord, Math.max(current, graph.config.paddingX))
+      maxColumn = Math.max(maxColumn, padCoord)
+    }
+  }
+
+  let width = 0
+  for (let col = 0; col <= maxColumn; col++) {
+    width += columnWidth.get(col) ?? 0
+  }
+  return width
+}
+
+function placeNodesOnGrid(
+  graph: AsciiGraph,
+  primaryLevelByNode: Map<string, number> | null,
+): void {
   const dir = graph.config.graphDirection
   const highestPositionPerLevel: number[] = new Array(100).fill(0)
 
@@ -414,22 +638,19 @@ export function createMapping(graph: AsciiGraph): void {
   // (e.g., `subgraph s; A-->B; end; X-->A` - A shouldn't be a root, X should).
   const rootNodes = initialRoots.filter(node => {
     const nodeSg = getNodeSubgraph(graph, node)
-    if (!nodeSg) return true  // external nodes: keep as roots
+    if (!nodeSg) return true
 
-    // Check if this subgraph node has incoming edges from outside its subgraph
     for (const edge of graph.edges) {
       if (edge.to === node) {
         const sourceSg = getNodeSubgraph(graph, edge.from)
         if (sourceSg !== nodeSg) {
-          return false  // has external incoming edge → not a root
+          return false
         }
       }
     }
     return true
   })
 
-  // In LR mode with both external and subgraph roots, separate them
-  // so subgraph roots are placed one level deeper
   let hasExternalRoots = false
   let hasSubgraphRootsWithEdges = false
   for (const node of rootNodes) {
@@ -451,60 +672,51 @@ export function createMapping(graph: AsciiGraph): void {
     externalRootNodes = rootNodes
   }
 
-  // Place external root nodes
   for (const node of externalRootNodes) {
+    const rootLevel = primaryLevelByNode?.get(node.name) ?? 0
     const requested: GridCoord = dir === 'LR'
-      ? { x: 0, y: highestPositionPerLevel[0]! }
-      : { x: highestPositionPerLevel[0]!, y: 0 }
+      ? { x: rootLevel, y: highestPositionPerLevel[rootLevel]! }
+      : { x: highestPositionPerLevel[rootLevel]!, y: rootLevel }
     reserveSpotInGrid(graph, graph.nodes[node.index]!, requested)
-    highestPositionPerLevel[0] = highestPositionPerLevel[0]! + 4
+    highestPositionPerLevel[rootLevel] = highestPositionPerLevel[rootLevel]! + 4
   }
 
-  // Place subgraph root nodes at level 4 (one level in from the edge)
   if (shouldSeparate && subgraphRootNodes.length > 0) {
     const subgraphLevel = 4
     for (const node of subgraphRootNodes) {
+      const rootLevel = Math.max(subgraphLevel, primaryLevelByNode?.get(node.name) ?? 0)
       const requested: GridCoord = dir === 'LR'
-        ? { x: subgraphLevel, y: highestPositionPerLevel[subgraphLevel]! }
-        : { x: highestPositionPerLevel[subgraphLevel]!, y: subgraphLevel }
+        ? { x: rootLevel, y: highestPositionPerLevel[rootLevel]! }
+        : { x: highestPositionPerLevel[rootLevel]!, y: rootLevel }
       reserveSpotInGrid(graph, graph.nodes[node.index]!, requested)
-      highestPositionPerLevel[subgraphLevel] = highestPositionPerLevel[subgraphLevel]! + 4
+      highestPositionPerLevel[rootLevel] = highestPositionPerLevel[rootLevel]! + 4
     }
   }
 
-  // Place child nodes level by level
-  // Use subgraph direction only when both parent and child are in the same subgraph
-  // Multi-pass: iterate until all nodes are placed (handles non-topological node order)
-  // Note: when shouldSeparate, externalRootNodes + subgraphRootNodes = rootNodes
-  //       otherwise, externalRootNodes = rootNodes and subgraphRootNodes is empty
   let placedCount = externalRootNodes.length + subgraphRootNodes.length
   while (placedCount < graph.nodes.length) {
     const prevCount = placedCount
     for (const node of graph.nodes) {
-      if (node.gridCoord === null) continue  // skip unplaced nodes
+      if (node.gridCoord === null) continue
       const gc = node.gridCoord
 
       for (const child of getChildren(graph, node)) {
-        if (child.gridCoord !== null) continue // already placed
+        if (child.gridCoord !== null) continue
 
-        // Determine direction for this edge (parent -> child)
-        // Use subgraph direction only if both are in the same subgraph with override
         const parentSg = getNodeSubgraph(graph, node)
         const childSg = getNodeSubgraph(graph, child)
         const edgeDir = (parentSg && parentSg === childSg && parentSg.direction)
           ? parentSg.direction
           : graph.config.graphDirection
 
-        const childLevel = edgeDir === 'LR' ? gc.x + 4 : gc.y + 4
+        const childLevel = edgeDir === graph.config.graphDirection
+          ? (primaryLevelByNode?.get(child.name) ?? (edgeDir === 'LR' ? gc.x + 4 : gc.y + 4))
+          : (edgeDir === 'LR' ? gc.x + 4 : gc.y + 4)
 
-        // Determine position based on direction context
         let highestPosition: number
         if (edgeDir !== graph.config.graphDirection) {
-          // Cross-direction: use parent's perpendicular coordinate
-          // This keeps children aligned with parent when direction changes
           highestPosition = edgeDir === 'LR' ? gc.y : gc.x
         } else {
-          // Same direction: use level tracker
           highestPosition = highestPositionPerLevel[childLevel]!
         }
 
@@ -513,15 +725,44 @@ export function createMapping(graph: AsciiGraph): void {
           : { x: highestPosition, y: childLevel }
         reserveSpotInGrid(graph, graph.nodes[child.index]!, requested, edgeDir)
 
-        // Only update level tracker for same-direction placements
         if (edgeDir === graph.config.graphDirection) {
           highestPositionPerLevel[childLevel] = highestPosition + 4
         }
         placedCount++
       }
     }
-    // Safety: break if no progress made (handles disconnected nodes)
+
     if (placedCount === prevCount) break
+  }
+}
+
+// ============================================================================
+// Main layout orchestrator
+// ============================================================================
+
+/**
+ * createMapping performs the full grid layout:
+ * 1. Place root nodes on the grid
+ * 2. Place child nodes level by level
+ * 3. Compute column widths and row heights
+ * 4. Run A* pathfinding for all edges
+ * 5. Determine label placement
+ * 6. Convert grid coords → drawing coords
+ * 7. Generate node box drawings
+ * 8. Calculate subgraph bounding boxes
+ */
+export function createMapping(graph: AsciiGraph): void {
+  const hasStatePseudoNode = graph.nodes.some(node => node.shape === 'state-start' || node.shape === 'state-end')
+  placeNodesOnGrid(graph, null)
+
+  if (graph.config.maxWidth && graph.config.maxWidth > 0) {
+    const naturalWidth = measurePlacedNodeLayoutWidth(graph)
+    if (naturalWidth > graph.config.maxWidth) {
+      clearGridPlacement(graph)
+      const primaryLevelByNode = hasStatePseudoNode ? null : computePrimaryLevels(graph)
+      placeNodesOnGrid(graph, primaryLevelByNode)
+      rebalanceLevelsForMaxWidth(graph)
+    }
   }
 
   // Compute column widths and row heights
@@ -536,6 +777,15 @@ export function createMapping(graph: AsciiGraph): void {
   // Route bundled edges through junction points
   processBundles(graph)
 
+  // Seed the occupancy map with any paths produced during bundle processing so the
+  // remaining edges can avoid reusing those corridors unless the overlap is intentional.
+  const occupiedEdgeCells = new Map<string, AsciiEdge[]>()
+  for (const edge of graph.edges) {
+    if (edge.path.length > 0) {
+      markPathCellsOccupied(occupiedEdgeCells, edge.path, edge)
+    }
+  }
+
   // Route non-bundled edges via A* and determine label positions
   for (const edge of graph.edges) {
     // Skip edges that were already routed as part of a bundle
@@ -545,8 +795,9 @@ export function createMapping(graph: AsciiGraph): void {
       continue
     }
 
-    determinePath(graph, edge)
+    determinePath(graph, edge, occupiedEdgeCells)
     increaseGridSizeForPath(graph, edge.path)
+    markPathCellsOccupied(occupiedEdgeCells, edge.path, edge)
     determineLabelLine(graph, edge)
   }
 
@@ -575,4 +826,55 @@ function getEdgesFromNode(graph: AsciiGraph, node: AsciiNode): AsciiGraph['edges
 /** Get all direct children of a node (targets of outgoing edges). */
 function getChildren(graph: AsciiGraph, node: AsciiNode): AsciiNode[] {
   return getEdgesFromNode(graph, node).map(e => e.to)
+}
+
+/**
+ * Expand a merged path back into unit grid cells and record every traversed cell except
+ * the final attachment point at the destination node. The destination cell stays free so
+ * later edges can still enter/leave the same node side when that overlap is legitimate.
+ */
+function markPathCellsOccupied(
+  occupied: Map<string, AsciiEdge[]>,
+  path: GridCoord[],
+  edge: AsciiEdge,
+): void {
+  if (path.length < 2) return
+
+  const last = path[path.length - 1]!
+
+  for (let i = 1; i < path.length; i++) {
+    const from = path[i - 1]!
+    const to = path[i]!
+    const dx = Math.sign(to.x - from.x)
+    const dy = Math.sign(to.y - from.y)
+    let x = from.x + dx
+    let y = from.y + dy
+
+    while (true) {
+      if (x !== last.x || y !== last.y) {
+        appendOccupiedEdge(occupied, gridKey({ x, y }), edge)
+      }
+
+      if (x === to.x && y === to.y) {
+        break
+      }
+
+      x += dx
+      y += dy
+    }
+  }
+}
+
+/** Append one routed edge to the occupancy list for a specific grid cell. */
+function appendOccupiedEdge(
+  occupied: Map<string, AsciiEdge[]>,
+  key: string,
+  edge: AsciiEdge,
+): void {
+  const edges = occupied.get(key)
+  if (edges) {
+    edges.push(edge)
+  } else {
+    occupied.set(key, [edge])
+  }
 }

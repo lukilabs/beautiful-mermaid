@@ -6,7 +6,7 @@
 // paths between nodes on the grid. Prefers straight lines over zigzags.
 // ============================================================================
 
-import type { GridCoord, AsciiNode } from './types.ts'
+import type { GridCoord, AsciiNode, AsciiEdge } from './types.ts'
 import { gridKey, gridCoordEquals } from './types.ts'
 
 // ============================================================================
@@ -108,6 +108,18 @@ const MOVE_DIRS: GridCoord[] = [
   { x: 0, y: -1 },
 ]
 
+/**
+ * Reusing a corridor is free when the overlap stays within the same fan-in or fan-out
+ * family (same source or same target). Those shared trunks are visually intentional.
+ */
+const RELATED_EDGE_PENALTY = 0
+
+/**
+ * Penalty for stepping onto a cell already used by an unrelated edge.
+ * This is large enough to prefer a short detour over creating a misleading branch.
+ */
+const OCCUPIED_EDGE_PENALTY = 4
+
 /** Check if a grid cell is unoccupied and has non-negative coordinates. */
 function isFreeInGrid(grid: Map<string, AsciiNode>, c: GridCoord): boolean {
   if (c.x < 0 || c.y < 0) return false
@@ -116,12 +128,19 @@ function isFreeInGrid(grid: Map<string, AsciiNode>, c: GridCoord): boolean {
 
 /**
  * Find a path from `from` to `to` on the grid using A*.
+ *
+ * `occupied` is an optional edge-occupancy map populated from already-routed paths.
+ * Unlike node occupancy in `grid`, these cells are still traversable; they just add
+ * cost so unrelated edges avoid collapsing into the same visual corridor.
+ *
  * Returns the path as an array of GridCoords, or null if no path exists.
  */
 export function getPath(
   grid: Map<string, AsciiNode>,
   from: GridCoord,
   to: GridCoord,
+  occupied?: Map<string, AsciiEdge[]>,
+  edge?: AsciiEdge,
 ): GridCoord[] | null {
   const pq = new MinHeap()
   pq.push({ coord: from, priority: 0 })
@@ -156,8 +175,12 @@ export function getPath(
         continue
       }
 
-      const newCost = currentCost + 1
       const nextKey = gridKey(next)
+      const penalty = !gridCoordEquals(next, to)
+        ? getOccupancyPenalty(occupied?.get(nextKey), edge)
+        : 0
+      const stepCost = 1 + penalty
+      const newCost = currentCost + stepCost
       const existingCost = costSoFar.get(nextKey)
 
       if (existingCost === undefined || newCost < existingCost) {
@@ -170,6 +193,26 @@ export function getPath(
   }
 
   return null // No path found
+}
+
+/**
+ * Compute the extra traversal cost for a candidate edge stepping onto a cell that
+ * already belongs to previously routed edges.
+ */
+function getOccupancyPenalty(occupants: AsciiEdge[] | undefined, edge: AsciiEdge | undefined): number {
+  if (!occupants || occupants.length === 0 || !edge) return 0
+
+  let allRelated = true
+  for (const occupant of occupants) {
+    const sharesSource = occupant.from === edge.from
+    const sharesTarget = occupant.to === edge.to
+    if (!sharesSource && !sharesTarget) {
+      allRelated = false
+      break
+    }
+  }
+
+  return allRelated ? RELATED_EDGE_PENALTY : OCCUPIED_EDGE_PENALTY
 }
 
 /**

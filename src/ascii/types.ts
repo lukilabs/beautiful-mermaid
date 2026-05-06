@@ -141,6 +141,8 @@ export interface AsciiConfig {
   boxBorderPadding: number
   /** Graph direction: "LR" or "TD". */
   graphDirection: 'LR' | 'TD'
+  /** Maximum output width in characters. Layout reduces spacing to fit. */
+  maxWidth?: number
 }
 
 /** Full ASCII graph state used during layout and rendering. */

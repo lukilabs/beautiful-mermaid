@@ -16,11 +16,16 @@ import type { Canvas, AsciiConfig, RoleCanvas, CharRole, AsciiTheme, ColorMode }
 import { mkCanvas, mkRoleCanvas, canvasToString, increaseSize, increaseRoleCanvasSize, setRole } from './canvas.ts'
 import { drawMultiBox } from './draw.ts'
 import { splitLines } from './multiline-utils.ts'
+import { wrapText } from './layout-budget.ts'
 
 /** Classify a character from a box drawing as 'border' or 'text'. */
 function classifyBoxChar(ch: string): CharRole {
   if (/^[┌┐└┘├┤┬┴┼│─╭╮╰╯+\-|]$/.test(ch)) return 'border'
   return 'text'
+}
+
+function visibleWidth(output: string): number {
+  return Math.max(...output.split('\n').map(line => line.replace(/\s+$/u, '').length), 0)
 }
 
 // ============================================================================
@@ -55,6 +60,26 @@ function buildClassSections(cls: ClassNode): string[][] {
   if (methods.length === 0) return [header, attrs]
   // Full 3-section box
   return [header, attrs, methods]
+}
+
+function measureSections(sections: string[][]): { width: number; height: number } {
+  let maxTextW = 0
+  for (const section of sections) {
+    for (const line of section) maxTextW = Math.max(maxTextW, line.length)
+  }
+
+  let totalLines = 0
+  for (const section of sections) totalLines += Math.max(section.length, 1)
+
+  return {
+    width: maxTextW + 4,
+    height: totalLines + (sections.length - 1) + 2,
+  }
+}
+
+function wrapSectionsToBoxWidth(sections: string[][], maxBoxWidth: number): string[][] {
+  const contentBudget = Math.max(1, maxBoxWidth - 4)
+  return sections.map(section => section.flatMap(line => splitLines(wrapText(line, contentBudget))))
 }
 
 // ============================================================================
@@ -149,37 +174,32 @@ interface PlacedClass {
  * Pipeline: parse → build boxes → level-based layout → draw boxes → draw relationships → string.
  */
 export function renderClassAscii(text: string, config: AsciiConfig, colorMode?: ColorMode, theme?: AsciiTheme): string {
+  if (config.maxWidth && config.maxWidth > 0) {
+    const unconstrained = renderClassAscii(text, { ...config, maxWidth: undefined }, colorMode, theme)
+    if (visibleWidth(unconstrained) <= config.maxWidth) return unconstrained
+  }
+
   const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0 && !l.startsWith('%%'))
   const diagram = parseClassDiagram(lines)
 
   if (diagram.classes.length === 0) return ''
 
   const useAscii = config.useAscii
-  const hGap = 4  // horizontal gap between class boxes
+  const defaultHGap = 4
+  let hGap = defaultHGap  // horizontal gap between class boxes
   const vGap = 3  // vertical gap between levels (enough for relationship lines)
 
   // --- Build box dimensions for each class ---
-  const classSections = new Map<string, string[][]>()
+  const naturalSections = new Map<string, string[][]>()
   const classBoxW = new Map<string, number>()
   const classBoxH = new Map<string, number>()
 
   for (const cls of diagram.classes) {
     const sections = buildClassSections(cls)
-    classSections.set(cls.id, sections)
-
-    // Compute box dimensions from drawMultiBox logic
-    let maxTextW = 0
-    for (const section of sections) {
-      for (const line of section) maxTextW = Math.max(maxTextW, line.length)
-    }
-    const boxW = maxTextW + 4 // 2 border + 2 padding
-
-    let totalLines = 0
-    for (const section of sections) totalLines += Math.max(section.length, 1)
-    const boxH = totalLines + (sections.length - 1) + 2 // section lines + dividers + top/bottom border
-
-    classBoxW.set(cls.id, boxW)
-    classBoxH.set(cls.id, boxH)
+    naturalSections.set(cls.id, sections)
+    const dims = measureSections(sections)
+    classBoxW.set(cls.id, dims.width)
+    classBoxH.set(cls.id, dims.height)
   }
 
   // --- Assign levels: topological sort based on directed relationships ---
@@ -250,9 +270,22 @@ export function renderClassAscii(text: string, config: AsciiConfig, colorMode?: 
     levelGroups[level.get(cls.id)!]!.push(cls.id)
   }
 
+  if (config.maxWidth && config.maxWidth > 0) {
+    let fittedGap = defaultHGap
+    for (const group of levelGroups) {
+      if (group.length <= 1) continue
+      let boxWidth = 0
+      for (const id of group) boxWidth += classBoxW.get(id) ?? 0
+      const allowed = Math.floor((config.maxWidth - 4 - boxWidth) / (group.length - 1))
+      fittedGap = Math.min(fittedGap, allowed)
+    }
+    hGap = Math.max(1, Math.min(defaultHGap, fittedGap))
+  }
+
   // Compute positions: each level is a row, classes in a row are spaced horizontally
   const placed = new Map<string, PlacedClass>()
   let currentY = 0
+  const rowBudget = config.maxWidth && config.maxWidth > 0 ? Math.max(12, config.maxWidth - 4) : Number.POSITIVE_INFINITY
 
   for (let lv = 0; lv <= maxLevel; lv++) {
     const group = levelGroups[lv]!
@@ -263,11 +296,23 @@ export function renderClassAscii(text: string, config: AsciiConfig, colorMode?: 
 
     for (const id of group) {
       const cls = classById.get(id)!
-      const w = classBoxW.get(id)!
-      const h = classBoxH.get(id)!
+      const baseSections = naturalSections.get(id)!
+      let sections = baseSections
+      let { width: w, height: h } = measureSections(sections)
+      if (currentX > 0 && currentX + w > rowBudget) {
+        currentY += maxH + vGap
+        currentX = 0
+        maxH = 0
+        sections = baseSections
+        ;({ width: w, height: h } = measureSections(sections))
+      }
+      if (config.maxWidth && config.maxWidth > 0 && currentX === 0 && w > rowBudget) {
+        sections = wrapSectionsToBoxWidth(baseSections, rowBudget)
+        ;({ width: w, height: h } = measureSections(sections))
+      }
       placed.set(id, {
         cls,
-        sections: classSections.get(id)!,
+        sections,
         x: currentX,
         y: currentY,
         width: w,

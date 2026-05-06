@@ -14,11 +14,16 @@ import type { SequenceDiagram, Block } from '../sequence/types.ts'
 import type { Canvas, AsciiConfig, RoleCanvas, CharRole, AsciiTheme, ColorMode } from './types.ts'
 import { mkCanvas, mkRoleCanvas, canvasToString, increaseSize, increaseRoleCanvasSize, setRole } from './canvas.ts'
 import { splitLines, maxLineWidth, lineCount } from './multiline-utils.ts'
+import { wrapText } from './layout-budget.ts'
 
 /** Classify a box-drawing character as 'border' or 'text'. */
 function classifyBoxChar(ch: string): CharRole {
   if (/^[┌┐└┘├┤┬┴┼│─╭╮╰╯+\-|]$/.test(ch)) return 'border'
   return 'text'
+}
+
+function visibleWidth(output: string): number {
+  return Math.max(...output.split('\n').map(line => line.replace(/\s+$/u, '').length), 0)
 }
 
 /**
@@ -27,10 +32,30 @@ function classifyBoxChar(ch: string): CharRole {
  * Pipeline: parse → layout (columns + rows) → draw onto canvas → string.
  */
 export function renderSequenceAscii(text: string, config: AsciiConfig, colorMode?: ColorMode, theme?: AsciiTheme): string {
+  if (config.maxWidth && config.maxWidth > 0) {
+    const unconstrained = renderSequenceAscii(text, { ...config, maxWidth: undefined }, colorMode, theme)
+    if (visibleWidth(unconstrained) <= config.maxWidth) return unconstrained
+  }
+
   const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0 && !l.startsWith('%%'))
   const diagram = parseSequenceDiagram(lines)
 
   if (diagram.actors.length === 0) return ''
+
+  if (config.maxWidth && config.maxWidth > 0) {
+    const actorCount = Math.max(diagram.actors.length, 1)
+    const actorBudget = Math.max(4, Math.floor((config.maxWidth - Math.max(0, actorCount - 1) * 2) / actorCount) - 2)
+    const messageBudget = Math.max(8, Math.floor(config.maxWidth / Math.max(actorCount - 1, 1)) - 4)
+    const noteBudget = Math.max(10, Math.min(config.maxWidth - 4, actorBudget * 2))
+
+    for (const actor of diagram.actors) actor.label = wrapText(actor.label, actorBudget)
+    for (const message of diagram.messages) message.label = wrapText(message.label, messageBudget)
+    for (const note of diagram.notes) note.text = wrapText(note.text, noteBudget)
+    for (const block of diagram.blocks) {
+      block.label = wrapText(block.label, messageBudget)
+      for (const divider of block.dividers) divider.label = wrapText(divider.label, messageBudget)
+    }
+  }
 
   const useAscii = config.useAscii
 
@@ -51,7 +76,7 @@ export function renderSequenceAscii(text: string, config: AsciiConfig, colorMode
   const actorIdx = new Map<string, number>()
   diagram.actors.forEach((a, i) => actorIdx.set(a.id, i))
 
-  const boxPad = 1
+  const boxPad = config.maxWidth && config.maxWidth > 0 ? 0 : 1
   // Use max line width for multi-line actor labels
   const actorBoxWidths = diagram.actors.map(a => maxLineWidth(a.label) + 2 * boxPad + 2)
   const halfBox = actorBoxWidths.map(w => Math.ceil(w / 2))
@@ -70,7 +95,7 @@ export function renderSequenceAscii(text: string, config: AsciiConfig, colorMode
     const lo = Math.min(fi, ti)
     const hi = Math.max(fi, ti)
     // Required gap per span = (max line width + arrow decorations) / number of gaps
-    const needed = maxLineWidth(msg.label) + 4
+    const needed = maxLineWidth(msg.label) + (config.maxWidth && config.maxWidth > 0 ? 3 : 4)
     const numGaps = hi - lo
     const perGap = Math.ceil(needed / numGaps)
     for (let g = lo; g < hi; g++) {
@@ -78,15 +103,39 @@ export function renderSequenceAscii(text: string, config: AsciiConfig, colorMode
     }
   }
 
+  function computeLifelinePositions(minGap: number, compactBoxes = false): number[] {
+    const positions: number[] = [compactBoxes ? Math.floor(actorBoxWidths[0]! / 2) : halfBox[0]!]
+    for (let i = 1; i < diagram.actors.length; i++) {
+      const boxGap = compactBoxes
+        ? Math.ceil(actorBoxWidths[i - 1]! / 2) + Math.floor(actorBoxWidths[i]! / 2)
+        : halfBox[i - 1]! + halfBox[i]! + 2
+      const gap = Math.max(
+        boxGap,
+        adjMaxWidth[i - 1]! + 2,
+        minGap,
+      )
+      positions[i] = positions[i - 1]! + gap
+    }
+    return positions
+  }
+
   // Compute lifeline x-positions (greedy left-to-right)
-  const llX: number[] = [halfBox[0]!]
-  for (let i = 1; i < diagram.actors.length; i++) {
-    const gap = Math.max(
-      halfBox[i - 1]! + halfBox[i]! + 2,
-      adjMaxWidth[i - 1]! + 2,
-      10,
-    )
-    llX[i] = llX[i - 1]! + gap
+  let llX = computeLifelinePositions(10)
+  if (config.maxWidth && config.maxWidth > 0 && diagram.actors.length > 1) {
+    const lastHalf = halfBox[halfBox.length - 1] ?? 0
+    const minGap = 2
+    const minPositions = computeLifelinePositions(minGap, true)
+    const minTotal = (minPositions[minPositions.length - 1] ?? 0) + lastHalf + 2
+
+    if (minTotal <= config.maxWidth) {
+      const gapCount = diagram.actors.length - 1
+      const extra = Math.floor((config.maxWidth - minTotal) / gapCount)
+      llX = computeLifelinePositions(minGap + Math.max(0, extra), true)
+      const totalW = (llX[llX.length - 1] ?? 0) + lastHalf + 2
+      if (totalW > config.maxWidth) llX = minPositions
+    } else {
+      llX = minPositions
+    }
   }
 
   // ---- LAYOUT: compute vertical positions for messages ----
@@ -189,25 +238,68 @@ export function renderSequenceAscii(text: string, config: AsciiConfig, colorMode
   const totalH = footerY + actorBoxH
 
   // Total canvas width
-  const lastLL = llX[llX.length - 1] ?? 0
-  const lastHalf = halfBox[halfBox.length - 1] ?? 0
-  let totalW = lastLL + lastHalf + 2
+  let minX = Number.POSITIVE_INFINITY
+  let maxX = Number.NEGATIVE_INFINITY
 
-  // Ensure canvas is wide enough for self-message labels and notes
+  for (let i = 0; i < diagram.actors.length; i++) {
+    const left = llX[i]! - Math.floor(actorBoxWidths[i]! / 2)
+    const right = left + actorBoxWidths[i]! - 1
+    minX = Math.min(minX, left)
+    maxX = Math.max(maxX, right)
+  }
+
   for (let m = 0; m < diagram.messages.length; m++) {
     const msg = diagram.messages[m]!
     if (msg.from === msg.to) {
       const fi = actorIdx.get(msg.from)!
-      const selfRight = llX[fi]! + 6 + 2 + msg.label.length
-      totalW = Math.max(totalW, selfRight + 1)
+      const loopW = 4
+      const labelWidth = maxLineWidth(msg.label)
+      minX = Math.min(minX, llX[fi]!)
+      maxX = Math.max(maxX, llX[fi]! + loopW + 2 + labelWidth - 1)
     }
   }
+
   for (const np of notePositions) {
-    totalW = Math.max(totalW, np.x + np.width + 1)
+    minX = Math.min(minX, np.x)
+    maxX = Math.max(maxX, np.x + np.width - 1)
   }
 
-  const canvas = mkCanvas(totalW, totalH - 1)
-  const rc = mkRoleCanvas(totalW, totalH - 1)
+  for (let b = 0; b < diagram.blocks.length; b++) {
+    const block = diagram.blocks[b]!
+    let minLX = Number.POSITIVE_INFINITY
+    let maxLX = Number.NEGATIVE_INFINITY
+    for (let m = block.startIndex; m <= block.endIndex && m < diagram.messages.length; m++) {
+      const msg = diagram.messages[m]!
+      const f = actorIdx.get(msg.from) ?? 0
+      const t = actorIdx.get(msg.to) ?? 0
+      minLX = Math.min(minLX, llX[Math.min(f, t)]!)
+      maxLX = Math.max(maxLX, llX[Math.max(f, t)]!)
+    }
+    if (Number.isFinite(minLX) && Number.isFinite(maxLX)) {
+      minX = Math.min(minX, minLX - 4)
+      maxX = Math.max(maxX, maxLX + 4)
+    }
+  }
+
+  if (!Number.isFinite(minX) || !Number.isFinite(maxX)) {
+    minX = 0
+    maxX = 0
+  }
+
+  const shiftX = minX < 0 ? -minX : 0
+  if (shiftX > 0) {
+    llX = llX.map(x => x + shiftX)
+    for (const np of notePositions) np.x += shiftX
+    maxX += shiftX
+  }
+
+  let totalW = maxX + 1
+  if (config.maxWidth && config.maxWidth > 0 && totalW > config.maxWidth) {
+    totalW = config.maxWidth
+  }
+
+  const canvas = mkCanvas(totalW - 1, totalH - 1)
+  const rc = mkRoleCanvas(totalW - 1, totalH - 1)
 
   /** Set a character on the canvas and track its role. */
   function setC(x: number, y: number, ch: string, role: CharRole): void {

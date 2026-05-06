@@ -14,12 +14,17 @@ import type { ErDiagram, ErEntity, ErAttribute, Cardinality } from '../er/types.
 import type { Canvas, AsciiConfig, RoleCanvas, CharRole, AsciiTheme, ColorMode } from './types.ts'
 import { mkCanvas, mkRoleCanvas, canvasToString, increaseSize, increaseRoleCanvasSize, setRole } from './canvas.ts'
 import { drawMultiBox } from './draw.ts'
-import { splitLines } from './multiline-utils.ts'
+import { splitLines, maxLineWidth } from './multiline-utils.ts'
+import { wrapText } from './layout-budget.ts'
 
 /** Classify a character from a box drawing as 'border' or 'text'. */
 function classifyBoxChar(ch: string): CharRole {
   if (/^[┌┐└┘├┤┬┴┼│─╭╮╰╯+\-|]$/.test(ch)) return 'border'
   return 'text'
+}
+
+function visibleWidth(output: string): number {
+  return Math.max(...output.split('\n').map(line => line.replace(/\s+$/u, '').length), 0)
 }
 
 // ============================================================================
@@ -39,6 +44,26 @@ function buildEntitySections(entity: ErEntity): string[][] {
   const attrs = entity.attributes.map(formatAttribute)
   if (attrs.length === 0) return [header]
   return [header, attrs]
+}
+
+function measureSections(sections: string[][]): { width: number; height: number } {
+  let maxTextW = 0
+  for (const section of sections) {
+    for (const line of section) maxTextW = Math.max(maxTextW, line.length)
+  }
+
+  let totalLines = 0
+  for (const section of sections) totalLines += Math.max(section.length, 1)
+
+  return {
+    width: maxTextW + 4,
+    height: totalLines + (sections.length - 1) + 2,
+  }
+}
+
+function wrapSectionsToBoxWidth(sections: string[][], maxBoxWidth: number): string[][] {
+  const contentBudget = Math.max(1, maxBoxWidth - 4)
+  return sections.map(section => section.flatMap(line => splitLines(wrapText(line, contentBudget))))
 }
 
 // ============================================================================
@@ -89,6 +114,76 @@ interface PlacedEntity {
   y: number
   width: number
   height: number
+}
+
+function widenHorizontalGapsForLabels(placed: Map<string, PlacedEntity>, diagram: ErDiagram): void {
+  let changed = true
+
+  while (changed) {
+    changed = false
+
+    for (const rel of diagram.relationships) {
+      if (!rel.label) continue
+
+      const e1 = placed.get(rel.entity1)
+      const e2 = placed.get(rel.entity2)
+      if (!e1 || !e2) continue
+
+      const e1CY = e1.y + Math.floor(e1.height / 2)
+      const e2CY = e2.y + Math.floor(e2.height / 2)
+      const sameRow = Math.abs(e1CY - e2CY) < Math.max(e1.height, e2.height)
+      if (!sameRow) continue
+
+      const [left, right] = e1.x < e2.x ? [e1, e2] : [e2, e1]
+      const gapWidth = right.x - (left.x + left.width)
+      const requiredGap = maxLineWidth(rel.label)
+      if (gapWidth >= requiredGap) continue
+
+      const delta = requiredGap - gapWidth
+      for (const entity of placed.values()) {
+        if (entity.y === right.y && entity.x >= right.x) {
+          entity.x += delta
+        }
+      }
+      changed = true
+    }
+  }
+}
+
+function estimateMaxRowWidth(widths: number[], maxPerRow: number, hGap: number): number {
+  let maxWidth = 0
+  for (let start = 0; start < widths.length; start += maxPerRow) {
+    const row = widths.slice(start, start + maxPerRow)
+    const rowWidth = row.reduce((sum, width) => sum + width, 0) + Math.max(0, row.length - 1) * hGap
+    maxWidth = Math.max(maxWidth, rowWidth)
+  }
+  return maxWidth
+}
+
+function chooseMaxPerRow(widths: number[], defaultMaxPerRow: number, maxWidth?: number): number {
+  if (!maxWidth || maxWidth <= 0 || widths.length <= 1) return defaultMaxPerRow
+  for (let candidate = defaultMaxPerRow; candidate >= 1; candidate--) {
+    if (estimateMaxRowWidth(widths, candidate, 1) + 4 <= maxWidth) {
+      return candidate
+    }
+  }
+  return 1
+}
+
+function chooseHorizontalGap(widths: number[], maxPerRow: number, maxWidth?: number): number {
+  const defaultGap = 6
+  if (!maxWidth || maxWidth <= 0 || widths.length <= 1) return defaultGap
+
+  let fittedGap = defaultGap
+  for (let start = 0; start < widths.length; start += maxPerRow) {
+    const row = widths.slice(start, start + maxPerRow)
+    if (row.length <= 1) continue
+    const rowWidth = row.reduce((sum, width) => sum + width, 0)
+    const allowed = Math.floor((maxWidth - 4 - rowWidth) / (row.length - 1))
+    fittedGap = Math.min(fittedGap, allowed)
+  }
+
+  return Math.max(1, Math.min(defaultGap, fittedGap))
 }
 
 // ============================================================================
@@ -157,18 +252,22 @@ function findConnectedComponents(diagram: ErDiagram): Set<string>[] {
  * Pipeline: parse → build boxes → component-aware layout → draw boxes → draw relationships → string.
  */
 export function renderErAscii(text: string, config: AsciiConfig, colorMode?: ColorMode, theme?: AsciiTheme): string {
+  if (config.maxWidth && config.maxWidth > 0) {
+    const unconstrained = renderErAscii(text, { ...config, maxWidth: undefined }, colorMode, theme)
+    if (visibleWidth(unconstrained) <= config.maxWidth) return unconstrained
+  }
+
   const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0 && !l.startsWith('%%'))
   const diagram = parseErDiagram(lines)
 
   if (diagram.entities.length === 0) return ''
 
   const useAscii = config.useAscii
-  const hGap = 6  // horizontal gap between entity boxes
   const vGap = 4  // vertical gap between rows (for relationship lines)
   const componentGap = 6  // vertical gap between disconnected components
 
   // --- Build entity box dimensions ---
-  const entitySections = new Map<string, string[][]>()
+  const naturalSections = new Map<string, string[][]>()
   const entityBoxW = new Map<string, number>()
   const entityBoxH = new Map<string, number>()
   const entityById = new Map<string, ErEntity>()
@@ -176,20 +275,10 @@ export function renderErAscii(text: string, config: AsciiConfig, colorMode?: Col
   for (const ent of diagram.entities) {
     entityById.set(ent.id, ent)
     const sections = buildEntitySections(ent)
-    entitySections.set(ent.id, sections)
-
-    let maxTextW = 0
-    for (const section of sections) {
-      for (const line of section) maxTextW = Math.max(maxTextW, line.length)
-    }
-    const boxW = maxTextW + 4 // 2 border + 2 padding
-
-    let totalLines = 0
-    for (const section of sections) totalLines += Math.max(section.length, 1)
-    const boxH = totalLines + (sections.length - 1) + 2
-
-    entityBoxW.set(ent.id, boxW)
-    entityBoxH.set(ent.id, boxH)
+    naturalSections.set(ent.id, sections)
+    const dims = measureSections(sections)
+    entityBoxW.set(ent.id, dims.width)
+    entityBoxH.set(ent.id, dims.height)
   }
 
   // --- Find connected components ---
@@ -202,31 +291,42 @@ export function renderErAscii(text: string, config: AsciiConfig, colorMode?: Col
   for (const component of components) {
     // Get entities in this component (preserve original order for consistency)
     const componentEntities = diagram.entities.filter(e => component.has(e.id))
+    const componentWidths = componentEntities.map(ent => entityBoxW.get(ent.id) ?? 0)
 
     // Layout entities within this component horizontally
     // Use sqrt-based row limit for larger components
-    const maxPerRow = Math.max(2, Math.ceil(Math.sqrt(componentEntities.length)))
+    const defaultMaxPerRow = Math.max(2, Math.ceil(Math.sqrt(componentEntities.length)))
+    const maxPerRow = chooseMaxPerRow(componentWidths, defaultMaxPerRow, config.maxWidth)
+    const hGap = chooseHorizontalGap(componentWidths, maxPerRow, config.maxWidth)
 
     let currentX = 0
     let maxRowH = 0
     let colCount = 0
-    const componentStartY = currentY
+    const rowBudget = config.maxWidth && config.maxWidth > 0 ? Math.max(12, config.maxWidth - 4) : Number.POSITIVE_INFINITY
 
     for (const ent of componentEntities) {
-      const w = entityBoxW.get(ent.id)!
-      const h = entityBoxH.get(ent.id)!
+      const baseSections = naturalSections.get(ent.id)!
+      let sections = baseSections
+      let { width: w, height: h } = measureSections(sections)
 
-      if (colCount >= maxPerRow) {
+      if (colCount >= maxPerRow || (currentX > 0 && currentX + w > rowBudget)) {
         // Wrap to next row within this component
         currentY += maxRowH + vGap
         currentX = 0
         maxRowH = 0
         colCount = 0
+        sections = baseSections
+        ;({ width: w, height: h } = measureSections(sections))
+      }
+
+      if (config.maxWidth && config.maxWidth > 0 && currentX === 0 && w > rowBudget) {
+        sections = wrapSectionsToBoxWidth(baseSections, rowBudget)
+        ;({ width: w, height: h } = measureSections(sections))
       }
 
       placed.set(ent.id, {
         entity: ent,
-        sections: entitySections.get(ent.id)!,
+        sections,
         x: currentX,
         y: currentY,
         width: w,
@@ -241,6 +341,8 @@ export function renderErAscii(text: string, config: AsciiConfig, colorMode?: Col
     // Move to next component row (add gap between components)
     currentY += maxRowH + componentGap
   }
+
+  widenHorizontalGapsForLabels(placed, diagram)
 
   // --- Create canvas ---
   let totalW = 0
@@ -335,18 +437,15 @@ export function renderErAscii(text: string, config: AsciiConfig, colorMode?: Col
       }
 
       // Relationship label centered in the gap between the two entities, below the line.
-      // Clamp label to the gap region [startX, endX] to avoid overwriting box borders.
-      // Supports multi-line labels.
+      // Layout widens row gaps ahead of time so the label stays adjacent to the edge.
       if (rel.label) {
         const lines = splitLines(rel.label)
         const gapMid = Math.floor((startX + endX) / 2)
 
-        // Place lines below the relationship line (lineY + 1, lineY + 2, ...)
         for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
           const line = lines[lineIdx]!
           const labelStart = Math.max(startX, gapMid - Math.floor(line.length / 2))
           const labelY = lineY + 1 + lineIdx
-          // Ensure canvas is tall enough
           increaseSize(canvas, Math.max(labelStart + line.length, 1), Math.max(labelY + 1, 1))
           increaseRoleCanvasSize(rc, Math.max(labelStart + line.length, 1), Math.max(labelY + 1, 1))
           for (let i = 0; i < line.length; i++) {

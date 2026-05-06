@@ -16,6 +16,7 @@ import type { XYChart } from '../xychart/types.ts'
 import type { AsciiConfig, AsciiTheme, ColorMode, CharRole, Canvas, RoleCanvas } from './types.ts'
 import { colorizeText } from './ansi.ts'
 import { getSeriesColor, CHART_ACCENT_FALLBACK } from '../xychart/colors.ts'
+import { wrapText } from './layout-budget.ts'
 
 // ============================================================================
 // Constants
@@ -54,6 +55,22 @@ const ASC = {
   cornerBR: '+',
 } as const
 
+function visibleWidth(output: string): number {
+  return Math.max(...output.split('\n').map(line => line.replace(/\s+$/u, '').length), 0)
+}
+
+function constrainPlotWidth(
+  defaultWidth: number,
+  minWidth: number,
+  reservedWidth: number,
+  maxWidth?: number,
+): number {
+  if (!maxWidth || maxWidth <= 0) return defaultWidth
+  const available = maxWidth - reservedWidth
+  if (available <= 0) return minWidth
+  return Math.max(minWidth, Math.min(defaultWidth, available))
+}
+
 // ============================================================================
 // Multi-series color support
 // ============================================================================
@@ -91,14 +108,19 @@ export function renderXYChartAscii(
   colorMode: ColorMode,
   theme: AsciiTheme,
 ): string {
+  if (config.maxWidth && config.maxWidth > 0) {
+    const unconstrained = renderXYChartAscii(text, { ...config, maxWidth: undefined }, colorMode, theme)
+    if (visibleWidth(unconstrained) <= config.maxWidth) return unconstrained
+  }
+
   const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0 && !l.startsWith('%%'))
   const chart = parseXYChart(lines)
   const ch = config.useAscii ? ASC : UNI
 
   if (chart.horizontal) {
-    return renderHorizontal(chart, ch, colorMode, theme)
+    return renderHorizontal(chart, config, ch, colorMode, theme)
   }
-  return renderVertical(chart, ch, colorMode, theme)
+  return renderVertical(chart, config, ch, colorMode, theme)
 }
 
 // ============================================================================
@@ -107,6 +129,7 @@ export function renderXYChartAscii(
 
 function renderVertical(
   chart: XYChart,
+  config: AsciiConfig,
   ch: typeof UNI | typeof ASC,
   colorMode: ColorMode,
   theme: AsciiTheme,
@@ -118,24 +141,34 @@ function renderVertical(
   const yTicks = niceTickValues(yRange.min, yRange.max)
   const yLabels = yTicks.map(v => formatTickValue(v))
   const yGutter = Math.max(...yLabels.map(l => l.length)) + 1
-
-  const plotW = Math.max(PLOT_WIDTH, dataCount * 6)
-  const plotH = PLOT_HEIGHT
-  const bandW = Math.floor(plotW / dataCount)
   const catLabels = getCategoryLabels(chart, dataCount)
+  const plotLeft = yGutter + 1 // +1 for axis character
+  const defaultPlotW = Math.max(PLOT_WIDTH, dataCount * 6)
+  const minPlotW = Math.max(dataCount * 4, Math.max(...catLabels.map(label => label.length + 2), 12))
+  const plotW = constrainPlotWidth(defaultPlotW, minPlotW, plotLeft + 2, config.maxWidth)
+  const plotH = PLOT_HEIGHT
+  const bandW = Math.max(1, Math.floor(plotW / dataCount))
+  const titleText = chart.title && config.maxWidth ? wrapText(chart.title, config.maxWidth) : chart.title
+  const titleLines = titleText ? titleText.split('\n') : []
+  const xTitleText = chart.xAxis.title && config.maxWidth ? wrapText(chart.xAxis.title, config.maxWidth) : chart.xAxis.title
+  const xTitleLines = xTitleText ? xTitleText.split('\n') : []
 
   // Canvas dimensions
-  const hasTitle = !!chart.title
-  const hasXTitle = !!chart.xAxis.title
+  const hasTitle = titleLines.length > 0
+  const hasXTitle = xTitleLines.length > 0
   const hasLegend = chart.series.length > 1
-  const titleRow = hasTitle ? 0 : -1
-  const plotTop = (hasTitle ? 2 : 0) + (hasLegend ? 1 : 0)
-  const plotLeft = yGutter + 1 // +1 for axis character
-  const totalW = plotLeft + bandW * dataCount + 2
+  const titleRows = hasTitle ? titleLines.length + 1 : 0
+  const plotTop = titleRows + (hasLegend ? 1 : 0)
+  const plotWidth = plotLeft + bandW * dataCount + 2
   const xAxisRow = plotTop + plotH
   const xLabelRow = xAxisRow + 1
   const xTitleRow = hasXTitle ? xLabelRow + 1 : -1
-  const totalH = xLabelRow + 1 + (hasXTitle ? 1 : 0) + (hasLegend && !hasTitle ? 0 : 0)
+  const totalW = Math.max(
+    plotWidth,
+    ...titleLines.map(line => line.length),
+    ...xTitleLines.map(line => line.length),
+  )
+  const totalH = xLabelRow + 1 + xTitleLines.length
 
   // Create canvas
   const canvas = createCanvas(totalW, totalH)
@@ -153,8 +186,10 @@ function renderVertical(
   const bandCenter = (i: number): number => plotLeft + Math.floor(bandW * (i + 0.5))
 
   // 1. Title
-  if (hasTitle && titleRow >= 0) {
-    writeText(canvas, roles, titleRow, Math.floor(totalW / 2 - chart.title!.length / 2), chart.title!, 'text')
+  if (hasTitle) {
+    for (let i = 0; i < titleLines.length; i++) {
+      writeText(canvas, roles, i, Math.floor((totalW - titleLines[i]!.length) / 2), titleLines[i]!, 'text')
+    }
   }
 
   // 2. Legend
@@ -198,8 +233,9 @@ function renderVertical(
 
   // 5. X-axis title
   if (hasXTitle && xTitleRow >= 0) {
-    const title = chart.xAxis.title!
-    writeText(canvas, roles, xTitleRow, Math.floor(totalW / 2 - title.length / 2), title, 'text')
+    for (let i = 0; i < xTitleLines.length; i++) {
+      writeText(canvas, roles, xTitleRow + i, Math.floor((totalW - xTitleLines[i]!.length) / 2), xTitleLines[i]!, 'text')
+    }
   }
 
   // 6. Grid lines (subtle horizontal dots at y-tick positions)
@@ -269,6 +305,7 @@ function renderVertical(
 
 function renderHorizontal(
   chart: XYChart,
+  config: AsciiConfig,
   ch: typeof UNI | typeof ASC,
   colorMode: ColorMode,
   theme: AsciiTheme,
@@ -281,17 +318,29 @@ function renderHorizontal(
   const catLabels = getCategoryLabels(chart, dataCount)
   const catGutter = Math.max(...catLabels.map(l => l.length)) + 1
 
-  const plotW = Math.max(PLOT_WIDTH, 40)
+  const plotLeft = catGutter + 1
+  const defaultPlotW = Math.max(PLOT_WIDTH, 40)
+  const minPlotW = Math.max(Math.max(...valueTicks.map(t => formatTickValue(t).length + 2), 12), 24)
+  const plotW = constrainPlotWidth(defaultPlotW, minPlotW, plotLeft + 2, config.maxWidth)
   const bandH = Math.max(2, Math.floor(PLOT_HEIGHT / dataCount))
   const plotH = bandH * dataCount
+  const titleText = chart.title && config.maxWidth ? wrapText(chart.title, config.maxWidth) : chart.title
+  const titleLines = titleText ? titleText.split('\n') : []
+  const yTitleText = chart.yAxis.title && config.maxWidth ? wrapText(chart.yAxis.title, config.maxWidth) : chart.yAxis.title
+  const yTitleLines = yTitleText ? yTitleText.split('\n') : []
 
-  const hasTitle = !!chart.title
+  const hasTitle = titleLines.length > 0
   const hasYTitle = !!chart.yAxis.title
   const hasLegend = chart.series.length > 1
-  const plotTop = (hasTitle ? 2 : 0) + (hasLegend ? 1 : 0)
-  const plotLeft = catGutter + 1
-  const totalW = plotLeft + plotW + 2
-  const totalH = plotTop + plotH + 2 + (hasYTitle ? 1 : 0)
+  const titleRows = hasTitle ? titleLines.length + 1 : 0
+  const plotTop = titleRows + (hasLegend ? 1 : 0)
+  const plotWidth = plotLeft + plotW + 2
+  const totalW = Math.max(
+    plotWidth,
+    ...titleLines.map(line => line.length),
+    ...yTitleLines.map(line => line.length),
+  )
+  const totalH = plotTop + plotH + 2 + yTitleLines.length
   const xAxisRow = plotTop + plotH
 
   const canvas = createCanvas(totalW, totalH)
@@ -310,7 +359,9 @@ function renderHorizontal(
 
   // Title
   if (hasTitle) {
-    writeText(canvas, roles, 0, Math.floor(totalW / 2 - chart.title!.length / 2), chart.title!, 'text')
+    for (let i = 0; i < titleLines.length; i++) {
+      writeText(canvas, roles, i, Math.floor((totalW - titleLines[i]!.length) / 2), titleLines[i]!, 'text')
+    }
   }
 
   // Legend
@@ -346,8 +397,9 @@ function renderHorizontal(
 
   // Y-axis title
   if (hasYTitle) {
-    const title = chart.yAxis.title!
-    writeText(canvas, roles, totalH - 1, Math.floor(totalW / 2 - title.length / 2), title, 'text')
+    for (let i = 0; i < yTitleLines.length; i++) {
+      writeText(canvas, roles, totalH - yTitleLines.length + i, Math.floor((totalW - yTitleLines[i]!.length) / 2), yTitleLines[i]!, 'text')
+    }
   }
 
   // Grid lines (vertical at value tick positions)
