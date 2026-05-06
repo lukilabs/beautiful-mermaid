@@ -15,6 +15,7 @@ import type { Canvas, AsciiConfig, RoleCanvas, CharRole, AsciiTheme, ColorMode }
 import { mkCanvas, mkRoleCanvas, canvasToString, increaseSize, increaseRoleCanvasSize, setRole } from './canvas.ts'
 import { drawMultiBox } from './draw.ts'
 import { splitLines } from './multiline-utils.ts'
+import { displayWidth, drawCJKText } from './cjk.ts'
 
 /** Classify a character from a box drawing as 'border' or 'text'. */
 function classifyBoxChar(ch: string): CharRole {
@@ -180,7 +181,7 @@ export function renderErAscii(text: string, config: AsciiConfig, colorMode?: Col
 
     let maxTextW = 0
     for (const section of sections) {
-      for (const line of section) maxTextW = Math.max(maxTextW, line.length)
+      for (const line of section) maxTextW = Math.max(maxTextW, displayWidth(line))
     }
     const boxW = maxTextW + 4 // 2 border + 2 padding
 
@@ -344,17 +345,13 @@ export function renderErAscii(text: string, config: AsciiConfig, colorMode?: Col
         // Place lines below the relationship line (lineY + 1, lineY + 2, ...)
         for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
           const line = lines[lineIdx]!
-          const labelStart = Math.max(startX, gapMid - Math.floor(line.length / 2))
+          const labelStart = Math.max(startX, gapMid - Math.floor(displayWidth(line) / 2))
           const labelY = lineY + 1 + lineIdx
           // Ensure canvas is tall enough
-          increaseSize(canvas, Math.max(labelStart + line.length, 1), Math.max(labelY + 1, 1))
-          increaseRoleCanvasSize(rc, Math.max(labelStart + line.length, 1), Math.max(labelY + 1, 1))
-          for (let i = 0; i < line.length; i++) {
-            const lx = labelStart + i
-            if (lx >= startX && lx <= endX) {
-              setC(lx, labelY, line[i]!, 'text')
-            }
-          }
+          increaseSize(canvas, Math.max(labelStart + displayWidth(line), 1), Math.max(labelY + 1, 1))
+          increaseRoleCanvasSize(rc, Math.max(labelStart + displayWidth(line), 1), Math.max(labelY + 1, 1))
+          // CJK-aware label rendering, clipped to gap boundary
+          drawCJKText(canvas, labelStart, labelY, line, true, rc, 'text', endX - labelStart + 1)
         }
       }
     } else {
@@ -417,14 +414,9 @@ export function renderErAscii(text: string, config: AsciiConfig, colorMode?: Col
           const labelX = lineX + 2
           const y = startLabelY + lineIdx
           if (y >= 0) {
-            for (let i = 0; i < line.length; i++) {
-              const lx = labelX + i
-              if (lx >= 0) {
-                increaseSize(canvas, lx + 1, y + 1)
-                increaseRoleCanvasSize(rc, lx + 1, y + 1)
-                setC(lx, y, line[i]!, 'text')
-              }
-            }
+            increaseSize(canvas, labelX + displayWidth(line) + 1, y + 1)
+            increaseRoleCanvasSize(rc, labelX + displayWidth(line) + 1, y + 1)
+            drawCJKText(canvas, labelX, y, line, true, rc, 'text')
           }
         }
       }

@@ -9,6 +9,7 @@
 import type { Canvas, DrawingCoord, Direction } from '../types.ts'
 import { mkCanvas } from '../canvas.ts'
 import { splitLines } from '../multiline-utils.ts'
+import { displayWidth, drawCJKText } from '../cjk.ts'
 import type { ShapeRenderer, ShapeDimensions, ShapeRenderOptions } from './types.ts'
 import { getBoxAttachmentPoint } from './rectangle.ts'
 
@@ -30,7 +31,7 @@ import { getBoxAttachmentPoint } from './rectangle.ts'
 export const stadiumRenderer: ShapeRenderer = {
   getDimensions(label: string, options: ShapeRenderOptions): ShapeDimensions {
     const lines = splitLines(label)
-    const maxLineWidth = Math.max(...lines.map(l => l.length), 0)
+    const maxLineWidth = Math.max(...lines.map(l => displayWidth(l)), 0)
     const lineCount = lines.length
 
     const innerWidth = 2 * options.padding + maxLineWidth
@@ -95,14 +96,8 @@ export const stadiumRenderer: ShapeRenderer = {
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i]!
-      const textX = Math.floor(width / 2) - Math.floor(line.length / 2)
-      for (let j = 0; j < line.length; j++) {
-        const x = textX + j
-        const y = startY + i
-        if (x > 0 && x < width - 1 && y >= 0 && y < height) {
-          canvas[x]![y] = line[j]!
-        }
-      }
+      const textX = Math.floor(width / 2) - Math.floor(displayWidth(line) / 2)
+      drawCJKText(canvas, textX, startY + i, line)
     }
 
     return canvas

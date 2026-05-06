@@ -10,6 +10,7 @@ import type { Canvas, DrawingCoord, Direction } from '../types.ts'
 import { Up, Down, Left, Right, UpperLeft, UpperRight, LowerLeft, LowerRight, Middle } from '../types.ts'
 import { mkCanvas } from '../canvas.ts'
 import { splitLines } from '../multiline-utils.ts'
+import { displayWidth, drawCJKText } from '../cjk.ts'
 import type { ShapeRenderer, ShapeDimensions, ShapeRenderOptions } from './types.ts'
 import { dirEquals } from '../edge-routing.ts'
 import { type CornerChars, getCorners } from './corners.ts'
@@ -24,11 +25,13 @@ import { type CornerChars, getCorners } from './corners.ts'
  */
 export function getBoxDimensions(label: string, options: ShapeRenderOptions): ShapeDimensions {
   const lines = splitLines(label)
-  const maxLineWidth = Math.max(...lines.map(l => l.length), 0)
+  const maxLineWidth = Math.max(...lines.map(l => displayWidth(l)), 0)
   const lineCount = lines.length
 
   // Width: 2*padding + maxLineWidth + 2 border chars
-  const innerWidth = 2 * options.padding + maxLineWidth
+  // Ensure innerWidth is odd for symmetric horizontal centering (matching innerHeight logic)
+  const rawInnerWidth = 2 * options.padding + maxLineWidth
+  const innerWidth = rawInnerWidth % 2 === 0 ? rawInnerWidth + 1 : rawInnerWidth
   const width = innerWidth + 2
 
   // Height: lineCount + 2*padding + 2 border chars
@@ -108,14 +111,10 @@ export function renderBox(
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!
-    const textX = Math.floor(w / 2) - Math.ceil(line.length / 2) + 1
-    for (let j = 0; j < line.length; j++) {
-      const x = textX + j
-      const y = startY + i
-      if (x >= 0 && x < canvas.length && y >= 0 && y < canvas[0]!.length) {
-        canvas[x]![y] = line[j]!
-      }
-    }
+    // 居中: 额外空间优先放右侧（left-bias），和 left-to-right 阅读习惯一致
+    const innerW = width - 2
+    const textX = 1 + Math.floor((innerW - displayWidth(line)) / 2)
+    drawCJKText(canvas, textX, startY + i, line)
   }
 
   return canvas

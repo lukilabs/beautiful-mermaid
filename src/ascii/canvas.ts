@@ -8,6 +8,7 @@
 
 import type { Canvas, DrawingCoord, RoleCanvas, CharRole, AsciiTheme, ColorMode } from './types.ts'
 import { colorizeLine, DEFAULT_ASCII_THEME } from './ansi.ts'
+import { displayWidth, drawCJKText, CJK_PAD } from './cjk.ts'
 
 /**
  * Create a blank canvas filled with spaces.
@@ -294,6 +295,7 @@ export function canvasToString(canvas: Canvas, options?: CanvasToStringOptions):
       // Plain text output — no colors
       let line = ''
       for (let x = 0; x <= maxX; x++) {
+        if (canvas[x]![y]! === CJK_PAD) continue
         line += canvas[x]![y]!
       }
       lines.push(line)
@@ -302,6 +304,7 @@ export function canvasToString(canvas: Canvas, options?: CanvasToStringOptions):
       const chars: string[] = []
       const roles: (CharRole | null)[] = []
       for (let x = 0; x <= maxX; x++) {
+        if (canvas[x]![y]! === CJK_PAD) continue
         chars.push(canvas[x]![y]!)
         roles.push(roleCanvas[x]?.[y] ?? null)
       }
@@ -387,15 +390,8 @@ export function drawText(
   text: string,
   forceOverwrite = false
 ): void {
-  increaseSize(canvas, start.x + text.length, start.y)
-  for (let i = 0; i < text.length; i++) {
-    const x = start.x + i
-    const current = canvas[x]![start.y]!
-    // Only write if target is empty or we're forcing overwrite
-    if (forceOverwrite || current === ' ') {
-      canvas[x]![start.y] = text[i]!
-    }
-  }
+  increaseSize(canvas, start.x + displayWidth(text), start.y)
+  drawCJKText(canvas, start.x, start.y, text, forceOverwrite)
 }
 
 /**

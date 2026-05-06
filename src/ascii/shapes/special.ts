@@ -9,6 +9,7 @@ import type { Canvas, DrawingCoord, Direction } from '../types.ts'
 import { Up, Down, Left, Right } from '../types.ts'
 import { mkCanvas } from '../canvas.ts'
 import { splitLines } from '../multiline-utils.ts'
+import { displayWidth, drawCJKText } from '../cjk.ts'
 import type { ShapeRenderer, ShapeDimensions, ShapeRenderOptions } from './types.ts'
 import { dirEquals } from '../edge-routing.ts'
 import { getBoxDimensions, renderBox, getBoxAttachmentPoint } from './rectangle.ts'
@@ -28,7 +29,7 @@ import { getCorners } from './corners.ts'
 export const subroutineRenderer: ShapeRenderer = {
   getDimensions(label: string, options: ShapeRenderOptions): ShapeDimensions {
     const lines = splitLines(label)
-    const maxLineWidth = Math.max(...lines.map(l => l.length), 0)
+    const maxLineWidth = Math.max(...lines.map(l => displayWidth(l)), 0)
     const lineCount = lines.length
 
     const innerWidth = 2 * options.padding + maxLineWidth
@@ -86,14 +87,8 @@ export const subroutineRenderer: ShapeRenderer = {
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i]!
-      const textX = Math.floor(width / 2) - Math.floor(line.length / 2)
-      for (let j = 0; j < line.length; j++) {
-        const x = textX + j
-        const y = startY + i
-        if (x > 1 && x < width - 2 && y > 0 && y < height - 1) {
-          canvas[x]![y] = line[j]!
-        }
-      }
+      const textX = Math.floor(width / 2) - Math.floor(displayWidth(line) / 2)
+      drawCJKText(canvas, textX, startY + i, line)
     }
 
     return canvas
@@ -142,7 +137,7 @@ export const doublecircleRenderer: ShapeRenderer = {
 export const cylinderRenderer: ShapeRenderer = {
   getDimensions(label: string, options: ShapeRenderOptions): ShapeDimensions {
     const lines = splitLines(label)
-    const maxLineWidth = Math.max(...lines.map(l => l.length), 0)
+    const maxLineWidth = Math.max(...lines.map(l => displayWidth(l)), 0)
     const lineCount = lines.length
 
     const innerWidth = 2 * options.padding + maxLineWidth
@@ -204,14 +199,8 @@ export const cylinderRenderer: ShapeRenderer = {
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i]!
-      const textX = Math.floor(width / 2) - Math.floor(line.length / 2)
-      for (let j = 0; j < line.length; j++) {
-        const x = textX + j
-        const y = startY + i
-        if (x > 0 && x < width - 1 && y > 1 && y < height - 2) {
-          canvas[x]![y] = line[j]!
-        }
-      }
+      const textX = Math.floor(width / 2) - Math.floor(displayWidth(line) / 2)
+      drawCJKText(canvas, textX, startY + i, line)
     }
 
     return canvas

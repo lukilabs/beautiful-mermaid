@@ -15,6 +15,7 @@ import { parseXYChart } from '../xychart/parser.ts'
 import type { XYChart } from '../xychart/types.ts'
 import type { AsciiConfig, AsciiTheme, ColorMode, CharRole, Canvas, RoleCanvas } from './types.ts'
 import { colorizeText } from './ansi.ts'
+import { displayWidth, drawCJKText, CJK_PAD } from './cjk.ts'
 import { getSeriesColor, CHART_ACCENT_FALLBACK } from '../xychart/colors.ts'
 
 // ============================================================================
@@ -117,7 +118,7 @@ function renderVertical(
   const yRange = chart.yAxis.range!
   const yTicks = niceTickValues(yRange.min, yRange.max)
   const yLabels = yTicks.map(v => formatTickValue(v))
-  const yGutter = Math.max(...yLabels.map(l => l.length)) + 1
+  const yGutter = Math.max(...yLabels.map(l => displayWidth(l))) + 1
 
   const plotW = Math.max(PLOT_WIDTH, dataCount * 6)
   const plotH = PLOT_HEIGHT
@@ -154,7 +155,7 @@ function renderVertical(
 
   // 1. Title
   if (hasTitle && titleRow >= 0) {
-    writeText(canvas, roles, titleRow, Math.floor(totalW / 2 - chart.title!.length / 2), chart.title!, 'text')
+    writeText(canvas, roles, titleRow, Math.floor(totalW / 2 - displayWidth(chart.title!) / 2), chart.title!, 'text')
   }
 
   // 2. Legend
@@ -179,7 +180,7 @@ function renderVertical(
     // Tick mark on axis
     set(canvas, roles, displayRow, plotLeft - 1, row === 0 ? ch.origin : ch.yTick, 'border')
     // Label
-    const labelStart = yGutter - label.length
+    const labelStart = yGutter - displayWidth(label)
     writeText(canvas, roles, displayRow, Math.max(0, labelStart), label, 'text')
   }
 
@@ -192,14 +193,14 @@ function renderVertical(
     set(canvas, roles, xAxisRow, cx, ch.xTick, 'border')
     // Label below
     const label = catLabels[i]!
-    const labelStart = cx - Math.floor(label.length / 2)
+    const labelStart = cx - Math.floor(displayWidth(label) / 2)
     writeText(canvas, roles, xLabelRow, Math.max(0, labelStart), label, 'text')
   }
 
   // 5. X-axis title
   if (hasXTitle && xTitleRow >= 0) {
     const title = chart.xAxis.title!
-    writeText(canvas, roles, xTitleRow, Math.floor(totalW / 2 - title.length / 2), title, 'text')
+    writeText(canvas, roles, xTitleRow, Math.floor(totalW / 2 - displayWidth(title) / 2), title, 'text')
   }
 
   // 6. Grid lines (subtle horizontal dots at y-tick positions)
@@ -279,7 +280,7 @@ function renderHorizontal(
   const yRange = chart.yAxis.range!
   const valueTicks = niceTickValues(yRange.min, yRange.max)
   const catLabels = getCategoryLabels(chart, dataCount)
-  const catGutter = Math.max(...catLabels.map(l => l.length)) + 1
+  const catGutter = Math.max(...catLabels.map(l => displayWidth(l))) + 1
 
   const plotW = Math.max(PLOT_WIDTH, 40)
   const bandH = Math.max(2, Math.floor(PLOT_HEIGHT / dataCount))
@@ -310,7 +311,7 @@ function renderHorizontal(
 
   // Title
   if (hasTitle) {
-    writeText(canvas, roles, 0, Math.floor(totalW / 2 - chart.title!.length / 2), chart.title!, 'text')
+    writeText(canvas, roles, 0, Math.floor(totalW / 2 - displayWidth(chart.title!) / 2), chart.title!, 'text')
   }
 
   // Legend
@@ -328,7 +329,7 @@ function renderHorizontal(
   for (let i = 0; i < dataCount; i++) {
     const my = bandMid(i)
     const label = catLabels[i]!
-    const labelStart = catGutter - label.length
+    const labelStart = catGutter - displayWidth(label)
     writeText(canvas, roles, my, Math.max(0, labelStart), label, 'text')
   }
 
@@ -341,13 +342,13 @@ function renderHorizontal(
     if (cx < plotLeft || cx >= plotLeft + plotW) continue
     set(canvas, roles, xAxisRow, cx, ch.xTick, 'border')
     const label = formatTickValue(tick)
-    writeText(canvas, roles, xAxisRow + 1, cx - Math.floor(label.length / 2), label, 'text')
+    writeText(canvas, roles, xAxisRow + 1, cx - Math.floor(displayWidth(label) / 2), label, 'text')
   }
 
   // Y-axis title
   if (hasYTitle) {
     const title = chart.yAxis.title!
-    writeText(canvas, roles, totalH - 1, Math.floor(totalW / 2 - title.length / 2), title, 'text')
+    writeText(canvas, roles, totalH - 1, Math.floor(totalW / 2 - displayWidth(title) / 2), title, 'text')
   }
 
   // Grid lines (vertical at value tick positions)
@@ -646,7 +647,7 @@ function drawLegend(
   let totalLen = 0
   for (let i = 0; i < items.length; i++) {
     if (i > 0) totalLen += 2 // gap between items
-    totalLen += 1 + 1 + items[i]!.label.length // symbol + space + label
+    totalLen += 1 + 1 + displayWidth(items[i]!.label) // symbol + space + label
   }
 
   const startCol = Math.max(0, Math.floor(totalW / 2 - totalLen / 2))
@@ -662,7 +663,7 @@ function drawLegend(
     col += 1
     // Label text
     writeText(canvas, roles, row, col, item.label, 'text')
-    col += item.label.length
+    col += displayWidth(item.label)
   }
 }
 
@@ -702,9 +703,8 @@ function get(canvas: Canvas, row: number, col: number): string {
 }
 
 function writeText(canvas: Canvas, roles: RoleCanvas, row: number, startCol: number, text: string, role: CharRole): void {
-  for (let i = 0; i < text.length; i++) {
-    set(canvas, roles, row, startCol + i, text[i]!, role)
-  }
+  // xychart canvas is column-major: canvas[col][row]
+  drawCJKText(canvas, startCol, row, text, true, roles, role)
 }
 
 // ============================================================================
@@ -728,6 +728,7 @@ function canvasToString(
     const rowRoles: (CharRole | null)[] = []
     const rowHex: (string | null)[] = []
     for (let col = 0; col < width; col++) {
+      if (canvas[col]![row]! === CJK_PAD) continue
       chars.push(canvas[col]![row]!)
       rowRoles.push(roles[col]![row]!)
       rowHex.push(hexCanvas[col]![row]!)

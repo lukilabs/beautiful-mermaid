@@ -19,6 +19,7 @@ import type { RoleCanvas, CharRole } from './types.ts'
 import { determineDirection, dirEquals } from './edge-routing.ts'
 import { gridToDrawingCoord, lineToDrawing } from './grid.ts'
 import { splitLines } from './multiline-utils.ts'
+import { displayWidth, drawCJKText } from './cjk.ts'
 import { getCorners } from './shapes/corners.ts'
 import { getShapeAttachmentPoint } from './shapes/index.ts'
 
@@ -104,12 +105,10 @@ function drawBoxWithGridDimensions(node: AsciiNode, graph: AsciiGraph): Canvas {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!
-    const textX = from.x + Math.floor(w / 2) - Math.ceil(line.length / 2) + 1
-    for (let j = 0; j < line.length; j++) {
-      if (textX + j >= 0 && textX + j < box.length && startY + i >= 0 && startY + i < box[0]!.length) {
-        box[textX + j]![startY + i] = line[j]!
-      }
-    }
+    // 居中: inner = (from.x+1) to (to.x-1), 余量优先放右侧
+    const boxInnerW = to.x - from.x - 1
+    const textX = from.x + 1 + Math.floor((boxInnerW - displayWidth(line)) / 2)
+    drawCJKText(box, textX, startY + i, line)
   }
 
   return box
@@ -147,7 +146,7 @@ export function drawMultiBox(
   let maxTextWidth = 0
   for (const section of sections) {
     for (const line of section) {
-      maxTextWidth = Math.max(maxTextWidth, line.length)
+      maxTextWidth = Math.max(maxTextWidth, displayWidth(line))
     }
   }
   const innerWidth = maxTextWidth + 2 * padding
@@ -198,9 +197,7 @@ export function drawMultiBox(
     // Draw section text lines
     for (const line of lines) {
       const startX = 1 + padding
-      for (let i = 0; i < line.length; i++) {
-        canvas[startX + i]![row] = line[i]!
-      }
+      drawCJKText(canvas, startX, row, line)
       row++
     }
 
@@ -673,7 +670,7 @@ function drawTextOnLine(canvas: Canvas, line: DrawingCoord[], label: string, isU
 
   for (let i = 0; i < lines.length; i++) {
     const lineText = lines[i]!
-    const startX = middleX - Math.floor(lineText.length / 2)
+    const startX = middleX - Math.floor(displayWidth(lineText) / 2)
     drawText(canvas, { x: startX, y: startY + i }, lineText)
   }
 }
@@ -1142,14 +1139,10 @@ export function drawSubgraphLabel(sg: AsciiSubgraph, graph: AsciiGraph): [Canvas
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!
     const labelY = 1 + i
-    let labelX = Math.floor(width / 2) - Math.floor(line.length / 2)
+    let labelX = Math.floor(width / 2) - Math.floor(displayWidth(line) / 2)
     if (labelX < 1) labelX = 1
 
-    for (let j = 0; j < line.length; j++) {
-      if (labelX + j < width && labelY < height) {
-        canvas[labelX + j]![labelY] = line[j]!
-      }
-    }
+    drawCJKText(canvas, labelX, labelY, line)
   }
 
   return [canvas, { x: sg.minX, y: sg.minY }]
