@@ -18,7 +18,7 @@ import { mkCanvas, copyCanvas, getCanvasSize, mergeCanvases, drawText, mkRoleCan
 import type { RoleCanvas, CharRole } from './types.ts'
 import { determineDirection, dirEquals } from './edge-routing.ts'
 import { gridToDrawingCoord, lineToDrawing } from './grid.ts'
-import { splitLines } from './multiline-utils.ts'
+import { splitLines, charVisualWidth, visualWidth } from './multiline-utils.ts'
 import { getCorners } from './shapes/corners.ts'
 import { getShapeAttachmentPoint } from './shapes/index.ts'
 
@@ -104,11 +104,21 @@ function drawBoxWithGridDimensions(node: AsciiNode, graph: AsciiGraph): Canvas {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!
-    const textX = from.x + Math.floor(w / 2) - Math.ceil(line.length / 2) + 1
+    const lineVW = visualWidth(line)
+    const textX = from.x + Math.floor(w / 2) - Math.ceil(lineVW / 2) + 1
+    let vx = 0
     for (let j = 0; j < line.length; j++) {
-      if (textX + j >= 0 && textX + j < box.length && startY + i >= 0 && startY + i < box[0]!.length) {
-        box[textX + j]![startY + i] = line[j]!
+      const ch = line[j]!
+      const x = textX + vx
+      const y = startY + i
+      if (x >= 0 && x < box.length && y >= 0 && y < box[0]!.length) {
+        box[x]![y] = ch
+        // Place sentinel after fullwidth char so the second column stays blank
+        if (charVisualWidth(ch) === 2 && x + 1 < box.length) {
+          box[x + 1]![y] = '\x00'
+        }
       }
+      vx += charVisualWidth(ch)
     }
   }
 

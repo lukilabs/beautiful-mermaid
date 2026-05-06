@@ -292,18 +292,24 @@ export function canvasToString(canvas: Canvas, options?: CanvasToStringOptions):
   for (let y = 0; y <= maxY; y++) {
     if (colorMode === 'none' || !roleCanvas) {
       // Plain text output — no colors
+      // '\x00' is a sentinel placed after fullwidth (CJK) characters to
+      // occupy the second terminal column; skip it during string assembly.
       let line = ''
       for (let x = 0; x <= maxX; x++) {
-        line += canvas[x]![y]!
+        const ch = canvas[x]![y]!
+        if (ch !== '\x00') line += ch
       }
       lines.push(line)
     } else {
-      // Colored output — collect chars and roles for this row
+      // Colored output — collect chars and roles for this row, skipping sentinels
       const chars: string[] = []
       const roles: (CharRole | null)[] = []
       for (let x = 0; x <= maxX; x++) {
-        chars.push(canvas[x]![y]!)
-        roles.push(roleCanvas[x]?.[y] ?? null)
+        const ch = canvas[x]![y]!
+        if (ch !== '\x00') {
+          chars.push(ch)
+          roles.push(roleCanvas[x]?.[y] ?? null)
+        }
       }
       lines.push(colorizeLine(chars, roles, theme, colorMode))
     }

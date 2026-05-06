@@ -8,7 +8,7 @@
 
 import type { Canvas, DrawingCoord, Direction } from '../types.ts'
 import { mkCanvas } from '../canvas.ts'
-import { splitLines } from '../multiline-utils.ts'
+import { splitLines, charVisualWidth, visualWidth } from '../multiline-utils.ts'
 import type { ShapeRenderer, ShapeDimensions, ShapeRenderOptions } from './types.ts'
 import { getBoxAttachmentPoint } from './rectangle.ts'
 
@@ -30,7 +30,7 @@ import { getBoxAttachmentPoint } from './rectangle.ts'
 export const stadiumRenderer: ShapeRenderer = {
   getDimensions(label: string, options: ShapeRenderOptions): ShapeDimensions {
     const lines = splitLines(label)
-    const maxLineWidth = Math.max(...lines.map(l => l.length), 0)
+    const maxLineWidth = Math.max(...lines.map(l => visualWidth(l)), 0)
     const lineCount = lines.length
 
     const innerWidth = 2 * options.padding + maxLineWidth
@@ -95,13 +95,20 @@ export const stadiumRenderer: ShapeRenderer = {
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i]!
-      const textX = Math.floor(width / 2) - Math.floor(line.length / 2)
+      const lineVW = visualWidth(line)
+      const textX = Math.floor(width / 2) - Math.floor(lineVW / 2)
+      let vx = 0
       for (let j = 0; j < line.length; j++) {
-        const x = textX + j
+        const ch = line[j]!
+        const x = textX + vx
         const y = startY + i
         if (x > 0 && x < width - 1 && y >= 0 && y < height) {
-          canvas[x]![y] = line[j]!
+          canvas[x]![y] = ch
+          if (charVisualWidth(ch) === 2 && x + 1 < width - 1) {
+            canvas[x + 1]![y] = '\x00'
+          }
         }
+        vx += charVisualWidth(ch)
       }
     }
 
