@@ -1247,25 +1247,24 @@ function computePortIndicesFromLayout(
   }
   walk(elkResult, 0, 0)
 
-  // 2. For each cross-hier port, look up the position of the FINAL leaf
-  //    on the OPPOSITE end of its cross-hier edge:
-  //      - Outgoing port (source side) → look up the target leaf's centre.
-  //      - Incoming port (target side) → look up the source leaf's centre.
-  //    Using the leaf rather than the next-compound port avoids a circular
-  //    dependency: next-compound positions are themselves derived from pass
-  //    1's port indices, so sorting by them just reproduces pass 1's order.
-  //    Leaf positions are constrained by graph structure, so they break the
-  //    cycle and let pass 2 actually propose a different order.
-  const outwardPos = new Map<string, Point>()
+  // 2. For each cross-hier port, compute the BARYCENTER of the edge's two
+  //    endpoints (source leaf and target leaf). This is the standard port-
+  //    ordering heuristic for crossing minimisation in port-constrained
+  //    layered layouts (KLay Layered uses the same approach internally).
+  //    Sorting ports by their edge's barycentre puts each port near where
+  //    the edge "wants to be" geographically, which propagates consistently
+  //    across compounds at every nesting level — when two cross-hier edges
+  //    share a source (e.g. both `spec→stepA` and `spec→merged`), the
+  //    target position breaks the tie and orders ports identically on
+  //    every compound the edges traverse.
+  const barycenter = new Map<string, Point>()
   for (const decomp of decompositions) {
-    const targetPos = nodeCenters.get(decomp.edge.target)
     const sourcePos = nodeCenters.get(decomp.edge.source)
-    for (const port of decomp.srcChain) {
-      if (targetPos) outwardPos.set(port.portId, targetPos)
-    }
-    for (const port of decomp.tgtChain) {
-      if (sourcePos) outwardPos.set(port.portId, sourcePos)
-    }
+    const targetPos = nodeCenters.get(decomp.edge.target)
+    if (!sourcePos || !targetPos) continue
+    const bary = { x: (sourcePos.x + targetPos.x) / 2, y: (sourcePos.y + targetPos.y) / 2 }
+    for (const port of decomp.srcChain) barycenter.set(port.portId, bary)
+    for (const port of decomp.tgtChain) barycenter.set(port.portId, bary)
   }
 
   // 3. Per compound, group ports by side and sort each side independently
@@ -1282,8 +1281,8 @@ function computePortIndicesFromLayout(
     }
     for (const sidePorts of bySide.values()) {
       sidePorts.sort((a, b) => {
-        const aPos = outwardPos.get(a.portId)
-        const bPos = outwardPos.get(b.portId)
+        const aPos = barycenter.get(a.portId)
+        const bPos = barycenter.get(b.portId)
         if (aPos && bPos) {
           const k1 = (a.side === 'NORTH' || a.side === 'SOUTH') ? aPos.x : aPos.y
           const k2 = (a.side === 'NORTH' || a.side === 'SOUTH') ? bPos.x : bPos.y
@@ -1296,6 +1295,12 @@ function computePortIndicesFromLayout(
     }
   }
   return newIndices
+}
+
+function sameIndices(a: Map<string, number>, b: Map<string, number>): boolean {
+  if (a.size !== b.size) return false
+  for (const [k, v] of a) if (b.get(k) !== v) return false
+  return true
 }
 
 /** True iff at least one compound has 2+ ports on the same side — the only case where indices can affect crossings. */
@@ -1374,19 +1379,38 @@ export function layoutGraphSync(
   // its crossing count is strictly lower — pass 2 can shift compound sizes
   // and shuffle root-level placement, so blindly preferring it sometimes
   // makes things worse.
+  // Iterative barycenter port ordering. Each iteration reads the previous
+  // layout's leaf positions, recomputes port barycentres, re-sorts ports
+  // per compound side, and re-runs ELK with the new indices. We accept the
+  // new layout only if it strictly reduces crossings, and stop once the
+  // index map stops changing or after a small cap. This is the standard
+  // crossing-minimisation layer-sweep adapted for compound-port layered
+  // layouts (KLay Layered's design uses the same heuristic).
   if (hasReorderableSide(pass1.rawPortsByCompound)) {
-    const crossings1 = countRightAngleCrossings(ext1.edges)
-    if (crossings1 > 0) {
-      const newIndices = computePortIndicesFromLayout(r1, pass1.rawPortsByCompound, pass1.decompositions)
-      const pass2 = mermaidToElk(graph, opts, newIndices)
-      const r2 = elkLayoutSync(pass2.elkGraph)
-      const ext2 = elkToPositioned(r2, graph, pass2.decompositions)
-      const crossings2 = countRightAngleCrossings(ext2.edges)
-      if (crossings2 < crossings1) {
-        extracted = ext2
-        elkResult = r2
+    let bestExt = ext1
+    let bestResult = r1
+    let bestCrossings = countRightAngleCrossings(ext1.edges)
+    let prevIndices: Map<string, number> | undefined
+    const MAX_PASSES = 4
+    for (let i = 0; bestCrossings > 0 && i < MAX_PASSES; i++) {
+      const newIndices = computePortIndicesFromLayout(bestResult, pass1.rawPortsByCompound, pass1.decompositions)
+      // Stop when the heuristic produces the same indices as last iteration.
+      if (prevIndices && sameIndices(newIndices, prevIndices)) break
+      prevIndices = newIndices
+      const candidate = mermaidToElk(graph, opts, newIndices)
+      const candidateResult = elkLayoutSync(candidate.elkGraph)
+      const candidateExt = elkToPositioned(candidateResult, graph, candidate.decompositions)
+      const candidateCrossings = countRightAngleCrossings(candidateExt.edges)
+      if (candidateCrossings < bestCrossings) {
+        bestExt = candidateExt
+        bestResult = candidateResult
+        bestCrossings = candidateCrossings
+      } else {
+        break
       }
     }
+    extracted = bestExt
+    elkResult = bestResult
   }
 
   // Shape-aware endpoint clipping (diamonds, etc.) on every edge.
