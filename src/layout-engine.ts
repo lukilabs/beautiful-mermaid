@@ -625,6 +625,7 @@ function extractNodesAndGroups(
       if (mNode) {
         // Resolve inline styles from nodeStyles map and classDefs
         const inlineStyle = resolveNodeStyle(child.id, graph)
+        const cssClass = graph.classAssignments.get(child.id)
 
         nodes.push({
           id: child.id,
@@ -635,6 +636,7 @@ function extractNodesAndGroups(
           width,
           height,
           inlineStyle,
+          cssClass,
         })
       }
 

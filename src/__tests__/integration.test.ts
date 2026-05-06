@@ -235,6 +235,20 @@ describe('renderMermaidSVG – Batch 2 edge features', () => {
     expect(svg).toContain('fill="#ff0000"')
     expect(svg).toContain('stroke="#cc0000"')
   })
+
+  it('emits :::className as a CSS class on the SVG node element', () => {
+    const svg = renderMermaidSVG(`graph LR
+      A[Start]:::highlight --> B[End]`)
+    expect(svg).toContain('class="node highlight"')
+    // Node without a class assignment still has only the base class
+    expect(svg).toContain('class="node"')
+  })
+
+  it('emits :::className even without a matching classDef', () => {
+    const svg = renderMermaidSVG(`graph LR
+      A[Only]:::external --> B[Other]`)
+    expect(svg).toContain('class="node external"')
+  })
 })
 
 // ============================================================================

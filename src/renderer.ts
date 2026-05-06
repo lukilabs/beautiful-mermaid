@@ -323,8 +323,9 @@ function renderNode(node: PositionedNode, font: string): string {
   // Combine shape and label inside a semantic group
   // This enables reliable node identification without heuristics
   const parts: string[] = []
+  const nodeClass = node.cssClass ? `node ${escapeAttr(node.cssClass)}` : 'node'
   parts.push(
-    `<g class="node" data-id="${escapeAttr(node.id)}" data-label="${escapeAttr(node.label)}" data-shape="${node.shape}">`
+    `<g class="${nodeClass}" data-id="${escapeAttr(node.id)}" data-label="${escapeAttr(node.label)}" data-shape="${node.shape}">`
   )
   parts.push(`  ${shape.replace(/\n/g, '\n  ')}`)
   if (label) {
