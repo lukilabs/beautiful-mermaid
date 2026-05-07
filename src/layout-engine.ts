@@ -53,7 +53,7 @@ const DEFAULTS = {
   padding: 40,
   nodeSpacing: 28,
   layerSpacing: 48,
-  thoroughness: 3,
+  thoroughness: 30,
 } as const
 
 type ElkDirection = 'RIGHT' | 'LEFT' | 'UP' | 'DOWN'
@@ -288,6 +288,8 @@ interface CrossHierPort {
   side: Side
   /** 'out' = outgoing (source side), 'in' = incoming (target side). */
   direction: 'in' | 'out'
+  /** Index of the underlying cross-hier edge in graph.edges. Numeric tiebreaker when several ports share a side and outsideDepth — falls back to declaration order, which lexicographic sort on portId got wrong (`e10` < `e2`) for graphs with 10+ edges. */
+  edgeIndex: number
   /**
    * Number of compound levels between this port's compound and the source
    * (for `direction: 'in'`) or the target (for `direction: 'out'`) of the
@@ -340,6 +342,7 @@ function decomposeCrossHierEdge(
         compoundId: cur,
         side,
         direction: dir,
+        edgeIndex: index,
         outsideDepth: 0, // filled in after loop
       })
       cur = subgraphParent.get(cur)
@@ -658,7 +661,7 @@ function mermaidToElk(
         } else if (a.outsideDepth !== b.outsideDepth) {
           return a.outsideDepth - b.outsideDepth
         }
-        return a.portId.localeCompare(b.portId)
+        return a.edgeIndex - b.edgeIndex
       })
       sidePorts.forEach((p, idx) => {
         elkPorts.push({
@@ -846,12 +849,38 @@ function buildSubgraphNode(
   }
 
   // Real internal edges at this compound's level.
-  for (const { index, edge } of internalEdgesBySubgraph.get(sg.id) ?? []) {
+  const internalEdges = internalEdgesBySubgraph.get(sg.id) ?? []
+  for (const { index, edge } of internalEdges) {
     elkNode.edges!.push(buildInternalElkEdge(index, edge))
   }
   // Cross-hier sub-edges at this compound's level.
   for (const e of subEdgesByCompound.get(sg.id) ?? []) {
     elkNode.edges!.push(e)
+  }
+
+  // Invisible chain edges to enforce the declared direction on leaves that
+  // have no internal edges. Without this, a compound like
+  // `subgraph foo; direction TB; A; B; C; end` lays out A/B/C in one layer
+  // (so horizontally side-by-side) — ELK Layered has no edges to layer them
+  // by, and `considerModelOrder` only breaks ties within a layer, not layer
+  // assignment. The fix injects chain edges A→B→C marked with a `__bm_chain`
+  // prefix so the renderer can drop them. We only chain leaves that have NO
+  // internal edges connecting to them in *this* compound's scope, so parallel
+  // chains (e.g. `A→B; C→D`) keep their parallelism.
+  if (sg.direction) {
+    const connected = new Set<string>()
+    for (const { edge } of internalEdges) {
+      connected.add(edge.source)
+      connected.add(edge.target)
+    }
+    const isolatedLeaves = sg.nodeIds.filter(id => graph.nodes.has(id) && !connected.has(id))
+    for (let i = 0; i + 1 < isolatedLeaves.length; i++) {
+      elkNode.edges!.push({
+        id: `__bm_chain_${sg.id}_${i}`,
+        sources: [isolatedLeaves[i]!],
+        targets: [isolatedLeaves[i + 1]!],
+      })
+    }
   }
 
   return elkNode
@@ -1289,7 +1318,7 @@ function computePortIndicesFromLayout(
           if (Math.abs(k1 - k2) > 0.5) return k1 - k2
         }
         if (a.outsideDepth !== b.outsideDepth) return a.outsideDepth - b.outsideDepth
-        return a.portId.localeCompare(b.portId)
+        return a.edgeIndex - b.edgeIndex
       })
       sidePorts.forEach((p, idx) => newIndices.set(p.portId, idx))
     }
@@ -1320,8 +1349,11 @@ function hasReorderableSide(rawPortsByCompound: Map<string, CrossHierPort[]>): b
  * both segments (HOP_RADIUS+1 padding from each endpoint, matching the
  * renderer so the count predicts the number of hops we'll draw). Same-edge
  * intersections don't count.
+ *
+ * Exported for the stress test suite — internal API, do not depend on
+ * outside `src/`.
  */
-function countRightAngleCrossings(edges: ReadonlyArray<PositionedEdge>): number {
+export function countRightAngleCrossings(edges: ReadonlyArray<PositionedEdge>): number {
   interface Seg { edgeIdx: number; axis: 'H' | 'V'; pos: number; rangeMin: number; rangeMax: number }
   const segs: Seg[] = []
   const EPS = 0.5
