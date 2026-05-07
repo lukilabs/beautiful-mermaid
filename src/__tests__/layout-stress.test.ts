@@ -21,196 +21,23 @@ import { parseMermaid, renderMermaidSVG } from '../index.ts'
 import { layoutGraphSync } from '../layout.ts'
 import { countRightAngleCrossings } from '../layout-engine.ts'
 import type { PositionedGraph, PositionedNode, PositionedGroup } from '../types.ts'
+import { SAMPLE_GRAPHS } from './sample-graphs/index.ts'
 
 // ============================================================================
-// Sample definitions
+// Sample definitions — sources live in `sample-graphs/stress-suite.ts` so
+// the comparison-page tooling reads the same canonical scenarios; this map
+// just gives each one a short camelCase alias for use inside this file.
 // ============================================================================
 
 const SAMPLES = {
-  microservicesStack: `graph LR
-    subgraph clients [Client Layer]
-      Web --> API
-      Mobile --> API
-      Desktop --> API
-    end
-    subgraph services [Service Layer]
-      API --> Auth
-      API --> Users
-      API --> Orders
-      API --> Payments
-    end
-    subgraph data [Data Layer]
-      Auth --> AuthDB
-      Users --> UserDB
-      Orders --> OrdersDB
-      Payments --> PaymentsDB
-      Payments --> AuditLog
-    end`,
-
-  // Subgraphs are declared *before* their members are referenced from outside —
-  // our parser pins a node to the first subgraph (or top level) it sees and
-  // doesn't promote it later, so `Artifact --> Unit` followed by
-  // `subgraph Tests; Unit; end` would leave Unit at top level.
-  ciCdParallelFeedback: `graph TD
-    subgraph build [Build]
-      Source --> Compile --> Artifact
-    end
-    subgraph TestParallel [Tests]
-      direction LR
-      Unit
-      Integration
-      E2E
-      Security
-    end
-    Artifact --> Unit
-    Artifact --> Integration
-    Artifact --> E2E
-    Artifact --> Security
-    Unit --> Gate
-    Integration --> Gate
-    E2E --> Gate
-    Security --> Gate
-    Gate{All Pass?} -->|Yes| Deploy
-    Gate -->|No| Source`,
-
-  bidirectionalRequestResponse: `graph LR
-    subgraph client [Client]
-      UI --> Cache
-      Cache --> Network
-    end
-    subgraph server [Server]
-      Endpoint --> Handler
-      Handler --> DB
-    end
-    Network --> Endpoint
-    DB --> Handler
-    Handler --> Endpoint
-    Endpoint --> Network
-    Network --> Cache
-    Cache --> UI`,
-
-  hubAndSpoke: `graph LR
-    subgraph hub [Orchestrator]
-      Coordinator
-      Scheduler
-    end
-    subgraph north [Ingest]
-      direction TB
-      IngestSource[Source] --> Validator
-    end
-    subgraph east [Compute]
-      direction TB
-      Worker1
-      Worker2
-    end
-    subgraph south [Storage]
-      direction TB
-      WriteBack
-    end
-    subgraph west [Notify]
-      direction TB
-      Pager --> Slack
-    end
-    Validator --> Coordinator
-    Coordinator --> Worker1
-    Coordinator --> Worker2
-    Worker1 --> Scheduler
-    Worker2 --> Scheduler
-    Scheduler --> WriteBack
-    Scheduler --> Pager`,
-
-  mixedDirectionSandwich: `graph LR
-    subgraph L1 [Outer LR]
-      direction LR
-      a
-      subgraph L2 [Inner TB]
-        direction TB
-        b
-        subgraph L3 [Deep LR]
-          direction LR
-          c
-          subgraph L4 [Deepest TB]
-            direction TB
-            d --> e --> f
-          end
-        end
-      end
-    end
-    src --> a
-    src --> d
-    src --> e
-    f --> sink
-    c --> b
-    b --> a`,
-
-  sharedServicesFanIn: `graph TD
-    subgraph shared [Shared Services]
-      direction TB
-      Auth
-      Logging
-      Metrics
-    end
-    subgraph featA [Feature A]
-      A1 --> A2
-    end
-    subgraph featB [Feature B]
-      B1 --> B2
-    end
-    subgraph featC [Feature C]
-      C1 --> C2
-    end
-    A2 --> Auth
-    B2 --> Auth
-    C2 --> Auth
-    A1 --> Logging
-    B1 --> Logging
-    C1 --> Logging
-    A2 --> Metrics
-    B2 --> Metrics`,
-
-  errorPathCluster: `graph TD
-    subgraph happy [Happy Path]
-      Login --> Verify --> Authorize --> Success
-    end
-    subgraph errflow [Error Path]
-      Reject --> Notify --> RetryStep[Retry]
-    end
-    subgraph mon [Monitoring]
-      Alerts
-      Dashboard
-    end
-    Verify -->|fail| Reject
-    Authorize -->|denied| Reject
-    RetryStep --> Login
-    Success --> Alerts
-    Reject --> Alerts
-    Notify --> Dashboard`,
-
-  dataflowFanOutFanIn: `graph LR
-    Ingest --> Splitter
-    subgraph processors [Processors]
-      direction TB
-      P1
-      P2
-      P3
-      P4
-    end
-    Splitter --> P1
-    Splitter --> P2
-    Splitter --> P3
-    Splitter --> P4
-    subgraph reducers [Reducers]
-      direction TB
-      R1
-      R2
-    end
-    P1 --> R1
-    P2 --> R1
-    P3 --> R2
-    P4 --> R2
-    R1 --> Combine
-    R2 --> Combine
-    Combine --> Output`,
+  microservicesStack:           SAMPLE_GRAPHS['stress-microservices-stack']!.source,
+  ciCdParallelFeedback:         SAMPLE_GRAPHS['stress-ci-cd-parallel-feedback']!.source,
+  bidirectionalRequestResponse: SAMPLE_GRAPHS['stress-bidirectional-request-response']!.source,
+  hubAndSpoke:                  SAMPLE_GRAPHS['stress-hub-and-spoke']!.source,
+  mixedDirectionSandwich:       SAMPLE_GRAPHS['stress-mixed-direction-sandwich']!.source,
+  sharedServicesFanIn:          SAMPLE_GRAPHS['stress-shared-services-fan-in']!.source,
+  errorPathCluster:             SAMPLE_GRAPHS['stress-error-path-cluster']!.source,
+  dataflowFanOutFanIn:          SAMPLE_GRAPHS['stress-dataflow-fan-out-fan-in']!.source,
 } as const
 
 // ============================================================================

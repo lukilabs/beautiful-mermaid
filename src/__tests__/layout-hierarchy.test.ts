@@ -16,6 +16,7 @@ import { parseMermaid } from '../index.ts'
 import { layoutGraphSync } from '../layout.ts'
 import type { PositionedGraph, PositionedNode, PositionedGroup } from '../types.ts'
 import { samples } from '../../samples-data.ts'
+import { SAMPLE_GRAPHS } from './sample-graphs/index.ts'
 
 // ============================================================================
 // Helpers
@@ -309,45 +310,7 @@ describe('layoutGraph – nested subgraph with cross-hierarchy edges', () => {
     // sibling clusters at root, one cluster contains a nested cluster, both
     // outer and inner declare `direction TB` matching the parent, and many
     // cross-hierarchy edges cross 1-3 subgraph boundaries.
-    const g = layout(`graph TB
-      subgraph rootA [Group A]
-        docs[contract doc]
-      end
-
-      ext_in1[Input 1]
-      ext_in2[Input 2]
-
-      subgraph rootB [Group B]
-        direction TB
-        subgraph inner [Inner Common]
-          direction TB
-          v[validator]
-          d[defaults]
-          t[tagger]
-          v --> d --> t
-        end
-        rd1[reader 1]
-        rd2[reader 2]
-        ud[unified data]
-        wr1[writer 1]
-        wr2[writer 2]
-        rd1 --> ud
-        rd2 --> ud
-        ud --> wr1
-        ud --> wr2
-      end
-
-      ext_out1[Output 1]
-      ext_out2[Output 2]
-
-      ext_in1 --> v
-      ext_in2 --> v
-      t --> rd1
-      t --> rd2
-      wr1 --> ext_out1
-      wr2 --> ext_out2
-      docs -. "schemas" .-> v
-      docs -. "defines" .-> ud`)
+    const g = layout(SAMPLE_GRAPHS['bug-repro']!.source)
 
     const inner = group(g, 'Inner Common')
     const rootB = group(g, 'Group B')
@@ -388,14 +351,7 @@ describe('layoutGraph – nested subgraph with cross-hierarchy edges', () => {
 
 describe('layoutGraph – direction permutations', () => {
   it('LR root with TB-direction nested subgraph keeps the inner content vertical', () => {
-    // Subgraph declared first so `a` parses inside `stack`, not at root.
-    const g = layout(`graph LR
-      subgraph stack [TB Stack]
-        direction TB
-        a --> b --> c
-      end
-      src[Source] --> a
-      c --> sink[Sink]`)
+    const g = layout(SAMPLE_GRAPHS['perm-lr-with-tb-nested']!.source)
 
     const a = node(g, 'a'), b = node(g, 'b'), c = node(g, 'c')
     expect(b.y).toBeGreaterThan(a.y)
@@ -408,22 +364,7 @@ describe('layoutGraph – direction permutations', () => {
   })
 
   it('TD root with mixed-direction sibling subgraphs preserves each independently', () => {
-    // Subgraphs declared first so l1-l3 and r1-r3 parse inside their
-    // respective subgraphs, not at root.
-    const g = layout(`graph TD
-      subgraph leftSide [LR pipeline]
-        direction LR
-        l1 --> l2 --> l3
-      end
-      subgraph rightSide [BT stack]
-        direction BT
-        r1 --> r2 --> r3
-      end
-      hub[Hub]
-      hub --> l1
-      hub --> r1
-      l3 --> tail[Tail]
-      r3 --> tail`)
+    const g = layout(SAMPLE_GRAPHS['perm-mixed-siblings']!.source)
 
     const l1 = node(g, 'l1'), l2 = node(g, 'l2'), l3 = node(g, 'l3')
     const r1 = node(g, 'r1'), r2 = node(g, 'r2'), r3 = node(g, 'r3')
@@ -448,22 +389,7 @@ describe('layoutGraph – direction permutations', () => {
     // inner.dir LR == middle.dir LR → inner inherits, no SEPARATE (and is
     // explicitly INCLUDE_CHILDREN so the leaf nodes flatten into middle's
     // interior layout, where the cross-hier port can reach them).
-    //
-    // Subgraph declared first so `a` parses as a member of `inner`, not
-    // root level (Mermaid registers a node at the level it first appears).
-    const g = layout(`graph TB
-      subgraph outer [TB Outer]
-        direction TB
-        subgraph middle [LR Middle]
-          direction LR
-          subgraph inner [LR Inner]
-            direction LR
-            a --> b --> c
-          end
-        end
-      end
-      src[Source] --> a
-      c --> sink[Sink]`)
+    const g = layout(SAMPLE_GRAPHS['perm-3-level-middle-switch']!.source)
 
     const a = node(g, 'a'), b = node(g, 'b'), c = node(g, 'c')
     expect(b.x).toBeGreaterThan(a.x)
@@ -485,24 +411,9 @@ describe('layoutGraph – direction permutations', () => {
 
   it('sibling subgraphs with RL and BT directions inside a TB parent each preserve their own direction', () => {
     // Both RL and BT differ from the TB root, so both get SEPARATE_CHILDREN
-    // + FIXED_SIDE ports. The cross-hierarchy edges entering each subgraph
-    // respect the direction-specific port side (incoming on EAST for RL,
-    // on SOUTH for BT — those are the "start" sides of each direction).
-    const g = layout(`graph TB
-      subgraph rlGroup [RL row]
-        direction RL
-        rlA --> rlB --> rlC
-      end
-      subgraph btGroup [BT stack]
-        direction BT
-        btA --> btB --> btC
-      end
-      hub[Hub]
-      tail[Tail]
-      hub --> rlA
-      hub --> btA
-      rlC --> tail
-      btC --> tail`)
+    // + FIXED_ORDER ports. Incoming RL ports pin to EAST, incoming BT ports
+    // pin to SOUTH (the "start" side of each direction).
+    const g = layout(SAMPLE_GRAPHS['perm-rl-and-bt-siblings']!.source)
 
     const rlA = node(g, 'rlA'), rlB = node(g, 'rlB'), rlC = node(g, 'rlC')
     const btA = node(g, 'btA'), btB = node(g, 'btB'), btC = node(g, 'btC')
@@ -527,13 +438,7 @@ describe('layoutGraph – direction permutations', () => {
     // still differs from LR per `directionToElk` (LEFT vs RIGHT), so the
     // subgraph gets SEPARATE_CHILDREN and the inner content lays out
     // right-to-left.
-    const g = layout(`graph LR
-      subgraph reverse [RL Reverse]
-        direction RL
-        a --> b --> c
-      end
-      src[Source] --> a
-      c --> sink[Sink]`)
+    const g = layout(SAMPLE_GRAPHS['perm-rl-in-lr']!.source)
 
     const a = node(g, 'a'), b = node(g, 'b'), c = node(g, 'c')
     // Inside the RL subgraph: x decreases along the chain.
@@ -548,22 +453,7 @@ describe('layoutGraph – direction permutations', () => {
     // through the flat layout. A pre-fix layout-engine would have treated
     // this as "any direction directive present → flip root to SEPARATE"
     // and produced a sprawl; this test guards that regression at depth.
-    const g = layout(`graph TB
-      subgraph L1 [Level 1]
-        direction TB
-        subgraph L2 [Level 2]
-          direction TB
-          subgraph L3 [Level 3]
-            direction TB
-            subgraph L4 [Level 4]
-              direction TB
-              a --> b --> c
-            end
-          end
-        end
-      end
-      src[Source] --> a
-      c --> sink[Sink]`)
+    const g = layout(SAMPLE_GRAPHS['perm-4-level-same-direction']!.source)
 
     const a = node(g, 'a'), b = node(g, 'b'), c = node(g, 'c')
     // Innermost chain stacks vertically.
@@ -603,22 +493,7 @@ describe('layoutGraph – direction permutations', () => {
     //   ext1 → deep_a  (crosses outer + middle + inner)
     //   mid_a → in_a   (one level deeper)
     //   in_a → mid_a   (one level shallower)
-    const g = layout(`graph TB
-      subgraph outer [Outer]
-        mid_a[mid a]
-        subgraph middle [Middle]
-          in_a[in a]
-          subgraph inner [Inner]
-            deep_a[deep a] --> deep_b[deep b]
-          end
-        end
-      end
-      ext1[Ext 1]
-      ext1 --> mid_a
-      ext1 --> in_a
-      ext1 --> deep_a
-      mid_a --> in_a
-      in_a --> mid_a`)
+    const g = layout(SAMPLE_GRAPHS['multi-3-level-every-level']!.source)
 
     expectEdgeReachesTarget(g, 'ext1', 'mid_a')
     expectEdgeReachesTarget(g, 'ext1', 'in_a')
@@ -642,18 +517,7 @@ describe('layoutGraph – direction permutations', () => {
     // shared parent. The cross-hier edges l2 → r1 and r2 → l1 must each
     // exit one child subgraph, traverse the parent's interior, and enter
     // the other child subgraph.
-    const g = layout(`graph TB
-      subgraph parent [Parent]
-        direction LR
-        subgraph leftChild [Left]
-          l1 --> l2
-        end
-        subgraph rightChild [Right]
-          r1 --> r2
-        end
-      end
-      l2 --> r1
-      r2 --> l1`)
+    const g = layout(SAMPLE_GRAPHS['multi-cousin-cross-hier']!.source)
 
     expectEdgeReachesTarget(g, 'l2', 'r1')
     expectEdgeReachesTarget(g, 'r2', 'l1')
@@ -669,24 +533,7 @@ describe('layoutGraph – direction permutations', () => {
   it('4-level nesting with edges spanning every depth combination', () => {
     // Edges with every distinct cross-hierarchy depth from a 4-level deep
     // graph: root↔level1, root↔level4, level1↔level3.
-    const g = layout(`graph TB
-      subgraph L1 [Level 1]
-        l1_node[L1]
-        subgraph L2 [Level 2]
-          l2_node[L2]
-          subgraph L3 [Level 3]
-            l3_node[L3]
-            subgraph L4 [Level 4]
-              l4_node[L4]
-            end
-          end
-        end
-      end
-      root_node[Root]
-      root_node --> l4_node
-      root_node --> l1_node
-      l1_node --> l3_node
-      l4_node --> root_node`)
+    const g = layout(SAMPLE_GRAPHS['multi-4-level-varied-depths']!.source)
 
     expectEdgeReachesTarget(g, 'root_node', 'l4_node')
     expectEdgeReachesTarget(g, 'root_node', 'l1_node')
@@ -704,23 +551,7 @@ describe('layoutGraph – direction permutations', () => {
     // Each level alternates direction. Cross-hierarchy edges connect nodes
     // at different levels. Direction directives interact with edge
     // synthesis at every depth.
-    const g = layout(`graph TB
-      subgraph L1 [TB Level 1]
-        direction TB
-        l1_a[l1 a]
-        subgraph L2 [LR Level 2]
-          direction LR
-          l2_a[l2 a]
-          subgraph L3 [TB Level 3]
-            direction TB
-            l3_a[l3 a] --> l3_b[l3 b]
-          end
-        end
-      end
-      ext[Ext]
-      ext --> l3_a
-      l1_a --> l3_b
-      l2_a --> l1_a`)
+    const g = layout(SAMPLE_GRAPHS['multi-mixed-direction']!.source)
 
     expectEdgeReachesTarget(g, 'ext', 'l3_a')
     expectEdgeReachesTarget(g, 'l1_a', 'l3_b')
@@ -738,20 +569,7 @@ describe('layoutGraph – direction permutations', () => {
     // Only the innermost layer has leaf nodes — every intermediate layer is
     // pure structure. With no cross-hierarchy edges to route through the
     // SEPARATE_CHILDREN boundaries, the multi-level case lays out cleanly.
-    const g = layout(`graph LR
-      subgraph L1 [Outer LR]
-        direction LR
-        subgraph L2 [Inner TB]
-          direction TB
-          subgraph L3 [Deeper LR]
-            direction LR
-            subgraph L4 [Deepest TB]
-              direction TB
-              a --> b --> c
-            end
-          end
-        end
-      end`)
+    const g = layout(SAMPLE_GRAPHS['perm-alt-lr-tb']!.source)
 
     const a = node(g, 'a'), b = node(g, 'b'), c = node(g, 'c')
     // Innermost L4 is TB — a/b/c stack vertically.
@@ -774,20 +592,7 @@ describe('layoutGraph – direction permutations', () => {
     // Mirror of the previous test starting from TB:
     //   root TB → L1 TB (matches root) → L2 LR (SEPARATE) → L3 TB (SEPARATE)
     //   → L4 LR (SEPARATE). Innermost has the chain; intermediates are empty.
-    const g = layout(`graph TB
-      subgraph L1 [Outer TB]
-        direction TB
-        subgraph L2 [Inner LR]
-          direction LR
-          subgraph L3 [Deeper TB]
-            direction TB
-            subgraph L4 [Deepest LR]
-              direction LR
-              a --> b --> c
-            end
-          end
-        end
-      end`)
+    const g = layout(SAMPLE_GRAPHS['perm-alt-tb-lr']!.source)
 
     const a = node(g, 'a'), b = node(g, 'b'), c = node(g, 'c')
     // Innermost L4 is LR — a/b/c arrange horizontally.
@@ -806,17 +611,7 @@ describe('layoutGraph – direction permutations', () => {
   })
 
   it('multiple cross-hierarchy edges into a non-matching direction subgraph keep the LR flow', () => {
-    // Subgraph declared first so a/b/c parse as members of `row`, not the
-    // root level (Mermaid registers a node at the level it first appears).
-    const g = layout(`graph TD
-      subgraph row [LR Row]
-        direction LR
-        a --> b --> c
-      end
-      s1 --> a
-      s2 --> a
-      c --> t1
-      c --> t2`)
+    const g = layout(SAMPLE_GRAPHS['perm-many-cross-hier']!.source)
 
     const a = node(g, 'a'), b = node(g, 'b'), c = node(g, 'c')
     expect(b.x).toBeGreaterThan(a.x)
