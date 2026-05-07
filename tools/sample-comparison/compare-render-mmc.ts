@@ -1,21 +1,11 @@
 /**
- * Pre-render every comparison sample with the official mermaid-cli (mmdc),
- * using its ELK renderer where applicable, into the directory passed as
- * argv[2]. compare-build-page.ts can then inline these SVGs as the third
- * "reference" column instead of running mermaid.js live in the browser
- * (which makes the page slow to load).
+ * Renders every comparison sample with mermaid-cli (mmdc) into the directory
+ * passed as argv[2]. compare-build-page.ts inlines these SVGs as the
+ * `mermaid + ELK (reference)` column when invoked with `--with-mmc`.
  *
- * Strategy: render each sample one at a time. mmdc kills its whole run on
- * the first chart that fails to parse, so a single markdown bundle is too
- * fragile for our 107-sample mix (ER and a few others have syntax mmdc
- * rejects but we accept). Per-sample isolation costs us mmdc's Puppeteer
- * cold-start on every sample (multiple seconds each — runs in single-digit
- * minutes for the full set), but the result is robust: bad samples log and
- * skip, the rest produce SVGs.
- *
- * mmdc must be on PATH (or invoked via npx). Skips silently with a warning
- * if it isn't available — the comparison page renders without the column
- * when its SVGs are missing.
+ * Each sample is rendered in its own mmdc invocation so a chart that fails
+ * to parse doesn't abort the rest of the run. mmdc must be on PATH or
+ * available via npx; the script exits with a warning if neither resolves.
  */
 import { execFileSync, spawnSync } from 'child_process'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs'
@@ -31,17 +21,23 @@ if (!outDir) {
 }
 mkdirSync(outDir, { recursive: true })
 
+/** Lowercase the title and replace any non-alphanumeric run with a single dash. */
 function slugify(title: string): string {
   return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
 }
 
+/** A sample that needs to be rendered: a slug for the output filename and the mermaid source. */
 interface Item { slug: string; source: string }
+
 const items: Item[] = [
   ...ALL_SAMPLE_GRAPHS.map(s => ({ slug: s.slug, source: s.source })),
   ...samples.map(s => ({ slug: slugify(s.title), source: s.source })),
 ]
 
-// Locate mmdc. Prefer the binary directly; fall back to npx invocation.
+/**
+ * How to invoke mmdc on this machine: either the binary directly or
+ * via npx. Resolves at startup; the script exits if neither is available.
+ */
 const mmdcCmd = (() => {
   const probe = spawnSync('mmdc', ['--version'], { stdio: 'ignore' })
   if (probe.status === 0) return { cmd: 'mmdc' as const, viaNpx: false }
@@ -52,6 +48,11 @@ const mmdcCmd = (() => {
   process.exit(0)
 })()
 
+/**
+ * Prepend an `%%{init:...}%%` directive that turns on the ELK renderer for
+ * flowchart and stateDiagram sources. Other diagram types are left alone.
+ * Sources that already declare a `defaultRenderer` are returned as-is.
+ */
 function withElk(source: string): string {
   if (source.includes('defaultRenderer')) return source
   const first = source.trim().split('\n')[0]?.toLowerCase() ?? ''
@@ -59,6 +60,11 @@ function withElk(source: string): string {
   return `%%{init: {"flowchart": {"defaultRenderer": "elk"}, "stateDiagram": {"defaultRenderer": "elk"}}}%%\n${source}`
 }
 
+/**
+ * Run mmdc to convert `inputPath` into `outputPath`. Returns whether the
+ * invocation succeeded and, on failure, a one-line reason extracted from
+ * mmdc's stderr (Puppeteer parse errors have a recognisable first line).
+ */
 function runMmdc(inputPath: string, outputPath: string): { ok: boolean; reason?: string } {
   const args = mmdcCmd.viaNpx
     ? ['-y', '-p', '@mermaid-js/mermaid-cli', 'mmdc', '-i', inputPath, '-o', outputPath, '-q']
@@ -67,7 +73,6 @@ function runMmdc(inputPath: string, outputPath: string): { ok: boolean; reason?:
     execFileSync(mmdcCmd.cmd, args, { stdio: ['ignore', 'ignore', 'pipe'] })
     return { ok: true }
   } catch (e: unknown) {
-    // execFileSync throws on non-zero exit; capture stderr from the error if available.
     const stderr = (e as { stderr?: Buffer | string }).stderr
     const msg = typeof stderr === 'string' ? stderr : stderr?.toString('utf8') ?? (e instanceof Error ? e.message : String(e))
     const firstLine = msg.split('\n').find(l => l.includes('Error') || l.includes('Parse'))?.trim() ?? msg.split('\n')[0]?.trim() ?? 'unknown'

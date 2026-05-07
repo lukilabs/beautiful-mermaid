@@ -1,17 +1,16 @@
 /**
  * Layout engine for beautiful-mermaid (ELK.js based).
  *
- * Architecture: ELK does both layout AND routing. Per-subgraph direction
- * directives are honoured by setting SEPARATE_CHILDREN on every compound
- * whose direction differs from its effective parent (or that contains a
- * leaf endpoint of a cross-hierarchy edge — without SEPARATE_CHILDREN the
- * leaf would migrate out of its declared compound). Cross-hier edges are
- * decomposed into a chain of sub-edges, one per compound boundary they
- * cross, with explicit ports on each compound's boundary on the side
- * dictated by that compound's direction. ELK lays out each compound
- * independently with its own direction, and routes everything in a single
- * pass — including reserving channels for the cross-hier edges, since they
- * appear as real sub-edges at every level.
+ * ELK does both layout and routing. Per-subgraph `direction` directives
+ * are honoured by setting `SEPARATE_CHILDREN` on every compound whose
+ * direction differs from its effective parent (or that contains a leaf
+ * endpoint of a cross-hierarchy edge — without `SEPARATE_CHILDREN` the
+ * leaf would migrate out of its declared compound). Cross-hierarchy
+ * edges are decomposed into a chain of sub-edges, one per compound
+ * boundary they cross, with explicit ports on each compound's boundary
+ * on the side dictated by that compound's direction. ELK lays out each
+ * compound independently with its own direction and routes every edge
+ * — including the cross-hierarchy ones — in a single pass.
  *
  * Pipeline:
  *   mermaidToElk:    build ELK input with port chains and sub-edges
@@ -19,11 +18,6 @@
  *   elkToPositioned: extract nodes + groups; assemble each cross-hier edge
  *                    polyline by concatenating its sub-edge sections
  *   clipEdgeToShape: shape-aware endpoint clipping for non-rectangles
- *
- * The previous architecture (custom orthogonal router after ELK) couldn't
- * work because ELK packs nodes tightly when it doesn't see the cross-hier
- * edges; a router has nowhere to thread. With sub-edges in the ELK input,
- * ELK reserves space for them at every level.
  */
 
 import type { ElkNode, ElkExtendedEdge, LayoutOptions } from 'elkjs'
@@ -288,7 +282,7 @@ interface CrossHierPort {
   side: Side
   /** 'out' = outgoing (source side), 'in' = incoming (target side). */
   direction: 'in' | 'out'
-  /** Index of the underlying cross-hier edge in graph.edges. Numeric tiebreaker when several ports share a side and outsideDepth — falls back to declaration order, which lexicographic sort on portId got wrong (`e10` < `e2`) for graphs with 10+ edges. */
+  /** Index of the underlying cross-hier edge in graph.edges. Numeric tiebreaker that orders ports sharing a side and outsideDepth in declaration order. */
   edgeIndex: number
   /**
    * Number of compound levels between this port's compound and the source
@@ -374,8 +368,8 @@ function decomposeCrossHierEdge(
 // Each subgraph that needs SEPARATE_CHILDREN becomes a compound with:
 //   - direction (its own or effective)
 //   - hierarchyHandling: SEPARATE_CHILDREN
-//   - portConstraints: FIXED_SIDE on the compound (so its ports respect the
-//     port.side we set)
+//   - portConstraints: FIXED_ORDER (the explicit port.index on each port
+//     decides the per-side order; the explicit port.side decides the side)
 //   - ports[] populated from cross-hier decomposition
 //
 // Sub-edges are placed in the edges array of the compound where their
@@ -431,11 +425,10 @@ function mermaidToElk(
   /**
    * Optional per-port index override. When supplied, each port's
    * `org.eclipse.elk.port.index` is set from this map instead of the
-   * default outsideDepth-based heuristic. Used by `layoutGraphSync`'s
-   * second pass: after the first ELK pass we know where each cross-hier
-   * edge actually attaches, so we can sort ports along each side by the
-   * outward-side perpendicular coordinate to remove crossings the
-   * default heuristic couldn't predict.
+   * default outsideDepth heuristic. `layoutGraphSync`'s iterative pass
+   * supplies this map after each ELK pass, sorting ports along each
+   * side by the outward neighbour's perpendicular coordinate to
+   * minimise crossings.
    */
   portIndexOverride?: Map<string, number>
 ): MermaidToElkResult {
@@ -538,10 +531,10 @@ function mermaidToElk(
     }
   }
 
-  // Subgraphs needing SEPARATE_CHILDREN. Cross-hier ports require the compound
-  // to be SEPARATE so its boundary is a real layout boundary with FIXED_SIDE
-  // ports — without SEPARATE the compound wouldn't have a fixed-shape boundary
-  // and the port constraints wouldn't apply.
+  // Subgraphs that need SEPARATE_CHILDREN. Cross-hier ports require it so
+  // the compound's boundary is a real layout boundary that ELK respects
+  // the FIXED_ORDER port constraints on; without SEPARATE the boundary
+  // would be soft and the port positions would not stick.
   const subgraphsNeedingSeparate = computeSubgraphsNeedingSeparate(
     subgraphMap, subgraphParent, graph.direction, nodeToSubgraph, crossHierRaw
   )
@@ -634,14 +627,14 @@ function mermaidToElk(
   }
 
   // Convert raw ports (CrossHierPort) to ELK ports with explicit indices.
-  // `port.index` is per side, restarting at 0 on each side. Empirically all
-  // sides number their ports in the natural "first along the perimeter"
-  // sense — NORTH/SOUTH left-to-right, EAST/WEST top-to-bottom. When
-  // `portIndexOverride` is supplied (second pass), we use those indices
-  // directly. Otherwise we sort by outsideDepth ascending within each side
-  // — the closer source/target endpoint comes first, which is the best
-  // blind heuristic when both sub-edges in a SEPARATE compound end at the
-  // same internal node.
+  // `port.index` is per side, restarting at 0 on each side. ELK numbers
+  // ports along each perimeter in the natural sense — NORTH/SOUTH
+  // left-to-right, EAST/WEST top-to-bottom. With `portIndexOverride`
+  // present (iterative-pass override), the supplied indices are used
+  // directly. Without it, ports sort by outsideDepth ascending within
+  // each side — the closer source/target endpoint comes first, which is
+  // the best blind heuristic when both sub-edges in a SEPARATE compound
+  // end at the same internal node.
   const portsByCompound = new Map<string, ElkPort[]>()
   for (const [compoundId, raws] of rawPortsByCompound) {
     // Group by side and sort each side independently.
@@ -722,10 +715,10 @@ function mermaidToElk(
       'elk.layered.thoroughness': String(DEFAULTS.thoroughness),
       'elk.layered.compaction.postCompaction.strategy': 'LEFT_RIGHT_CONSTRAINT_LOCKING',
       'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
-      // Reverse edges that go against model order (declaration order in the
-      // source) when breaking cycles. Without this ELK uses a heuristic and
-      // can pick the wrong edge — e.g., reversing A→B instead of a back-edge
-      // D→A on a flowchart, which inverts the visual flow.
+      // When breaking cycles, reverse the edge that goes against
+      // declaration order rather than ELK's default heuristic. Keeps a
+      // back-edge like `D-.->A` reading as the back-edge in the rendered
+      // flow rather than ELK reversing the forward edge `A→B`.
       'elk.layered.cycleBreaking.strategy': 'GREEDY_MODEL_ORDER',
       'elk.layered.wrapping.strategy': 'OFF',
       'elk.hierarchyHandling': 'INCLUDE_CHILDREN',
@@ -794,24 +787,23 @@ function buildSubgraphNode(
 
   if (needsSeparate) {
     // SEPARATE_CHILDREN starts an independent layered layout for this
-    // compound. ELK's default direction for that layout is RIGHT (LR), so we
-    // must seed it with the effective direction (own directive, nearest
-    // ancestor's, or root) — otherwise an inherited TB would silently render
-    // LR inside the SEPARATE compound.
+    // compound. ELK's default for that layout is RIGHT (LR), so the
+    // compound's effective direction (own directive, nearest ancestor's,
+    // or root) must be set explicitly — an inherited TB silently renders
+    // as LR inside a SEPARATE compound otherwise.
     layoutOptions['elk.hierarchyHandling'] = 'SEPARATE_CHILDREN'
     layoutOptions['elk.direction'] = directionToElk(
       effectiveDirection(sg.id, subgraphMap, subgraphParent, rootDirection)
     )
     if (ownPorts.length > 0) {
-      // FIXED_ORDER lets us hand ELK an explicit port.index per port, which
-      // we set in mermaidToElk so the port closer to its endpoint sits
-      // earlier in the clockwise traversal. Inside a SEPARATE compound,
-      // ELK can't otherwise tell which order minimises crossings — both
+      // FIXED_ORDER honours the explicit `port.index` set by mermaidToElk
+      // so the port nearest its endpoint sits earlier along its side. In
+      // a SEPARATE compound ELK can't otherwise pick a good order — both
       // ends of the sub-edges meet at the same internal node — so without
-      // an explicit hint it falls back to declaration order, which can
-      // place a port for a far-away source between the compound and a
-      // closer source's port and force the closer source's edge to cross
-      // through it.
+      // an explicit index it falls back to declaration order, which can
+      // place a far-source port between the compound and a closer
+      // source's port and force the closer source's edge to cross through
+      // it.
       layoutOptions['elk.portConstraints'] = 'FIXED_ORDER'
     }
   } else if (sg.direction) {
@@ -858,15 +850,16 @@ function buildSubgraphNode(
     elkNode.edges!.push(e)
   }
 
-  // Invisible chain edges to enforce the declared direction on leaves that
-  // have no internal edges. Without this, a compound like
-  // `subgraph foo; direction TB; A; B; C; end` lays out A/B/C in one layer
-  // (so horizontally side-by-side) — ELK Layered has no edges to layer them
-  // by, and `considerModelOrder` only breaks ties within a layer, not layer
-  // assignment. The fix injects chain edges A→B→C marked with a `__bm_chain`
-  // prefix so the renderer can drop them. We only chain leaves that have NO
-  // internal edges connecting to them in *this* compound's scope, so parallel
-  // chains (e.g. `A→B; C→D`) keep their parallelism.
+  // Synthetic chain edges between consecutive isolated leaves of a
+  // direction-bearing compound. ELK Layered has no edges to layer
+  // disconnected leaves by — `considerModelOrder` only breaks ties
+  // within a layer, not layer assignment — so a compound like
+  // `subgraph foo; direction TB; A; B; C; end` would otherwise place
+  // A/B/C in one row. The chain edges (`__bm_chain_*` ids, which the
+  // renderer drops by id-prefix filter) put each isolated leaf in its
+  // own layer in declaration order. Only nodes with zero internal
+  // edges in this compound's scope are chained — parallel patterns
+  // like `A→B; C→D` are left alone.
   if (sg.direction) {
     const connected = new Set<string>()
     for (const { edge } of internalEdges) {
@@ -1229,19 +1222,16 @@ function calculatePathMidpoint(points: Point[]): Point {
 }
 
 // ============================================================================
-// Second-pass port indexing
+// Iterative port-index recomputation
 //
-// After the first ELK pass, every cross-hier port has a known position,
-// and so does every leaf and every other port. We use that to recompute
-// port indices on each compound's boundary, sorted by where the port's
-// OUTSIDE neighbour ended up — i.e., the position of the next step
-// outward along the cross-hier chain. Sorting by perpendicular coordinate
-// (x for NORTH/SOUTH ports, y for EAST/WEST) puts each port directly
-// underneath / next to its outward neighbour, which is the order that
-// yields the fewest crossings between cross-hier sub-edges entering the
-// same compound side. The first pass's outsideDepth heuristic is just a
-// blind fallback — when the actual positions disagree with it, the
-// second pass corrects course.
+// Each ELK pass leaves every cross-hier port, leaf, and sub-edge endpoint
+// with a known position. Reading those back lets us recompute port indices
+// on each compound boundary by the position of each port's outside
+// neighbour — the next step outward along the cross-hier chain. Sorting
+// by perpendicular coordinate (x for NORTH/SOUTH, y for EAST/WEST) places
+// each port directly across from its outward neighbour, the order that
+// minimises crossings between cross-hier sub-edges entering the same
+// compound side. Used by `layoutGraphSync`'s iterative barycenter pass.
 // ============================================================================
 
 function computePortIndicesFromLayout(
@@ -1343,15 +1333,15 @@ function hasReorderableSide(rawPortsByCompound: Map<string, CrossHierPort[]>): b
 }
 
 /**
- * Count right-angle crossings between distinct edges. Mirrors the renderer's
- * hop-detection logic: a crossing is a horizontal segment of one edge passing
- * over a vertical segment of another, with the intersection strictly inside
- * both segments (HOP_RADIUS+1 padding from each endpoint, matching the
- * renderer so the count predicts the number of hops we'll draw). Same-edge
- * intersections don't count.
+ * Count right-angle crossings between distinct edges. A crossing is a
+ * horizontal segment of one edge passing over a vertical segment of
+ * another with the intersection strictly inside both segments
+ * (`HOP_RADIUS + 1` padding from each endpoint, matching the renderer so
+ * this count predicts the hop count drawn on screen). Same-edge
+ * intersections do not count.
  *
- * Exported for the stress test suite — internal API, do not depend on
- * outside `src/`.
+ * Exported for the stress test suite. Internal API; do not depend on
+ * this from outside `src/`.
  */
 export function countRightAngleCrossings(edges: ReadonlyArray<PositionedEdge>): number {
   interface Seg { edgeIdx: number; axis: 'H' | 'V'; pos: number; rangeMin: number; rangeMax: number }
@@ -1403,21 +1393,15 @@ export function layoutGraphSync(
   let extracted = ext1
   let elkResult = r1
 
-  // Pass 2 only runs when (a) there's a compound with multiple ports on the
-  // same side (otherwise port indices can't affect anything) AND (b) pass 1
-  // actually has right-angle crossings between distinct edges (otherwise
-  // there's nothing to fix). When both hold, we recompute port indices from
-  // pass 1's positions and re-run ELK. We accept the second pass only if
-  // its crossing count is strictly lower — pass 2 can shift compound sizes
-  // and shuffle root-level placement, so blindly preferring it sometimes
-  // makes things worse.
-  // Iterative barycenter port ordering. Each iteration reads the previous
-  // layout's leaf positions, recomputes port barycentres, re-sorts ports
-  // per compound side, and re-runs ELK with the new indices. We accept the
-  // new layout only if it strictly reduces crossings, and stop once the
-  // index map stops changing or after a small cap. This is the standard
-  // crossing-minimisation layer-sweep adapted for compound-port layered
-  // layouts (KLay Layered's design uses the same heuristic).
+  // Iterative barycenter port-ordering pass. Skipped unless (a) some
+  // compound has multiple ports on the same side (otherwise port indices
+  // can't affect anything) AND (b) pass 1 has right-angle crossings to
+  // reduce. Each iteration reads the previous layout's leaf positions,
+  // recomputes each port's barycentre, re-sorts ports per compound side,
+  // and re-runs ELK with the new indices. The new layout is accepted only
+  // if it strictly reduces crossings; iteration stops on convergence or
+  // after MAX_PASSES iterations. Standard crossing-minimisation layer
+  // sweep adapted for compound-port layered layouts.
   if (hasReorderableSide(pass1.rawPortsByCompound)) {
     let bestExt = ext1
     let bestResult = r1

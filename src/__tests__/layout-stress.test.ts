@@ -1,20 +1,18 @@
 /**
- * Stress test suite — eight realistic medium-complexity diagrams plus
- * cross-cutting assertions that catch the regression patterns we kept
- * hitting (port reordering for crossing minimisation, header threading,
- * back-edge inversion, bidirectional cousin pairs, fan-in/fan-out).
+ * Stress test suite for the flowchart layout engine. Eight realistic
+ * medium-complexity diagrams (microservices, CI/CD, bidirectional pairs,
+ * hub-and-spoke, deep mixed-direction nesting, shared-services fan-in,
+ * error paths, dataflow) each get a `describe` block that asserts:
  *
- * Each sample becomes a `describe` block with a fixed shape:
- *   - "renders with zero right-angle crossings"
- *   - "preserves containment"
- *   - "preserves sibling declaration order"      (when applicable)
- *   - "respects direction inside subgraphs"      (when applicable)
- *   - "no edge threads a foreign subgraph header"
- * Plus targeted assertions specific to that sample.
+ *   - bounded right-angle crossings (zero where structurally achievable)
+ *   - containment of every leaf in its declared subgraph
+ *   - direction directives respected on each subgraph
+ *   - sibling declaration order preserved
+ *   - no edge polyline threads a foreign subgraph's header strip
  *
- * After the per-sample blocks, a `cross-cutting` block runs:
- *   - layout determinism (same input → same output)
- *   - rendered hop count == crossing count
+ * A trailing `cross-cutting` block asserts layout determinism and that
+ * the renderer's drawn hop count matches the layout-engine crossing
+ * count for every sample.
  */
 import { describe, it, expect } from 'bun:test'
 import { parseMermaid, renderMermaidSVG } from '../index.ts'
@@ -23,11 +21,9 @@ import { countRightAngleCrossings } from '../layout-engine.ts'
 import type { PositionedGraph, PositionedNode, PositionedGroup } from '../types.ts'
 import { SAMPLE_GRAPHS } from './sample-graphs/index.ts'
 
-// ============================================================================
-// Sample definitions — sources live in `sample-graphs/stress-suite.ts` so
-// the comparison-page tooling reads the same canonical scenarios; this map
-// just gives each one a short camelCase alias for use inside this file.
-// ============================================================================
+// Each `it` block reads its source from this map; the source itself lives
+// in `sample-graphs/stress-suite.ts` so the comparison-page tooling reads
+// the exact same scenarios.
 
 const SAMPLES = {
   microservicesStack:           SAMPLE_GRAPHS['stress-microservices-stack']!.source,

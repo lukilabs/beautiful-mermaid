@@ -1,8 +1,8 @@
 /**
- * The original failure-mode reproduction: three sibling root containers, one
- * with a nested subgraph, both outer and inner declaring `direction TB`
- * matching the parent, and many cross-hierarchy edges crossing 1-3 boundaries.
- * Anonymized labels so it can travel publicly.
+ * Three sibling root containers — one of them holds a nested cluster — plus
+ * many cross-hierarchy edges crossing 1-3 subgraph boundaries. Both the
+ * outer and inner subgraphs declare `direction TB` matching the parent.
+ * Labels are anonymised.
  */
 import type { SampleGraph } from './types.ts'
 
@@ -10,7 +10,7 @@ export const BUG_REPRO_SAMPLES: SampleGraph[] = [
   {
     slug: 'bug-repro',
     title: 'Stress case: three-cluster TB diagram with nested cluster and many cross-hier edges',
-    description: 'Anonymized stress case mirroring the original failure mode. Sibling clusters at root, one cluster contains a nested cluster, both outer and inner declare `direction TB` matching the root, and many cross-hierarchy edges traverse 1-3 boundaries. On `main` this came out roughly square because the broken hierarchy handling spread cross-hierarchy edge routing horizontally; the fix keeps it tall and narrow.',
+    description: 'Sibling clusters at root, one cluster contains a nested cluster; both outer and inner declare `direction TB` matching the root, and many cross-hierarchy edges traverse 1-3 boundaries. A correct TB layout keeps this tall and narrow; broken hierarchy handling spreads it horizontally.',
     source: `graph TB
       subgraph rootA [Group A]
         docs[contract doc]

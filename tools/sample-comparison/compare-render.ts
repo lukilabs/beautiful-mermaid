@@ -1,16 +1,11 @@
 /**
- * Render every comparison sample to SVG using whichever beautiful-mermaid
- * code is currently on disk. The output dir (argv[2]) is conventionally
- * named after the version being captured — e.g. `before/` and `after/` —
- * but the script doesn't care; it just writes one SVG per sample plus a
- * `_summary.json` manifest. Run it twice (with two different checkouts)
- * to get a pair of directories that compare-build-page.ts can diff.
+ * Renders every comparison sample to SVG using the beautiful-mermaid build
+ * currently on disk. argv[2] is the output directory; one SVG is written
+ * per sample plus a `_summary.json` manifest of dimensions and errors.
  *
- * Sources come from two places:
- *   - samples-data.ts (the package's published gallery of canonical demos)
- *   - src/__tests__/sample-graphs/ (the layout-stressing scenarios that the
- *     test suite asserts on — adding a new sample-graphs module makes it
- *     appear here automatically with no further wiring)
+ * Samples are read from samples-data.ts (the published gallery) and from
+ * src/__tests__/sample-graphs/ (the layout-stress scenarios shared with
+ * the test suite).
  */
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -25,6 +20,7 @@ if (!outDir) {
 }
 mkdirSync(outDir, { recursive: true })
 
+/** Lowercase the title and replace any non-alphanumeric run with a single dash. */
 function slugify(title: string): string {
   return title
     .toLowerCase()
@@ -32,6 +28,7 @@ function slugify(title: string): string {
     .replace(/^-+|-+$/g, '')
 }
 
+/** One row of the `_summary.json` manifest emitted alongside the SVGs. */
 interface SummaryEntry {
   title: string
   category: string
@@ -43,14 +40,15 @@ interface SummaryEntry {
 
 const summary: SummaryEntry[] = []
 
-// Canonical published gallery (samples-data.ts) — slug derived from title.
+// Published-gallery samples use a slug derived from the title; the category
+// comes from the source manifest.
 for (const sample of samples) {
   const slug = slugify(sample.title)
   render(slug, sample.title, sample.category ?? 'Other', sample.source)
 }
 
-// Layout-stress scenarios (sample-graphs/*) — slug is canonical, category
-// inferred from the slug prefix so the page filter still groups them.
+// Layout-stress scenarios already carry a canonical slug; the category is
+// "Stress Cases" for the four prefixes the page filter groups together.
 for (const sample of ALL_SAMPLE_GRAPHS) {
   const category = sample.slug === 'bug-repro' || sample.slug.startsWith('perm-') ||
                    sample.slug.startsWith('multi-') || sample.slug.startsWith('stress-')
@@ -59,6 +57,11 @@ for (const sample of ALL_SAMPLE_GRAPHS) {
   render(sample.slug, sample.title, category, sample.source)
 }
 
+/**
+ * Render `source` and write `<slug>.svg` into the output directory. On
+ * failure, write `<slug>.error.txt` with the error message and record the
+ * failure in the summary so the comparison page can flag it.
+ */
 function render(slug: string, title: string, category: string, source: string): void {
   try {
     const svg = renderMermaidSVG(source, { bg: '#ffffff', fg: '#1f2937' })

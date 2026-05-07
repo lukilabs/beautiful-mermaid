@@ -1,10 +1,7 @@
 /**
- * Single-import surface for every layout-stressing sample diagram.
- *
- * Both the test suite and the comparison-page tooling read from here. To add
- * a new scenario: append to the appropriate category file (or create a new
- * one and register it below). It will appear in the comparison page on the
- * next render.
+ * Aggregates every layout-stress sample graph from the per-category modules
+ * into a flat list and a slug-keyed lookup. Both the test suite and the
+ * sample-comparison tooling import from here.
  */
 import { BUG_REPRO_SAMPLES } from './bug-repro.ts'
 import { DIRECTION_PERMUTATION_SAMPLES } from './direction-permutations.ts'
@@ -14,7 +11,7 @@ import type { SampleGraph } from './types.ts'
 
 export type { SampleGraph } from './types.ts'
 
-/** Every sample, in render order. */
+/** Every sample in render order — bug-repro, direction permutations, multi-level workflows, stress suite. */
 export const ALL_SAMPLE_GRAPHS: ReadonlyArray<SampleGraph> = [
   ...BUG_REPRO_SAMPLES,
   ...DIRECTION_PERMUTATION_SAMPLES,
@@ -22,7 +19,7 @@ export const ALL_SAMPLE_GRAPHS: ReadonlyArray<SampleGraph> = [
   ...STRESS_SUITE_SAMPLES,
 ]
 
-/** O(1) lookup by slug, for tests that only care about a single sample. */
+/** Slug-keyed lookup; tests use this to grab a single sample by id. */
 export const SAMPLE_GRAPHS: Readonly<Record<string, SampleGraph>> =
   Object.freeze(Object.fromEntries(ALL_SAMPLE_GRAPHS.map(s => [s.slug, s])))
 

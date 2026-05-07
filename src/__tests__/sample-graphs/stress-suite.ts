@@ -1,9 +1,6 @@
 /**
  * Eight realistic medium-complexity flowcharts. Each maps 1:1 to a `describe`
- * block in `layout-stress.test.ts`. These were the regression-driving
- * scenarios that uncovered the e10/e2 lex-sort tiebreaker, the
- * bare-leaves-collapse-into-one-layer behaviour, and the thoroughness=3
- * default leaving planar layouts on the table.
+ * block in `layout-stress.test.ts`.
  */
 import type { SampleGraph } from './types.ts'
 

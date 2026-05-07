@@ -1,9 +1,9 @@
 /**
- * Direction-directive permutations: nested subgraphs whose `direction`
- * directives match or differ from their parents in every combination we can
- * think of. Each scenario stresses a specific aspect of the SEPARATE_CHILDREN
- * vs INCLUDE_CHILDREN handling and the per-side port placement that follows
- * from each compound's effective direction.
+ * Nested subgraphs whose `direction` directives match or differ from their
+ * parents in varying combinations. Each scenario stresses a different
+ * aspect of SEPARATE_CHILDREN vs INCLUDE_CHILDREN handling and the
+ * per-side port placement that follows from each compound's effective
+ * direction.
  */
 import type { SampleGraph } from './types.ts'
 

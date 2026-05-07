@@ -1,9 +1,9 @@
 /**
- * Multi-level workflow scenarios: subgraphs nested 3+ levels deep with leaf
- * nodes at every level, and cross-hierarchy edges that cross varying numbers
- * of subgraph boundaries (1, 2, 3, n). These exercise the port-chain
- * decomposition at maximum depth and edge-synthesis when ELK leaves the
- * port→leaf section empty (whenever the leaf is buried inside an
+ * Subgraphs nested 3+ levels deep with leaf nodes at every level and
+ * cross-hierarchy edges that cross varying numbers of subgraph boundaries
+ * (1, 2, 3, n). Stresses port-chain decomposition at depth and the
+ * edge-synthesis path that completes a polyline when ELK leaves the
+ * port-to-leaf section empty (the case where a leaf is buried inside an
  * INCLUDE_CHILDREN descendant of a SEPARATE_CHILDREN ancestor).
  */
 import type { SampleGraph } from './types.ts'

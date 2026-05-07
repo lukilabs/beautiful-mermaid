@@ -1,16 +1,15 @@
 /**
- * Shared type for sample graphs that travel between layout tests and the
- * sample-comparison tooling. Keep these in `sample-graphs/` modules — adding
- * a new module (re-exported from `index.ts`) makes the scenario appear in
- * both the test suite and the comparison page automatically.
+ * Shape of a sample graph shared by the layout test suite and the
+ * sample-comparison tooling. Concrete samples live in the per-category
+ * `sample-graphs/` modules; `index.ts` aggregates them.
  */
 export interface SampleGraph {
-  /** Kebab-case identifier; used as the SVG filename and DOM id. */
+  /** Kebab-case identifier; used as the SVG filename and the DOM id on the comparison page. */
   slug: string
-  /** Human-readable name shown in the comparison page. */
+  /** Human-readable name shown above the sample on the comparison page. */
   title: string
-  /** Why this scenario exists — what shape of layout it stresses. */
+  /** Short prose describing what shape of layout this scenario stresses. */
   description: string
-  /** Mermaid source. The test asserts against the layout produced from this string. */
+  /** Mermaid source; tests parse and lay this out and assert on the result. */
   source: string
 }
