@@ -14,10 +14,13 @@
  * before/after diff.
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
-import { join } from 'path'
+import { dirname, join } from 'path'
+import { fileURLToPath } from 'url'
 import { tmpdir } from 'os'
 import { samples } from '../../samples-data.ts'
 import { ALL_SAMPLE_GRAPHS } from '../../src/__tests__/sample-graphs/index.ts'
+
+const scriptDir = dirname(fileURLToPath(import.meta.url))
 
 const withMmc = process.argv.includes('--with-mmc')
 
@@ -169,118 +172,17 @@ const rowsHtml = entries.map((e, idx) => {
 </section>`
 }).join('\n')
 
-const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<title>beautiful-mermaid · sample comparison</title>
-<style>
-  :root {
-    --bg: #f6f7f9;
-    --fg: #1f2937;
-    --muted: #6b7280;
-    --border: #d1d5db;
-    --accent: #2563eb;
-    --bad: #dc2626;
-    --good: #15803d;
-  }
-  * { box-sizing: border-box; }
-  body { font-family: -apple-system, "Segoe UI", system-ui, sans-serif; margin: 0; background: var(--bg); color: var(--fg); }
-  .topbar {
-    position: sticky; top: 0; z-index: 100;
-    background: #fff; border-bottom: 1px solid var(--border);
-    padding: 0.75rem 1.25rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
-  }
-  .topbar h1 { margin: 0; font-size: 1.05rem; font-weight: 600; }
-  .topbar .stats { color: var(--muted); font-size: 0.85rem; }
-  .filters { display: flex; gap: 0.4rem; flex-wrap: wrap; }
-  .filters button {
-    background: #fff; border: 1px solid var(--border); border-radius: 999px;
-    padding: 0.25rem 0.7rem; font-size: 0.8rem; cursor: pointer;
-  }
-  .filters button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
-  main { padding: 1rem 1.25rem; max-width: 1900px; margin: 0 auto; }
-  section.row {
-    background: #fff; border: 1px solid var(--border); border-radius: 10px;
-    padding: 0.9rem; margin-bottom: 1rem;
-  }
-  section.row .row-header { margin-bottom: 0.7rem; }
-  section.row h2 { margin: 0 0 0.3rem 0; font-size: 1rem; font-weight: 600; }
-  .row-meta { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.3rem; }
-  .row-desc { margin: 0; font-size: 0.85rem; color: var(--muted); }
-  .badge {
-    display: inline-block; padding: 0.1rem 0.55rem; border-radius: 999px; font-size: 0.7rem; font-weight: 600;
-    text-transform: uppercase; letter-spacing: 0.04em;
-  }
-  .badge.diff { background: #fee2e2; color: var(--bad); }
-  .badge.same { background: #f3f4f6; color: var(--muted); }
-  .badge.cat { background: #e0e7ff; color: #4338ca; }
-  .badge.cat-stress-cases { background: #fef3c7; color: #b45309; }
-  .badge.cat-hero { background: #fce7f3; color: #be185d; }
-  .grid {
-    display: grid; grid-template-columns: ${withMmc ? '1fr 1fr 1fr' : '1fr 1fr'}; gap: 0.7rem;
-  }
-  @media (max-width: 1100px) { .grid { grid-template-columns: 1fr; } }
-  .panel {
-    border: 1px solid var(--border); border-radius: 8px; background: #fff; overflow: hidden;
-    display: flex; flex-direction: column;
-  }
-  .panel-differs { border-color: var(--accent); }
-  .panel-head {
-    padding: 0.45rem 0.7rem; background: #f9fafb; border-bottom: 1px solid var(--border);
-    font-size: 0.78rem; display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;
-  }
-  .panel-head em { color: var(--muted); font-style: italic; font-weight: 400; }
-  .panel-differs .panel-head { background: #eff6ff; color: var(--accent); }
-  .panel-head .dim { color: var(--muted); font-family: ui-monospace, monospace; font-size: 0.72rem; }
-  .panel-body { flex: 1; padding: 0.6rem; min-height: 120px; display: flex; align-items: center; justify-content: center; overflow: auto; }
-  .panel-body svg { max-width: 100%; height: auto; display: block; }
-  .panel-body .err { color: var(--accent); font-size: 0.8rem; }
-  .row[hidden] { display: none; }
-</style>
-</head>
-<body>
-<div class="topbar">
-  <h1>beautiful-mermaid · sample comparison</h1>
-  <span class="stats">${totalCount} samples · ${differCount} differ · ${totalCount - differCount} identical</span>
-  <div class="filters" id="filters">
-    <button data-filter="all" class="active">All (${totalCount})</button>
-    <button data-filter="differs">Differing (${differCount})</button>
-    <button data-filter="Stress Cases">Stress Cases</button>
-    <button data-filter="Flowchart">Flowchart</button>
-    <button data-filter="State">State</button>
-    <button data-filter="Sequence">Sequence</button>
-    <button data-filter="Class">Class</button>
-    <button data-filter="ER">ER</button>
-    <button data-filter="XY Chart">XY Chart</button>
-    <button data-filter="Hero">Hero</button>
-  </div>
-</div>
-<main>
-${rowsHtml}
-</main>
-<script>
-  const filters = document.getElementById('filters');
-  filters.addEventListener('click', e => {
-    if (!(e.target instanceof HTMLButtonElement)) return;
-    const btn = e.target;
-    const filter = btn.dataset.filter;
-    filters.querySelectorAll('button').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    document.querySelectorAll('section.row').forEach(row => {
-      const cat = row.dataset.category;
-      const differs = row.dataset.differs === 'true';
-      let show = false;
-      if (filter === 'all') show = true;
-      else if (filter === 'differs') show = differs;
-      else show = cat === filter;
-      row.hidden = !show;
-    });
-  });
-</script>
-</body>
-</html>
-`
+// Page shell (HTML/CSS/JS) lives in template.html. We load it once and fill
+// in `{{TOKEN}}` placeholders — kept simple on purpose; no escaping pass
+// because every substitution value is either a number we control or
+// per-row HTML that's already been escaped at row construction time.
+const template = readFileSync(join(scriptDir, 'template.html'), 'utf8')
+const html = template
+  .replace(/\{\{GRID_COLUMNS\}\}/g, withMmc ? '1fr 1fr 1fr' : '1fr 1fr')
+  .replace(/\{\{TOTAL_COUNT\}\}/g, String(totalCount))
+  .replace(/\{\{DIFFER_COUNT\}\}/g, String(differCount))
+  .replace(/\{\{IDENTICAL_COUNT\}\}/g, String(totalCount - differCount))
+  .replace(/\{\{ROWS\}\}/g, rowsHtml)
 
 mkdirSync(compareDir, { recursive: true })
 writeFileSync(`${compareDir}/index.html`, html)
