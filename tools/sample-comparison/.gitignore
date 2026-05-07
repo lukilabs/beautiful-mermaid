@@ -1,0 +1,5 @@
+# The comparison page output is regenerable artifact — never commit it.
+before/
+after/
+index.html
+_summary.json
