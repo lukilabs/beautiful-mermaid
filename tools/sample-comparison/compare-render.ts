@@ -1,84 +1,78 @@
 /**
- * Renders every comparison sample to SVG using the beautiful-mermaid build
- * currently on disk. argv[2] is the output directory; one SVG is written
- * per sample plus a `_summary.json` manifest of dimensions and errors.
+ * Renders every comparison sample to SVG using the selected backend.
  *
- * Samples are read from samples-data.ts (the published gallery) and from
- * src/__tests__/sample-graphs/ (the layout-stress scenarios shared with
- * the test suite).
+ * Iterates the canonical sample list once, hands each source to the
+ * backend, writes the resulting `<slug>.svg` into the output directory,
+ * and emits a `_summary.json` manifest of dimensions and any failures.
+ *
+ * Usage:
+ *   bun run compare-render.ts <out-dir> [--backend=bm|mmc]
+ *
+ * Backends:
+ *   bm   beautiful-mermaid (default) — the code under test
+ *   mmc  mermaid-cli (mmdc) — reference renders for the page's optional
+ *        third column
  */
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { renderMermaidSVG } from '../../src/index.ts'
-import { samples } from '../../samples-data.ts'
-import { ALL_SAMPLE_GRAPHS } from '../../src/__tests__/sample-graphs/index.ts'
+import { allSampleItems, dims, type SummaryEntry } from './shared.ts'
+import { bmBackend } from './backends/bm.ts'
+import { mmcBackend } from './backends/mmc.ts'
+import type { RenderBackend } from './backends/types.ts'
 
-const outDir = process.argv[2]
+const positionals = process.argv.slice(2).filter(a => !a.startsWith('-'))
+const outDir = positionals[0]
 if (!outDir) {
-  console.error('usage: bun run compare-render.ts <out-dir>')
+  console.error('usage: bun run compare-render.ts <out-dir> [--backend=bm|mmc]')
   process.exit(1)
 }
+
+const backendName = process.argv.find(a => a.startsWith('--backend='))?.split('=')[1] ?? 'bm'
+const backends: Record<string, RenderBackend> = { bm: bmBackend, mmc: mmcBackend }
+const backend = backends[backendName]
+if (!backend) {
+  console.error(`unknown backend: ${backendName} (available: ${Object.keys(backends).join(', ')})`)
+  process.exit(1)
+}
+
 mkdirSync(outDir, { recursive: true })
+backend.init?.()
 
-/** Lowercase the title and replace any non-alphanumeric run with a single dash. */
-function slugify(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-}
-
-/** One row of the `_summary.json` manifest emitted alongside the SVGs. */
-interface SummaryEntry {
-  title: string
-  category: string
-  slug: string
-  width: number
-  height: number
-  error?: string
-}
-
+const items = allSampleItems()
 const summary: SummaryEntry[] = []
+let rendered = 0
+let failed = 0
+const startedAt = Date.now()
 
-// Published-gallery samples use a slug derived from the title; the category
-// comes from the source manifest.
-for (const sample of samples) {
-  const slug = slugify(sample.title)
-  render(slug, sample.title, sample.category ?? 'Other', sample.source)
-}
+console.log(`Rendering ${items.length} samples through ${backend.name} into ${outDir}...`)
 
-// Layout-stress scenarios already carry a canonical slug; the category is
-// "Stress Cases" for the four prefixes the page filter groups together.
-for (const sample of ALL_SAMPLE_GRAPHS) {
-  const category = sample.slug === 'bug-repro' || sample.slug.startsWith('perm-') ||
-                   sample.slug.startsWith('multi-') || sample.slug.startsWith('stress-')
-    ? 'Stress Cases'
-    : 'Other'
-  render(sample.slug, sample.title, category, sample.source)
-}
-
-/**
- * Render `source` and write `<slug>.svg` into the output directory. On
- * failure, write `<slug>.error.txt` with the error message and record the
- * failure in the summary so the comparison page can flag it.
- */
-function render(slug: string, title: string, category: string, source: string): void {
+for (let i = 0; i < items.length; i++) {
+  const it = items[i]!
   try {
-    const svg = renderMermaidSVG(source, { bg: '#ffffff', fg: '#1f2937' })
-    const widthMatch = svg.match(/<svg\b[^>]*\bwidth="([\d.]+)"/)
-    const heightMatch = svg.match(/<svg\b[^>]*\bheight="([\d.]+)"/)
-    const width = Number(widthMatch?.[1] ?? 0)
-    const height = Number(heightMatch?.[1] ?? 0)
-    writeFileSync(join(outDir, `${slug}.svg`), svg)
-    summary.push({ title, category, slug, width, height })
+    const svg = backend.render(it.source)
+    const d = dims(svg)
+    writeFileSync(join(outDir, `${it.slug}.svg`), svg)
+    summary.push({ title: it.title, category: it.category, slug: it.slug, width: d.w, height: d.h })
+    rendered++
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
-    writeFileSync(join(outDir, `${slug}.error.txt`), msg)
-    summary.push({ title, category, slug, width: 0, height: 0, error: msg })
+    writeFileSync(join(outDir, `${it.slug}.error.txt`), msg)
+    summary.push({ title: it.title, category: it.category, slug: it.slug, width: 0, height: 0, error: msg })
+    failed++
+  }
+  // Slow backends (mmdc cold-starts Puppeteer per sample) get a progress line.
+  if (backend.name === 'mmc' && (i % 10 === 9 || i === items.length - 1)) {
+    const elapsed = ((Date.now() - startedAt) / 1000).toFixed(0)
+    process.stdout.write(`  ${i + 1}/${items.length} (${elapsed}s, ${failed} failed)\r`)
   }
 }
+if (backend.name === 'mmc') process.stdout.write('\n')
 
+backend.cleanup?.()
 writeFileSync(join(outDir, '_summary.json'), JSON.stringify(summary, null, 2))
-console.log(`Rendered ${summary.length} samples to ${outDir}`)
-const errors = summary.filter(s => s.error)
-if (errors.length > 0) console.log(`  ${errors.length} errors`)
+
+const elapsedSec = ((Date.now() - startedAt) / 1000).toFixed(1)
+console.log(`Rendered ${rendered}/${items.length} samples (${elapsedSec}s${failed > 0 ? `, ${failed} failed` : ''})`)
+if (failed > 0) {
+  for (const e of summary.filter(s => s.error)) console.log(`  - ${e.slug}: ${e.error}`)
+}

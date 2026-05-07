@@ -7,14 +7,13 @@
  * panels per sample.
  *
  * Pass `--with-mmc` to add a third "reference" column populated from
- * `<compareDir>/mmc/` (rendered by compare-render-mmc.ts).
+ * `<compareDir>/mmc/` (rendered by `compare-render.ts --backend=mmc`).
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { dirname, join } from 'path'
 import { fileURLToPath } from 'url'
 import { tmpdir } from 'os'
-import { samples } from '../../samples-data.ts'
-import { ALL_SAMPLE_GRAPHS } from '../../src/__tests__/sample-graphs/index.ts'
+import { allSampleItems, dims, escapeHtml, slugify } from './shared.ts'
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 
@@ -25,23 +24,6 @@ const compareDir = process.env.BM_COMPARE_DIR ?? join(tmpdir(), 'sample-comparis
 const beforeDir = `${compareDir}/before`
 const afterDir = `${compareDir}/after`
 const mmcDir = `${compareDir}/mmc`
-
-/** Pulls width and height attributes off the root <svg> tag. */
-const dimRe = /<svg\b[^>]*\bwidth="([\d.]+)"[^>]*\bheight="([\d.]+)"/
-function dims(svg: string): { w: number; h: number } {
-  const m = svg.match(dimRe)
-  return m ? { w: Number(m[1]), h: Number(m[2]) } : { w: 0, h: 0 }
-}
-
-/** Lowercase the title and replace any non-alphanumeric run with a single dash. */
-function slugify(title: string): string {
-  return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
-}
-
-/** Escape the four characters that affect HTML attribute and element parsing. */
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-}
 
 /** One row of the comparison page — two or three rendered SVGs plus metadata. */
 interface Entry {
@@ -58,27 +40,8 @@ interface Entry {
   diffPct: number
 }
 
-// Layout-stress scenarios first (under "Stress Cases"), then the published
-// gallery in samples-data.ts under each sample's own category.
-const allSamples: Array<{ title: string; category: string; description?: string; source: string; slug: string }> = [
-  ...ALL_SAMPLE_GRAPHS.map(s => ({
-    title: s.title,
-    category: 'Stress Cases',
-    description: s.description,
-    source: s.source,
-    slug: s.slug,
-  })),
-  ...samples.map(s => ({
-    title: s.title,
-    category: s.category ?? 'Other',
-    description: s.description,
-    source: s.source,
-    slug: slugify(s.title),
-  })),
-]
-
 const entries: Entry[] = []
-for (const s of allSamples) {
+for (const s of allSampleItems()) {
   let beforeSvg = ''
   let afterSvg = ''
   let mmcSvg = ''
@@ -125,11 +88,8 @@ entries.sort((a, b) => {
 const differCount = entries.filter(e => e.diffPct > 1).length
 const totalCount = entries.length
 
-/**
- * Substitute every `{{KEY}}` placeholder in `template` with the matching
- * value from `vars`. Substitution is global per key.
- */
-function fill(template: string, vars: Record<string, string>): string {
+/** Substitutes every `{{KEY}}` placeholder in `template` with the matching value from `vars`. Each key replaces all occurrences. */
+function render(template: string, vars: Record<string, string>): string {
   let out = template
   for (const [key, value] of Object.entries(vars)) {
     out = out.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value)
@@ -147,13 +107,13 @@ const rowsHtml = entries.map((e, idx) => {
     : '<span class="badge same">identical</span>'
   const descriptionBlock = e.description ? `<p class="row-desc">${escapeHtml(e.description)}</p>` : ''
   const mmcPanel = withMmc
-    ? fill(mmcPanelTemplate, {
+    ? render(mmcPanelTemplate, {
         MMC_W: e.mmcDims.w.toFixed(0),
         MMC_H: e.mmcDims.h.toFixed(0),
         MMC_SVG: e.mmcSvg || '<div class="err">no svg</div>',
       })
     : ''
-  return fill(rowTemplate, {
+  return render(rowTemplate, {
     CATEGORY: escapeHtml(e.category),
     CATEGORY_SLUG: slugify(e.category),
     DIFFERS: String(differs),
@@ -172,11 +132,10 @@ const rowsHtml = entries.map((e, idx) => {
   })
 }).join('\n')
 
-// Substitute the page shell with its filled-in counts and rows. No escaping
-// pass on the substituted values because every entry is either a number
-// produced here or per-row HTML already escaped during row construction.
+// Page-shell substitution. No escaping pass because every value is either
+// a number generated here or per-row HTML escaped during row construction.
 const template = readFileSync(join(scriptDir, 'template.html'), 'utf8')
-const html = fill(template, {
+const html = render(template, {
   GRID_COLUMNS: withMmc ? '1fr 1fr 1fr' : '1fr 1fr',
   TOTAL_COUNT: String(totalCount),
   DIFFER_COUNT: String(differCount),
