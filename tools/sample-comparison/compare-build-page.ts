@@ -1,12 +1,17 @@
 /**
  * Build the comparison page.
  *
- * Reads two sets of SVGs from sample-comparison/{before,after} (each
- * captured by running compare-render.ts against a different checkout —
- * conventionally main vs. the working branch, but the script doesn't care
- * which is which) and emits a single self-contained HTML file with
- * 3-column rows: beautiful-mermaid before / beautiful-mermaid after /
- * mermaid-cli (ELK) rendered live in the browser.
+ * Reads SVGs from sample-comparison/{before,after} (each captured by
+ * running compare-render.ts against a different checkout — conventionally
+ * main vs. the working branch, but the script doesn't care which is which)
+ * and emits a self-contained HTML file with two side-by-side panels per
+ * sample.
+ *
+ * Pass `--with-mmc` to also include a third "reference" column populated
+ * from sample-comparison/mmc/ (pre-rendered by compare-render-mmc.ts via
+ * mermaid-cli with ELK enabled). The default is two-panel because rendering
+ * mermaid live in the browser is slow and most reviewers just want the
+ * before/after diff.
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -14,12 +19,15 @@ import { tmpdir } from 'os'
 import { samples } from '../../samples-data.ts'
 import { ALL_SAMPLE_GRAPHS } from '../../src/__tests__/sample-graphs/index.ts'
 
-// Output (index.html, before/, after/) is regenerable artifact — keep it
-// outside the repo. Defaults to OS temp; override with $BM_COMPARE_DIR if you
-// want to render somewhere else.
+const withMmc = process.argv.includes('--with-mmc')
+
+// Output (index.html, before/, after/, mmc/) is regenerable artifact —
+// keep it outside the repo. Defaults to OS temp; override with
+// $BM_COMPARE_DIR if you want to render somewhere else.
 const compareDir = process.env.BM_COMPARE_DIR ?? join(tmpdir(), 'sample-comparison')
 const beforeDir = `${compareDir}/before`
 const afterDir = `${compareDir}/after`
+const mmcDir = `${compareDir}/mmc`
 
 const dimRe = /<svg\b[^>]*\bwidth="([\d.]+)"[^>]*\bheight="([\d.]+)"/
 function dims(svg: string): { w: number; h: number } {
@@ -42,11 +50,11 @@ interface Entry {
   source: string
   beforeSvg: string
   afterSvg: string
+  mmcSvg: string
   beforeDims: { w: number; h: number }
   afterDims: { w: number; h: number }
+  mmcDims: { w: number; h: number }
   diffPct: number
-  isFlowchart: boolean
-  isStateOrFlowchart: boolean
 }
 
 // All comparison samples: layout-stressing scenarios from `sample-graphs/`
@@ -73,19 +81,20 @@ const entries: Entry[] = []
 for (const s of allSamples) {
   let beforeSvg = ''
   let afterSvg = ''
+  let mmcSvg = ''
   try { beforeSvg = readFileSync(join(beforeDir, `${s.slug}.svg`), 'utf8') } catch {}
   try { afterSvg = readFileSync(join(afterDir, `${s.slug}.svg`), 'utf8') } catch {}
+  if (withMmc) {
+    try { mmcSvg = readFileSync(join(mmcDir, `${s.slug}.svg`), 'utf8') } catch {}
+  }
 
   const bd = dims(beforeSvg)
   const ad = dims(afterSvg)
+  const md = dims(mmcSvg)
   const dw = Math.abs(bd.w - ad.w)
   const dh = Math.abs(bd.h - ad.h)
   const maxDim = Math.max(bd.w, bd.h, ad.w, ad.h, 1)
   const diffPct = ((dw + dh) / maxDim) * 100
-
-  const firstLine = s.source.trim().split('\n')[0]?.trim().toLowerCase() ?? ''
-  const isFlowchart = /^(graph|flowchart)\b/.test(firstLine)
-  const isStateOrFlowchart = isFlowchart || /^statediagram/i.test(firstLine)
 
   entries.push({
     title: s.title,
@@ -94,11 +103,11 @@ for (const s of allSamples) {
     source: s.source,
     beforeSvg,
     afterSvg,
+    mmcSvg,
     beforeDims: bd,
     afterDims: ad,
+    mmcDims: md,
     diffPct,
-    isFlowchart,
-    isStateOrFlowchart,
   })
 }
 
@@ -116,12 +125,6 @@ entries.sort((a, b) => {
 const differCount = entries.filter(e => e.diffPct > 1).length
 const totalCount = entries.length
 
-// Inject `defaultRenderer: elk` into each flowchart source for the live mermaid column.
-function withElk(source: string): string {
-  if (source.includes('defaultRenderer')) return source
-  return `%%{init: {"flowchart": {"defaultRenderer": "elk"}, "stateDiagram": {"defaultRenderer": "elk"}}}%%\n${source}`
-}
-
 const rowsHtml = entries.map((e, idx) => {
   const diffBadge = e.diffPct > 1
     ? `<span class="badge diff">DIFFERS · Δ ${e.diffPct.toFixed(0)}%</span>`
@@ -129,7 +132,15 @@ const rowsHtml = entries.map((e, idx) => {
 
   const categoryBadge = `<span class="badge cat cat-${slugify(e.category)}">${escapeHtml(e.category)}</span>`
 
-  const elkSource = e.isStateOrFlowchart ? withElk(e.source) : e.source
+  const mmcPanel = withMmc
+    ? `
+    <div class="panel">
+      <div class="panel-head">mermaid + ELK <em>(reference)</em>
+        <span class="dim">${e.mmcDims.w.toFixed(0)} × ${e.mmcDims.h.toFixed(0)}</span>
+      </div>
+      <div class="panel-body">${e.mmcSvg || '<div class="err">no svg</div>'}</div>
+    </div>`
+    : ''
 
   return `
 <section class="row" data-category="${escapeHtml(e.category)}" data-differs="${e.diffPct > 1}" data-index="${idx}">
@@ -153,13 +164,7 @@ const rowsHtml = entries.map((e, idx) => {
         <span class="dim">${e.afterDims.w.toFixed(0)} × ${e.afterDims.h.toFixed(0)}</span>
       </div>
       <div class="panel-body">${e.afterSvg || '<div class="err">no svg</div>'}</div>
-    </div>
-    <div class="panel">
-      <div class="panel-head">mermaid + ELK <em>(reference)</em></div>
-      <div class="panel-body">
-        <pre class="mermaid">${escapeHtml(elkSource)}</pre>
-      </div>
-    </div>
+    </div>${mmcPanel}
   </div>
 </section>`
 }).join('\n')
@@ -213,7 +218,7 @@ const html = `<!DOCTYPE html>
   .badge.cat-stress-cases { background: #fef3c7; color: #b45309; }
   .badge.cat-hero { background: #fce7f3; color: #be185d; }
   .grid {
-    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.7rem;
+    display: grid; grid-template-columns: ${withMmc ? '1fr 1fr 1fr' : '1fr 1fr'}; gap: 0.7rem;
   }
   @media (max-width: 1100px) { .grid { grid-template-columns: 1fr; } }
   .panel {
@@ -231,7 +236,6 @@ const html = `<!DOCTYPE html>
   .panel-body { flex: 1; padding: 0.6rem; min-height: 120px; display: flex; align-items: center; justify-content: center; overflow: auto; }
   .panel-body svg { max-width: 100%; height: auto; display: block; }
   .panel-body .err { color: var(--accent); font-size: 0.8rem; }
-  pre.mermaid { font-size: 0.75rem; max-width: 100%; }
   .row[hidden] { display: none; }
 </style>
 </head>
@@ -255,11 +259,7 @@ const html = `<!DOCTYPE html>
 <main>
 ${rowsHtml}
 </main>
-<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 <script>
-  mermaid.initialize({ startOnLoad: false, securityLevel: 'loose', flowchart: { defaultRenderer: 'elk' } });
-  mermaid.run({ querySelector: 'pre.mermaid' });
-
   const filters = document.getElementById('filters');
   filters.addEventListener('click', e => {
     if (!(e.target instanceof HTMLButtonElement)) return;
@@ -285,4 +285,4 @@ ${rowsHtml}
 mkdirSync(compareDir, { recursive: true })
 writeFileSync(`${compareDir}/index.html`, html)
 console.log(`Wrote ${compareDir}/index.html`)
-console.log(`  ${totalCount} samples, ${differCount} differ between before/after`)
+console.log(`  ${totalCount} samples, ${differCount} differ between before/after${withMmc ? ', mmc reference column included' : ''}`)
