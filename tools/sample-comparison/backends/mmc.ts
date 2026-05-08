@@ -1,8 +1,7 @@
 /**
- * Renders comparison samples through the official mermaid-cli (mmdc),
- * with the ELK renderer enabled for flowcharts and stateDiagrams.
- * Provides the third "reference" column that compare-build-page.ts
- * inlines when invoked with `--with-mmc`.
+ * Renders comparison samples through the official mermaid-cli (mmdc) with
+ * its default renderer. Provides the third "reference" column that
+ * compare-build-page.ts inlines when invoked with `--with-mmc`.
  *
  * mmdc must be on PATH or available via npx. `init()` exits the process
  * with an install hint if neither resolves. Each `render()` call shells
@@ -17,18 +16,6 @@ import type { RenderBackend } from './types.ts'
 
 let mmdc: { cmd: string; viaNpx: boolean } | null = null
 let workDir: string | null = null
-
-/**
- * Prepends the `%%{init:...}%%` directive that turns on ELK for flowchart
- * and stateDiagram sources. Other diagram types and sources that already
- * declare a `defaultRenderer` are returned unchanged.
- */
-function withElk(source: string): string {
-  if (source.includes('defaultRenderer')) return source
-  const first = source.trim().split('\n')[0]?.toLowerCase() ?? ''
-  if (!/^(graph|flowchart|statediagram)/.test(first)) return source
-  return `%%{init: {"flowchart": {"defaultRenderer": "elk"}, "stateDiagram": {"defaultRenderer": "elk"}}}%%\n${source}`
-}
 
 /**
  * Probes for `mmdc` on PATH (preferred) and via `npx` (fallback). Stores
@@ -62,7 +49,7 @@ function renderWithMmc(source: string): string {
   if (!mmdc || !workDir) throw new Error('mmcBackend.init() not called')
   const inputPath = join(workDir, 'in.mmd')
   const outputPath = join(workDir, 'out.svg')
-  writeFileSync(inputPath, withElk(source))
+  writeFileSync(inputPath, source)
   const args = mmdc.viaNpx
     ? ['-y', '-p', '@mermaid-js/mermaid-cli', 'mmdc', '-i', inputPath, '-o', outputPath, '-q']
     : ['-i', inputPath, '-o', outputPath, '-q']

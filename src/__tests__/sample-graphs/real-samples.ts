@@ -66,9 +66,9 @@ export const REAL_SAMPLES: SampleGraph[] = [
   },
   {
     slug: 'issue-83-td-flowchart-with-back-edges',
-    title: 'Issue #83: TD flowchart with many backward edges flips to horizontal',
-    description: 'Verbatim source from lukilabs/beautiful-mermaid#83 — a long `flowchart TD` with retry/feedback edges between modules (e.g. `C3 -->|校验不通过| C1`). The reporter saw a 5.6:1 horizontal sprawl despite TD; expected vertical orientation.',
-    maxCrossings: 30,
+    title: 'Issue #83: TD flowchart with many backward edges',
+    description: 'Verbatim source from lukilabs/beautiful-mermaid#83 — a long `flowchart TD` with retry/feedback edges between modules (e.g. `C3 -->|校验不通过| C1`) plus a multi-target fan-back from `H3` to five earlier modules. The reporter saw a 5.6:1 horizontal sprawl; depth-first cycle breaking restores the declared TD orientation.',
+    minGraphHeightOverWidth: 1.5,
     source: `flowchart TD
     A[用户输入任务指令] --> B[目标深度解构：穿透商业本质，拆解可量化核心指标]
     B --> C[模块1：前置市场与用户洞察]

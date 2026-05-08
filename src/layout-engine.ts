@@ -732,11 +732,13 @@ function mermaidToElk(
       'elk.layered.thoroughness': String(DEFAULTS.thoroughness),
       'elk.layered.compaction.postCompaction.strategy': 'LEFT_RIGHT_CONSTRAINT_LOCKING',
       'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
-      // When breaking cycles, reverse the edge that goes against
-      // declaration order rather than ELK's default heuristic. Keeps a
-      // back-edge like `D-.->A` reading as the back-edge in the rendered
-      // flow rather than ELK reversing the forward edge `A→B`.
-      'elk.layered.cycleBreaking.strategy': 'GREEDY_MODEL_ORDER',
+      // Depth-first cycle breaking. Pulls long retry chains and
+      // multi-target back-edges (e.g. `H -->|fail| C & D & E & F`) onto
+      // the trunk of the DFS tree so they reverse as a coherent block,
+      // which keeps the rendered graph stretched along the declared
+      // direction. The greedy-model-order strategy compacts the
+      // resulting DAG into wide-but-short layouts on these inputs.
+      'elk.layered.cycleBreaking.strategy': 'DEPTH_FIRST',
       'elk.layered.wrapping.strategy': 'OFF',
       'elk.hierarchyHandling': 'INCLUDE_CHILDREN',
     },
