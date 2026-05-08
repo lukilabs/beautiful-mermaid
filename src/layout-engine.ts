@@ -111,11 +111,25 @@ function estimateNodeSize(_id: string, label: string, shape: string): { width: n
     height = width
   }
 
-  if (shape === 'hexagon') width += NODE_PADDING.horizontal
-  if (shape === 'trapezoid' || shape === 'trapezoid-alt') width += NODE_PADDING.horizontal
-  if (shape === 'asymmetric') width += 12
-  if (shape === 'cylinder') height += 14
-  if (shape === 'state-start' || shape === 'state-end') return { width: 28, height: 28 }
+  if (shape === 'hexagon') {
+    width += NODE_PADDING.horizontal
+  }
+
+  if (shape === 'trapezoid' || shape === 'trapezoid-alt') {
+    width += NODE_PADDING.horizontal
+  }
+
+  if (shape === 'asymmetric') {
+    width += 12
+  }
+
+  if (shape === 'cylinder') {
+    height += 14
+  }
+
+  if (shape === 'state-start' || shape === 'state-end') {
+    return { width: 28, height: 28 }
+  }
 
   width = Math.max(width, 60)
   height = Math.max(height, 36)

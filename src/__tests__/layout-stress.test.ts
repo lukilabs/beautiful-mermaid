@@ -1,18 +1,13 @@
 /**
  * Stress test suite for the flowchart layout engine.
  *
- * One parameterised describe block per sample in ALL_SAMPLE_GRAPHS. Inside
- * each, every applicable structural assertion runs — bounded right-angle
- * crossings, declared containment, no node overlaps, no edge polyline
- * threading a foreign subgraph header, axis ordering, nesting, subgraph
- * aspect ratio, and absence of colinear edge overlaps. Each assertion
- * skips itself when the sample doesn't declare the matching metadata
- * field, so a sample only opts into the checks that meaningfully apply
- * to it.
- *
- * A trailing `cross-cutting` block asserts layout determinism and that
- * the renderer's drawn hop count matches the layout-engine crossing
- * count, again iterating every sample.
+ * One parameterised describe block per sample in ALL_SAMPLE_GRAPHS. Each
+ * iteration runs every applicable check: bounded right-angle crossings,
+ * declared containment, no node overlaps, no edge polyline threading a
+ * foreign subgraph header, axis ordering, nesting, subgraph aspect ratio,
+ * absence of colinear edge overlaps, layout determinism, and matching
+ * hop / crossing counts in the rendered SVG. Per-sample metadata in
+ * `sample-graphs/` decides which checks apply.
  */
 import { describe, it, expect } from 'bun:test'
 import { parseMermaid, renderMermaidSVG } from '../index.ts'
@@ -249,32 +244,34 @@ for (const sample of ALL_SAMPLE_GRAPHS) {
         expect(findColinearOverlaps(g)).toEqual([])
       })
     }
-  })
-}
 
-// ============================================================================
-// Cross-cutting properties — run on every sample
-// ============================================================================
-
-describe('cross-cutting', () => {
-  it('layout is deterministic — same input produces identical output', () => {
-    for (const sample of ALL_SAMPLE_GRAPHS) {
-      const a = layout(sample.source)
-      const b = layout(sample.source)
-      expect(JSON.stringify(a), `non-deterministic layout for ${sample.slug}`).toBe(JSON.stringify(b))
+    if (sample.minGraphHeightOverWidth !== undefined) {
+      const min = sample.minGraphHeightOverWidth
+      it(`graph height / width ≥ ${min}`, () => {
+        expect(g.height / g.width).toBeGreaterThanOrEqual(min)
+      })
     }
-  })
 
-  it('rendered hop count equals computed crossing count', () => {
-    for (const sample of ALL_SAMPLE_GRAPHS) {
-      const g = layout(sample.source)
+    if (sample.minGraphWidthOverHeight !== undefined) {
+      const min = sample.minGraphWidthOverHeight
+      it(`graph width / height ≥ ${min}`, () => {
+        expect(g.width / g.height).toBeGreaterThanOrEqual(min)
+      })
+    }
+
+    it('layout is deterministic — same input produces identical output', () => {
+      const replay = layout(sample.source)
+      expect(JSON.stringify(replay)).toBe(JSON.stringify(g))
+    })
+
+    it('rendered hop count equals computed crossing count', () => {
       const crossings = countRightAngleCrossings(g.edges)
       const svg = renderMermaidSVG(sample.source, { bg: '#fff', fg: '#000' })
       const hops = (svg.match(/Q\d+\.\d+/g) ?? []).length
-      expect(hops, `${sample.slug}: hops (${hops}) ≠ crossings (${crossings})`).toBe(crossings)
-    }
+      expect(hops, `hops (${hops}) ≠ crossings (${crossings})`).toBe(crossings)
+    })
   })
-})
+}
 
 // Re-export type for IDE convenience
 export type { SampleGraph }

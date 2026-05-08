@@ -310,7 +310,7 @@ describe('layoutGraph – nested subgraph with cross-hierarchy edges', () => {
     // sibling clusters at root, one cluster contains a nested cluster, both
     // outer and inner declare `direction TB` matching the parent, and many
     // cross-hierarchy edges cross 1-3 subgraph boundaries.
-    const g = layout(SAMPLE_GRAPHS['issue-83-tb-flowchart-flips-horizontal']!.source)
+    const g = layout(SAMPLE_GRAPHS['pr-98-nested-tb-cross-hier']!.source)
 
     const inner = group(g, 'Inner Common')
     const rootB = group(g, 'Group B')

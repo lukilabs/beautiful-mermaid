@@ -47,4 +47,10 @@ export interface SampleGraph {
 
   /** When true, asserts no two distinct edges share a colinear segment longer than 6px (i.e. no arrows drawn on top of each other). */
   expectNoColinearOverlap?: boolean
+
+  /** When set, asserts the diagram's overall `height / width` is at least this value — used to catch graphs that should be tall but flip horizontal. */
+  minGraphHeightOverWidth?: number
+
+  /** When set, asserts the diagram's overall `width / height` is at least this value — the wider-than-tall counterpart. */
+  minGraphWidthOverHeight?: number
 }
