@@ -67,11 +67,8 @@ export const REAL_SAMPLES: SampleGraph[] = [
   {
     slug: 'issue-83-td-flowchart-with-back-edges',
     title: 'Issue #83: TD flowchart with many backward edges flips to horizontal',
-    description: 'Verbatim source from lukilabs/beautiful-mermaid#83 — a long `flowchart TD` with retry/feedback edges between modules (e.g. `C3 -->|校验不通过| C1`). The reporter saw a 5.6:1 horizontal sprawl despite TD; expected vertical orientation. **This PR does not fix the symptom** — the sample currently lays out at ~3.1:1 horizontal with ~22 right-angle crossings. Once the layout engine handles this case, tighten `maxCrossings` to 0 and uncomment `minGraphHeightOverWidth: 1.5`.',
-    // Permissive thresholds reflect the current (unfixed) layout. Tighten
-    // when the layout engine is updated to handle this case.
+    description: 'Verbatim source from lukilabs/beautiful-mermaid#83 — a long `flowchart TD` with retry/feedback edges between modules (e.g. `C3 -->|校验不通过| C1`). The reporter saw a 5.6:1 horizontal sprawl despite TD; expected vertical orientation.',
     maxCrossings: 30,
-    // minGraphHeightOverWidth: 1.5,
     source: `flowchart TD
     A[用户输入任务指令] --> B[目标深度解构：穿透商业本质，拆解可量化核心指标]
     B --> C[模块1：前置市场与用户洞察]
