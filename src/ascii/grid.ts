@@ -395,38 +395,32 @@ export function createMapping(graph: AsciiGraph): void {
   const dir = graph.config.graphDirection
   const highestPositionPerLevel: number[] = new Array(100).fill(0)
 
-  // Identify root nodes — nodes that aren't the target of any edge
-  const nodesFound = new Set<string>()
-  const initialRoots: AsciiNode[] = []
+  // Identify root nodes — nodes that aren't the target of any edge.
+  // Use a direct edge-target check so the result is independent of
+  // node insertion order in the parser. When every node is an edge
+  // target (pure cycle / self-reference), fall back to the original
+  // forward-scan heuristic that picks roots by definition order.
+  const edgeTargets = new Set(graph.edges.map(e => e.to.name))
+  const strictRoots = graph.nodes.filter(n => !edgeTargets.has(n.name))
 
-  for (const node of graph.nodes) {
-    if (!nodesFound.has(node.name)) {
-      initialRoots.push(node)
-    }
-    nodesFound.add(node.name)
-    for (const child of getChildren(graph, node)) {
-      nodesFound.add(child.name)
-    }
-  }
-
-  // Filter out subgraph nodes that have incoming edges from external sources.
-  // This handles the case where subgraph is declared before external nodes
-  // (e.g., `subgraph s; A-->B; end; X-->A` - A shouldn't be a root, X should).
-  const rootNodes = initialRoots.filter(node => {
-    const nodeSg = getNodeSubgraph(graph, node)
-    if (!nodeSg) return true  // external nodes: keep as roots
-
-    // Check if this subgraph node has incoming edges from outside its subgraph
-    for (const edge of graph.edges) {
-      if (edge.to === node) {
-        const sourceSg = getNodeSubgraph(graph, edge.from)
-        if (sourceSg !== nodeSg) {
-          return false  // has external incoming edge → not a root
-        }
+  let rootNodes: AsciiNode[]
+  if (strictRoots.length > 0) {
+    rootNodes = strictRoots
+  } else {
+    // Fallback: all nodes are edge targets (cycles / self-references).
+    // Use forward-scan to pick roots by definition order.
+    const nodesFound = new Set<string>()
+    rootNodes = []
+    for (const node of graph.nodes) {
+      if (!nodesFound.has(node.name)) {
+        rootNodes.push(node)
+      }
+      nodesFound.add(node.name)
+      for (const child of getChildren(graph, node)) {
+        nodesFound.add(child.name)
       }
     }
-    return true
-  })
+  }
 
   // In LR mode with both external and subgraph roots, separate them
   // so subgraph roots are placed one level deeper
