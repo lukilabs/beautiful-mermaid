@@ -115,6 +115,13 @@ function isFreeInGrid(grid: Map<string, AsciiNode>, c: GridCoord): boolean {
 }
 
 /**
+ * Maximum number of A* iterations before giving up.
+ * Prevents unbounded memory growth when the destination is unreachable
+ * through free cells (the grid has no positive upper-bound check).
+ */
+const MAX_ITERATIONS = 50_000
+
+/**
  * Find a path from `from` to `to` on the grid using A*.
  * Returns the path as an array of GridCoords, or null if no path exists.
  */
@@ -132,7 +139,12 @@ export function getPath(
   const cameFrom = new Map<string, GridCoord | null>()
   cameFrom.set(gridKey(from), null)
 
+  let iterations = 0
   while (pq.length > 0) {
+    if (++iterations > MAX_ITERATIONS) {
+      return null
+    }
+
     const current = pq.pop()!.coord
 
     if (gridCoordEquals(current, to)) {
