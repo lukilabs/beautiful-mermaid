@@ -156,7 +156,7 @@ describe('layoutGraph – overall graph direction', () => {
 })
 
 // ============================================================================
-// Property: a subgraph's `direction` directive reaches ELK (sealed compounds)
+// Property: a subgraph's `direction` directive reaches ELK (sealed subgraphs)
 //
 // When no cross-hierarchy edge crosses a subgraph's boundary, the directive
 // must take effect on the subgraph's interior. This is the contract that the
@@ -221,8 +221,8 @@ describe('layoutGraph – subgraph direction directive', () => {
 // The original v1.0.0 bug. When any subgraph had a `direction` directive,
 // beautiful-mermaid passed hierarchyHandling 'SEPARATE' (an invalid enum
 // value) and rewrote cross-hierarchy edges to use per-edge ports on each
-// compound boundary. With nested subgraphs and many cross-hier edges, ELK
-// scattered ports across all sides of a compound and its interior widened
+// subgraph boundary. With nested subgraphs and many cross-hier edges, ELK
+// scattered ports across all sides of a subgraph and its interior widened
 // regardless of the requested direction.
 //
 // The properties asserted here would have failed pre-fix:
@@ -310,7 +310,7 @@ describe('layoutGraph – nested subgraph with cross-hierarchy edges', () => {
     // sibling clusters at root, one cluster contains a nested cluster, both
     // outer and inner declare `direction TB` matching the parent, and many
     // cross-hierarchy edges cross 1-3 subgraph boundaries.
-    const g = layout(SAMPLE_GRAPHS['bug-repro']!.source)
+    const g = layout(SAMPLE_GRAPHS['issue-83-tb-flowchart-flips-horizontal']!.source)
 
     const inner = group(g, 'Inner Common')
     const rootB = group(g, 'Group B')

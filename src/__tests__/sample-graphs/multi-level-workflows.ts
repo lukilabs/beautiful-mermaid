@@ -73,7 +73,7 @@ export const MULTI_LEVEL_WORKFLOW_SAMPLES: SampleGraph[] = [
   {
     slug: 'multi-mixed-direction',
     title: 'Multi-level workflow: direction switches at every level + nodes at varying levels',
-    description: 'TB → LR → TB direction switches at every level, with leaf nodes at every level. Cross-hierarchy edges at varying depths interact with the SEPARATE_CHILDREN handling and FIXED_ORDER port placement on the alternating compounds.',
+    description: 'TB → LR → TB direction switches at every level, with leaf nodes at every level. Cross-hierarchy edges at varying depths interact with the SEPARATE_CHILDREN handling and FIXED_ORDER port placement on the alternating subgraphs.',
     source: `graph TB
       subgraph L1 [TB Level 1]
         direction TB

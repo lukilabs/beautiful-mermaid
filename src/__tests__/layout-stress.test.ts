@@ -1,40 +1,25 @@
 /**
- * Stress test suite for the flowchart layout engine. Eight realistic
- * medium-complexity diagrams (microservices, CI/CD, bidirectional pairs,
- * hub-and-spoke, deep mixed-direction nesting, shared-services fan-in,
- * error paths, dataflow) each get a `describe` block that asserts:
+ * Stress test suite for the flowchart layout engine.
  *
- *   - bounded right-angle crossings (zero where structurally achievable)
- *   - containment of every leaf in its declared subgraph
- *   - direction directives respected on each subgraph
- *   - sibling declaration order preserved
- *   - no edge polyline threads a foreign subgraph's header strip
+ * One parameterised describe block per sample in ALL_SAMPLE_GRAPHS. Inside
+ * each, every applicable structural assertion runs — bounded right-angle
+ * crossings, declared containment, no node overlaps, no edge polyline
+ * threading a foreign subgraph header, axis ordering, nesting, subgraph
+ * aspect ratio, and absence of colinear edge overlaps. Each assertion
+ * skips itself when the sample doesn't declare the matching metadata
+ * field, so a sample only opts into the checks that meaningfully apply
+ * to it.
  *
  * A trailing `cross-cutting` block asserts layout determinism and that
  * the renderer's drawn hop count matches the layout-engine crossing
- * count for every sample.
+ * count, again iterating every sample.
  */
 import { describe, it, expect } from 'bun:test'
 import { parseMermaid, renderMermaidSVG } from '../index.ts'
 import { layoutGraphSync } from '../layout.ts'
 import { countRightAngleCrossings } from '../layout-engine.ts'
 import type { PositionedGraph, PositionedNode, PositionedGroup } from '../types.ts'
-import { SAMPLE_GRAPHS } from './sample-graphs/index.ts'
-
-// Each `it` block reads its source from this map; the source itself lives
-// in `sample-graphs/stress-suite.ts` so the comparison-page tooling reads
-// the exact same scenarios.
-
-const SAMPLES = {
-  microservicesStack:           SAMPLE_GRAPHS['stress-microservices-stack']!.source,
-  ciCdParallelFeedback:         SAMPLE_GRAPHS['stress-ci-cd-parallel-feedback']!.source,
-  bidirectionalRequestResponse: SAMPLE_GRAPHS['stress-bidirectional-request-response']!.source,
-  hubAndSpoke:                  SAMPLE_GRAPHS['stress-hub-and-spoke']!.source,
-  mixedDirectionSandwich:       SAMPLE_GRAPHS['stress-mixed-direction-sandwich']!.source,
-  sharedServicesFanIn:          SAMPLE_GRAPHS['stress-shared-services-fan-in']!.source,
-  errorPathCluster:             SAMPLE_GRAPHS['stress-error-path-cluster']!.source,
-  dataflowFanOutFanIn:          SAMPLE_GRAPHS['stress-dataflow-fan-out-fan-in']!.source,
-} as const
+import { ALL_SAMPLE_GRAPHS, type SampleGraph } from './sample-graphs/index.ts'
 
 // ============================================================================
 // Helpers
@@ -42,10 +27,12 @@ const SAMPLES = {
 
 interface Rect { x: number; y: number; width: number; height: number }
 
+/** Lay out the parsed mermaid source synchronously through the production engine. */
 function layout(src: string): PositionedGraph {
   return layoutGraphSync(parseMermaid(src))
 }
 
+/** True when `inner`'s rectangle sits entirely within `outer` (with a small floating-point tolerance). */
 function rectContains(outer: Rect, inner: Rect, tol = 0.01): boolean {
   return inner.x >= outer.x - tol &&
          inner.y >= outer.y - tol &&
@@ -53,6 +40,7 @@ function rectContains(outer: Rect, inner: Rect, tol = 0.01): boolean {
          inner.y + inner.height <= outer.y + outer.height + tol
 }
 
+/** True when two rectangles share any interior area. */
 function rectsOverlap(a: Rect, b: Rect): boolean {
   return !(
     a.x + a.width <= b.x ||
@@ -62,6 +50,7 @@ function rectsOverlap(a: Rect, b: Rect): boolean {
   )
 }
 
+/** Recursively find a positioned subgraph by id or label. */
 function findGroup(groups: PositionedGroup[], idOrLabel: string): PositionedGroup | undefined {
   for (const g of groups) {
     if (g.id === idOrLabel || g.label === idOrLabel) return g
@@ -71,54 +60,35 @@ function findGroup(groups: PositionedGroup[], idOrLabel: string): PositionedGrou
   return undefined
 }
 
-function group(g: PositionedGraph, idOrLabel: string): PositionedGroup {
-  const found = findGroup(g.groups, idOrLabel)
-  if (!found) throw new Error(`Group "${idOrLabel}" not found`)
-  return found
-}
-
-function node(g: PositionedGraph, id: string): PositionedNode {
-  const found = g.nodes.find(n => n.id === id)
-  if (!found) throw new Error(`Node "${id}" not found`)
-  return found
-}
-
 /**
- * Walk every leaf in `g` and assert it sits inside its declared subgraph
- * by id. The map keys are leaf ids; values are the id (or label) of the
- * subgraph the leaf is supposed to be in.
+ * Resolves an item from the sample's metadata to its positioned rectangle.
+ * Tries leaf nodes first, then subgraphs by id or label. Throws when neither
+ * resolves so a typo in the sample data fails fast instead of silently
+ * passing.
  */
-function expectContainment(g: PositionedGraph, leafToSubgraph: Record<string, string>): void {
-  for (const [leafId, subgraphIdOrLabel] of Object.entries(leafToSubgraph)) {
-    const leaf = node(g, leafId)
-    const sg = group(g, subgraphIdOrLabel)
-    expect(
-      rectContains(sg, leaf),
-      `leaf "${leafId}" is not inside its declared subgraph "${subgraphIdOrLabel}"`,
-    ).toBe(true)
-  }
+function resolveRect(g: PositionedGraph, idOrLabel: string): Rect {
+  const leaf = g.nodes.find(n => n.id === idOrLabel)
+  if (leaf) return leaf
+  const sub = findGroup(g.groups, idOrLabel)
+  if (sub) return sub
+  throw new Error(`No node or subgraph matches "${idOrLabel}"`)
 }
 
-/**
- * For each subgraph in the diagram, walk every edge polyline. If the edge
- * has BOTH endpoints outside the subgraph (or both inside but not
- * terminating in this subgraph specifically), no segment of the polyline
- * may pass through that subgraph's header strip — the top HEADER_HEIGHT
- * pixels of the subgraph's bbox. Returns a list of offending pairs for a
- * descriptive failure message.
- */
 const HEADER_HEIGHT = 28
+
+/**
+ * Returns the list of (edge, subgraph) pairs where an edge polyline
+ * threads the top `HEADER_HEIGHT` strip of a subgraph it neither enters
+ * nor exits — visually, a line cutting across a subgraph's title bar.
+ */
 function findHeaderThreads(g: PositionedGraph): Array<{ edge: string; subgraph: string }> {
   const offenders: Array<{ edge: string; subgraph: string }> = []
-  // Flatten groups
   const allGroups: PositionedGroup[] = []
   function collect(gs: PositionedGroup[]): void {
     for (const grp of gs) { allGroups.push(grp); collect(grp.children) }
   }
   collect(g.groups)
 
-  // Build leaf-to-subgraph-ids ancestry. (A leaf is "inside" any subgraph
-  // whose bbox contains it.)
   const leafContainers = new Map<string, Set<string>>()
   for (const n of g.nodes) {
     const set = new Set<string>()
@@ -126,19 +96,13 @@ function findHeaderThreads(g: PositionedGraph): Array<{ edge: string; subgraph: 
     leafContainers.set(n.id, set)
   }
 
-  function edgeName(e: typeof g.edges[0]): string { return `${e.source} → ${e.target}` }
-
   for (const grp of allGroups) {
     const headerStripY1 = grp.y
     const headerStripY2 = grp.y + HEADER_HEIGHT
     for (const e of g.edges) {
-      // If this edge has an endpoint INSIDE grp, the header may be crossed
-      // legitimately when the edge enters/exits.
       const sourceInside = leafContainers.get(e.source)?.has(grp.id) ?? false
       const targetInside = leafContainers.get(e.target)?.has(grp.id) ?? false
       if (sourceInside || targetInside) continue
-      // Walk segments. If any segment intersects (grp.x..grp.x+grp.width,
-      // headerStripY1..headerStripY2) STRICTLY inside, flag it.
       const pts = e.points
       for (let i = 0; i + 1 < pts.length; i++) {
         const p1 = pts[i]!
@@ -148,7 +112,7 @@ function findHeaderThreads(g: PositionedGraph): Array<{ edge: string; subgraph: 
         const xOverlap = maxX > grp.x + 0.5 && minX < grp.x + grp.width - 0.5
         const yOverlap = maxY > headerStripY1 + 0.5 && minY < headerStripY2 - 0.5
         if (xOverlap && yOverlap) {
-          offenders.push({ edge: edgeName(e), subgraph: grp.label || grp.id })
+          offenders.push({ edge: `${e.source} → ${e.target}`, subgraph: grp.label || grp.id })
           break
         }
       }
@@ -157,19 +121,7 @@ function findHeaderThreads(g: PositionedGraph): Array<{ edge: string; subgraph: 
   return offenders
 }
 
-function expectNoNodeOverlaps(g: PositionedGraph): void {
-  for (let i = 0; i < g.nodes.length; i++) {
-    for (let j = i + 1; j < g.nodes.length; j++) {
-      const a = g.nodes[i]!, b = g.nodes[j]!
-      expect(rectsOverlap(a, b), `nodes "${a.id}" and "${b.id}" overlap`).toBe(false)
-    }
-  }
-}
-
-/**
- * Count distinct-edge segment pairs that share a colinear interval longer
- * than `minLen`. Used to detect "drawing arrows on top of each other".
- */
+/** Returns segment pairs from distinct edges that share a colinear interval longer than `minLen` — a proxy for "drawing arrows on top of each other". */
 function findColinearOverlaps(g: PositionedGraph, minLen = 6): Array<{ a: string; b: string; axis: 'H' | 'V' }> {
   interface Seg { eId: string; axis: 'H' | 'V'; pos: number; lo: number; hi: number }
   const EPS = 0.5
@@ -204,271 +156,125 @@ function findColinearOverlaps(g: PositionedGraph, minLen = 6): Array<{ a: string
 }
 
 // ============================================================================
-// Per-sample blocks
+// Per-sample assertions, parameterised over every sample
 // ============================================================================
 
-describe('stress: microservices-stack', () => {
-  const g = layout(SAMPLES.microservicesStack)
+for (const sample of ALL_SAMPLE_GRAPHS) {
+  describe(`sample: ${sample.slug}`, () => {
+    const g = layout(sample.source)
+    const maxCrossings = sample.maxCrossings ?? 0
 
-  it('renders with zero right-angle crossings', () => {
-    expect(countRightAngleCrossings(g.edges)).toBe(0)
-  })
-
-  it('preserves containment of each leaf in its declared subgraph', () => {
-    expectContainment(g, {
-      Web: 'Client Layer', Mobile: 'Client Layer', Desktop: 'Client Layer', API: 'Client Layer',
-      Auth: 'Service Layer', Users: 'Service Layer', Orders: 'Service Layer', Payments: 'Service Layer',
-      AuthDB: 'Data Layer', UserDB: 'Data Layer', OrdersDB: 'Data Layer', PaymentsDB: 'Data Layer', AuditLog: 'Data Layer',
+    it(`right-angle crossings ≤ ${maxCrossings}`, () => {
+      expect(countRightAngleCrossings(g.edges)).toBeLessThanOrEqual(maxCrossings)
     })
-  })
 
-  it('respects LR root: Client Layer left of Service Layer left of Data Layer', () => {
-    expect(group(g, 'Service Layer').x).toBeGreaterThan(group(g, 'Client Layer').x)
-    expect(group(g, 'Data Layer').x).toBeGreaterThan(group(g, 'Service Layer').x)
-  })
-
-  it('does not thread any foreign subgraph header', () => {
-    expect(findHeaderThreads(g), 'edges threading foreign headers').toEqual([])
-  })
-
-  it('has no node overlaps', () => {
-    expectNoNodeOverlaps(g)
-  })
-})
-
-describe('stress: ci-cd-parallel-feedback', () => {
-  const g = layout(SAMPLES.ciCdParallelFeedback)
-
-  // The Gate→Source feedback edge is a back-edge that wraps around the entire
-  // graph, and the 4-into-1 fan-in to Gate from differently-x'd test stages
-  // forces some crossings; both are realistic patterns we don't expect ELK
-  // Layered to fully resolve.
-  it('keeps right-angle crossings to a small bounded number', () => {
-    expect(countRightAngleCrossings(g.edges)).toBeLessThanOrEqual(6)
-  })
-
-  it('preserves containment', () => {
-    expectContainment(g, {
-      Source: 'Build', Compile: 'Build', Artifact: 'Build',
-      Unit: 'Tests', Integration: 'Tests', E2E: 'Tests', Security: 'Tests',
+    it('no two leaves overlap', () => {
+      for (let i = 0; i < g.nodes.length; i++) {
+        for (let j = i + 1; j < g.nodes.length; j++) {
+          const a = g.nodes[i]!, b = g.nodes[j]!
+          expect(rectsOverlap(a, b), `nodes "${a.id}" and "${b.id}" overlap`).toBe(false)
+        }
+      }
     })
-  })
 
-  it('Tests subgraph lays out LR (children stacked horizontally)', () => {
-    const tests = group(g, 'Tests')
-    expect(tests.width).toBeGreaterThan(tests.height)
-    // Unit/Integration/E2E/Security ordered left to right in declaration order.
-    expect(node(g, 'Integration').x).toBeGreaterThan(node(g, 'Unit').x)
-    expect(node(g, 'E2E').x).toBeGreaterThan(node(g, 'Integration').x)
-    expect(node(g, 'Security').x).toBeGreaterThan(node(g, 'E2E').x)
-  })
-
-  it('Build subgraph above Tests above Gate above Deploy', () => {
-    expect(group(g, 'Tests').y).toBeGreaterThan(group(g, 'Build').y)
-    expect(node(g, 'Gate').y).toBeGreaterThan(group(g, 'Tests').y)
-    expect(node(g, 'Deploy').y).toBeGreaterThan(node(g, 'Gate').y)
-  })
-
-  it('does not thread any foreign subgraph header', () => {
-    expect(findHeaderThreads(g)).toEqual([])
-  })
-})
-
-describe('stress: bidirectional-request-response', () => {
-  const g = layout(SAMPLES.bidirectionalRequestResponse)
-
-  it('renders with zero right-angle crossings', () => {
-    expect(countRightAngleCrossings(g.edges)).toBe(0)
-  })
-
-  it('Client left of Server (declaration order)', () => {
-    expect(group(g, 'Server').x).toBeGreaterThan(group(g, 'Client').x)
-  })
-
-  it('preserves containment', () => {
-    expectContainment(g, {
-      UI: 'Client', Cache: 'Client', Network: 'Client',
-      Endpoint: 'Server', Handler: 'Server', DB: 'Server',
+    it('no edge threads a foreign subgraph header', () => {
+      expect(findHeaderThreads(g)).toEqual([])
     })
+
+    if (sample.containment) {
+      const containment: Record<string, string> = sample.containment
+      it('every leaf sits inside its declared subgraph', () => {
+        for (const [leafId, subgraphIdOrLabel] of Object.entries(containment)) {
+          const leaf = g.nodes.find(n => n.id === leafId)
+          expect(leaf, `leaf "${leafId}" is missing from the laid-out graph`).toBeDefined()
+          const sg = findGroup(g.groups, subgraphIdOrLabel)
+          expect(sg, `subgraph "${subgraphIdOrLabel}" is missing from the laid-out graph`).toBeDefined()
+          expect(
+            rectContains(sg!, leaf!),
+            `leaf "${leafId}" is not inside its declared subgraph "${subgraphIdOrLabel}"`,
+          ).toBe(true)
+        }
+      })
+    }
+
+    if (sample.expectedAxisOrder) {
+      for (const ordering of sample.expectedAxisOrder) {
+        const ordering_ = ordering
+        it(`${ordering_.axis}-axis order: ${ordering_.items.join(' < ')}`, () => {
+          for (let i = 0; i + 1 < ordering_.items.length; i++) {
+            const aRect = resolveRect(g, ordering_.items[i]!)
+            const bRect = resolveRect(g, ordering_.items[i + 1]!)
+            const aPos = ordering_.axis === 'x' ? aRect.x : aRect.y
+            const bPos = ordering_.axis === 'x' ? bRect.x : bRect.y
+            expect(
+              bPos > aPos,
+              `expected ${ordering_.items[i + 1]} (${ordering_.axis}=${bPos.toFixed(0)}) to be after ${ordering_.items[i]} (${ordering_.axis}=${aPos.toFixed(0)}) on the ${ordering_.axis}-axis`,
+            ).toBe(true)
+          }
+        })
+      }
+    }
+
+    if (sample.expectedNesting) {
+      for (const chain of sample.expectedNesting) {
+        const chain_ = chain
+        it(`nesting chain: ${chain_.join(' ⊃ ')}`, () => {
+          for (let i = 0; i + 1 < chain_.length; i++) {
+            const outer = resolveRect(g, chain_[i]!)
+            const inner = resolveRect(g, chain_[i + 1]!)
+            expect(
+              rectContains(outer, inner),
+              `expected "${chain_[i + 1]}" to be inside "${chain_[i]}"`,
+            ).toBe(true)
+          }
+        })
+      }
+    }
+
+    if (sample.expectedSubgraphAspect) {
+      for (const aspect of sample.expectedSubgraphAspect) {
+        const aspect_ = aspect
+        const dim = aspect_.taller ? 'taller than wide' : aspect_.wider ? 'wider than tall' : 'unspecified aspect'
+        it(`${aspect_.subgraph} is ${dim}`, () => {
+          const sg = findGroup(g.groups, aspect_.subgraph)
+          expect(sg, `subgraph "${aspect_.subgraph}" is missing from the laid-out graph`).toBeDefined()
+          if (aspect_.taller) expect(sg!.height).toBeGreaterThan(sg!.width)
+          if (aspect_.wider) expect(sg!.width).toBeGreaterThan(sg!.height)
+        })
+      }
+    }
+
+    if (sample.expectNoColinearOverlap) {
+      it('no two distinct edges share a colinear segment longer than 6px', () => {
+        expect(findColinearOverlaps(g)).toEqual([])
+      })
+    }
   })
-
-  it('bidirectional edges between Client and Server share no colinear segment longer than 6px', () => {
-    expect(findColinearOverlaps(g)).toEqual([])
-  })
-})
-
-describe('stress: hub-and-spoke', () => {
-  const g = layout(SAMPLES.hubAndSpoke)
-
-  // Coordinator and Scheduler share the Orchestrator subgraph but participate
-  // at opposite ends of the bidirectional flow with Compute. ELK Layered
-  // can't lay this out in a planar way — putting both halves of the hub in
-  // one compound forces a 2-cycle that has to be broken. We accept the
-  // residual crossings and assert they stay bounded.
-  it('keeps right-angle crossings to a small bounded number', () => {
-    expect(countRightAngleCrossings(g.edges)).toBeLessThanOrEqual(6)
-  })
-
-  it('preserves containment', () => {
-    expectContainment(g, {
-      Coordinator: 'Orchestrator', Scheduler: 'Orchestrator',
-      IngestSource: 'Ingest', Validator: 'Ingest',
-      Worker1: 'Compute', Worker2: 'Compute',
-      WriteBack: 'Storage',
-      Pager: 'Notify', Slack: 'Notify',
-    })
-  })
-
-  it('does not thread any foreign subgraph header', () => {
-    expect(findHeaderThreads(g)).toEqual([])
-  })
-
-  it('has no node overlaps', () => {
-    expectNoNodeOverlaps(g)
-  })
-})
-
-describe('stress: mixed-direction-sandwich', () => {
-  const g = layout(SAMPLES.mixedDirectionSandwich)
-
-  // src has 3 fan-out edges to nodes at three different nesting levels (a, d,
-  // e). ELK routes them as best it can but the deep nesting plus shared
-  // source forces a small number of right-angle interior crossings.
-  it('keeps right-angle crossings to a small bounded number', () => {
-    expect(countRightAngleCrossings(g.edges)).toBeLessThanOrEqual(2)
-  })
-
-  it('full nesting chain holds: L1 ⊃ L2 ⊃ L3 ⊃ L4 ⊃ d/e/f', () => {
-    expect(rectContains(group(g, 'Outer LR'), group(g, 'Inner TB'))).toBe(true)
-    expect(rectContains(group(g, 'Inner TB'), group(g, 'Deep LR'))).toBe(true)
-    expect(rectContains(group(g, 'Deep LR'), group(g, 'Deepest TB'))).toBe(true)
-    expect(rectContains(group(g, 'Deepest TB'), node(g, 'd'))).toBe(true)
-    expect(rectContains(group(g, 'Deepest TB'), node(g, 'e'))).toBe(true)
-    expect(rectContains(group(g, 'Deepest TB'), node(g, 'f'))).toBe(true)
-  })
-
-  it('Deepest TB stacks d/e/f vertically (TB direction)', () => {
-    expect(node(g, 'e').y).toBeGreaterThan(node(g, 'd').y)
-    expect(node(g, 'f').y).toBeGreaterThan(node(g, 'e').y)
-  })
-
-  it('Inner TB lays out top-to-bottom', () => {
-    const inner = group(g, 'Inner TB')
-    expect(inner.height).toBeGreaterThan(inner.width)
-  })
-})
-
-describe('stress: shared-services-fan-in', () => {
-  const g = layout(SAMPLES.sharedServicesFanIn)
-
-  // Eight cross-hier edges from three feature columns into three stacked
-  // services produce a fan-in pattern whose minimum-crossing layout depends
-  // on column ordering; ELK's heuristic doesn't always find it. Threshold
-  // is set to the count it actually achieves so a future improvement that
-  // brings it down is allowed but a regression that pushes it up fails.
-  it('keeps right-angle crossings to a small bounded number', () => {
-    expect(countRightAngleCrossings(g.edges)).toBeLessThanOrEqual(5)
-  })
-
-  it('preserves containment', () => {
-    expectContainment(g, {
-      Auth: 'Shared Services', Logging: 'Shared Services', Metrics: 'Shared Services',
-      A1: 'Feature A', A2: 'Feature A',
-      B1: 'Feature B', B2: 'Feature B',
-      C1: 'Feature C', C2: 'Feature C',
-    })
-  })
-
-  it('does not thread any foreign subgraph header', () => {
-    expect(findHeaderThreads(g)).toEqual([])
-  })
-})
-
-describe('stress: error-path-cluster', () => {
-  const g = layout(SAMPLES.errorPathCluster)
-
-  // The RetryStep→Login back-edge has to wrap around the full height of the
-  // graph (Login is at the top, RetryStep is near the bottom) and that
-  // wraparound necessarily crosses a couple of forward edges from Happy and
-  // Error Path into Monitoring.
-  it('keeps right-angle crossings to a small bounded number', () => {
-    expect(countRightAngleCrossings(g.edges)).toBeLessThanOrEqual(2)
-  })
-
-  it('preserves containment', () => {
-    expectContainment(g, {
-      Login: 'Happy Path', Verify: 'Happy Path', Authorize: 'Happy Path', Success: 'Happy Path',
-      Reject: 'Error Path', Notify: 'Error Path', RetryStep: 'Error Path',
-      Alerts: 'Monitoring', Dashboard: 'Monitoring',
-    })
-  })
-
-  it('Happy Path internal flow goes top-to-bottom', () => {
-    expect(node(g, 'Verify').y).toBeGreaterThan(node(g, 'Login').y)
-    expect(node(g, 'Authorize').y).toBeGreaterThan(node(g, 'Verify').y)
-    expect(node(g, 'Success').y).toBeGreaterThan(node(g, 'Authorize').y)
-  })
-
-  it('does not thread any foreign subgraph header', () => {
-    expect(findHeaderThreads(g)).toEqual([])
-  })
-})
-
-describe('stress: dataflow-fan-out-fan-in', () => {
-  const g = layout(SAMPLES.dataflowFanOutFanIn)
-
-  it('renders with zero right-angle crossings', () => {
-    expect(countRightAngleCrossings(g.edges)).toBe(0)
-  })
-
-  it('preserves containment', () => {
-    expectContainment(g, {
-      P1: 'Processors', P2: 'Processors', P3: 'Processors', P4: 'Processors',
-      R1: 'Reducers', R2: 'Reducers',
-    })
-  })
-
-  it('Processors stacks TB inside an LR root', () => {
-    const procs = group(g, 'Processors')
-    expect(procs.height).toBeGreaterThan(procs.width)
-    expect(node(g, 'P2').y).toBeGreaterThan(node(g, 'P1').y)
-    expect(node(g, 'P3').y).toBeGreaterThan(node(g, 'P2').y)
-    expect(node(g, 'P4').y).toBeGreaterThan(node(g, 'P3').y)
-  })
-
-  it('Splitter left of Processors left of Reducers left of Combine', () => {
-    expect(group(g, 'Processors').x).toBeGreaterThan(node(g, 'Splitter').x)
-    expect(group(g, 'Reducers').x).toBeGreaterThan(group(g, 'Processors').x)
-    expect(node(g, 'Combine').x).toBeGreaterThan(group(g, 'Reducers').x)
-  })
-
-  it('does not thread any foreign subgraph header', () => {
-    expect(findHeaderThreads(g)).toEqual([])
-  })
-})
+}
 
 // ============================================================================
-// Cross-cutting
+// Cross-cutting properties — run on every sample
 // ============================================================================
 
-describe('stress: cross-cutting', () => {
-  const SAMPLE_LIST = Object.entries(SAMPLES)
-
+describe('cross-cutting', () => {
   it('layout is deterministic — same input produces identical output', () => {
-    for (const [name, src] of SAMPLE_LIST) {
-      const a = layout(src)
-      const b = layout(src)
-      expect(JSON.stringify(a), `non-deterministic layout for ${name}`).toBe(JSON.stringify(b))
+    for (const sample of ALL_SAMPLE_GRAPHS) {
+      const a = layout(sample.source)
+      const b = layout(sample.source)
+      expect(JSON.stringify(a), `non-deterministic layout for ${sample.slug}`).toBe(JSON.stringify(b))
     }
   })
 
-  it('rendered hop count equals computed crossing count for every sample', () => {
-    for (const [name, src] of SAMPLE_LIST) {
-      const g = layout(src)
+  it('rendered hop count equals computed crossing count', () => {
+    for (const sample of ALL_SAMPLE_GRAPHS) {
+      const g = layout(sample.source)
       const crossings = countRightAngleCrossings(g.edges)
-      const svg = renderMermaidSVG(src, { bg: '#fff', fg: '#000' })
+      const svg = renderMermaidSVG(sample.source, { bg: '#fff', fg: '#000' })
       const hops = (svg.match(/Q\d+\.\d+/g) ?? []).length
-      expect(hops, `${name}: hops (${hops}) ≠ crossings (${crossings})`).toBe(crossings)
+      expect(hops, `${sample.slug}: hops (${hops}) ≠ crossings (${crossings})`).toBe(crossings)
     }
   })
 })
+
+// Re-export type for IDE convenience
+export type { SampleGraph }

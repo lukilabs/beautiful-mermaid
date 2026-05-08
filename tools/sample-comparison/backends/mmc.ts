@@ -30,44 +30,63 @@ function withElk(source: string): string {
   return `%%{init: {"flowchart": {"defaultRenderer": "elk"}, "stateDiagram": {"defaultRenderer": "elk"}}}%%\n${source}`
 }
 
+/**
+ * Probes for `mmdc` on PATH (preferred) and via `npx` (fallback). Stores
+ * the resolved invocation on `mmdc` for `renderWithMmc` to use, then
+ * creates the temp work directory mmdc reads/writes through. Exits the
+ * process with an install hint if neither resolves.
+ */
+function initMmc(): void {
+  const probe = spawnSync('mmdc', ['--version'], { stdio: 'ignore' })
+  if (probe.status === 0) {
+    mmdc = { cmd: 'mmdc', viaNpx: false }
+  } else {
+    const npx = spawnSync('npx', ['--no-install', '-p', '@mermaid-js/mermaid-cli', 'mmdc', '--version'], { stdio: 'ignore' })
+    if (npx.status !== 0) {
+      console.warn('mmdc not found on PATH and not installed for npx — mmc backend unavailable')
+      console.warn('install with: npm i -g @mermaid-js/mermaid-cli  (or)  npm i -D @mermaid-js/mermaid-cli')
+      process.exit(1)
+    }
+    mmdc = { cmd: 'npx', viaNpx: true }
+  }
+  workDir = mkdtempSync(join(tmpdir(), 'bm-mmc-'))
+}
+
+/**
+ * Writes the source to a temp `.mmd`, shells out to mmdc, reads the
+ * resulting SVG back. Throws with a one-line summary of mmdc's stderr
+ * when the chart fails to parse so the surrounding render run can log
+ * and continue.
+ */
+function renderWithMmc(source: string): string {
+  if (!mmdc || !workDir) throw new Error('mmcBackend.init() not called')
+  const inputPath = join(workDir, 'in.mmd')
+  const outputPath = join(workDir, 'out.svg')
+  writeFileSync(inputPath, withElk(source))
+  const args = mmdc.viaNpx
+    ? ['-y', '-p', '@mermaid-js/mermaid-cli', 'mmdc', '-i', inputPath, '-o', outputPath, '-q']
+    : ['-i', inputPath, '-o', outputPath, '-q']
+  try {
+    execFileSync(mmdc.cmd, args, { stdio: ['ignore', 'ignore', 'pipe'] })
+  } catch (e: unknown) {
+    const stderr = (e as { stderr?: Buffer | string }).stderr
+    const msg = typeof stderr === 'string' ? stderr : stderr?.toString('utf8') ?? (e instanceof Error ? e.message : String(e))
+    const firstLine = msg.split('\n').find(l => l.includes('Error') || l.includes('Parse'))?.trim() ?? msg.split('\n')[0]?.trim() ?? 'unknown'
+    throw new Error(firstLine.slice(0, 120))
+  }
+  return readFileSync(outputPath, 'utf8')
+}
+
+/** Removes the temp work directory `initMmc` created and clears the cached mmdc invocation. */
+function cleanupMmc(): void {
+  if (workDir) rmSync(workDir, { recursive: true, force: true })
+  workDir = null
+  mmdc = null
+}
+
 export const mmcBackend: RenderBackend = {
   name: 'mmc',
-  init() {
-    const probe = spawnSync('mmdc', ['--version'], { stdio: 'ignore' })
-    if (probe.status === 0) {
-      mmdc = { cmd: 'mmdc', viaNpx: false }
-    } else {
-      const npx = spawnSync('npx', ['--no-install', '-p', '@mermaid-js/mermaid-cli', 'mmdc', '--version'], { stdio: 'ignore' })
-      if (npx.status !== 0) {
-        console.warn('mmdc not found on PATH and not installed for npx — mmc backend unavailable')
-        console.warn('install with: npm i -g @mermaid-js/mermaid-cli  (or)  npm i -D @mermaid-js/mermaid-cli')
-        process.exit(1)
-      }
-      mmdc = { cmd: 'npx', viaNpx: true }
-    }
-    workDir = mkdtempSync(join(tmpdir(), 'bm-mmc-'))
-  },
-  render(source) {
-    if (!mmdc || !workDir) throw new Error('mmcBackend.init() not called')
-    const inputPath = join(workDir, 'in.mmd')
-    const outputPath = join(workDir, 'out.svg')
-    writeFileSync(inputPath, withElk(source))
-    const args = mmdc.viaNpx
-      ? ['-y', '-p', '@mermaid-js/mermaid-cli', 'mmdc', '-i', inputPath, '-o', outputPath, '-q']
-      : ['-i', inputPath, '-o', outputPath, '-q']
-    try {
-      execFileSync(mmdc.cmd, args, { stdio: ['ignore', 'ignore', 'pipe'] })
-    } catch (e: unknown) {
-      const stderr = (e as { stderr?: Buffer | string }).stderr
-      const msg = typeof stderr === 'string' ? stderr : stderr?.toString('utf8') ?? (e instanceof Error ? e.message : String(e))
-      const firstLine = msg.split('\n').find(l => l.includes('Error') || l.includes('Parse'))?.trim() ?? msg.split('\n')[0]?.trim() ?? 'unknown'
-      throw new Error(firstLine.slice(0, 120))
-    }
-    return readFileSync(outputPath, 'utf8')
-  },
-  cleanup() {
-    if (workDir) rmSync(workDir, { recursive: true, force: true })
-    workDir = null
-    mmdc = null
-  },
+  init: initMmc,
+  render: renderWithMmc,
+  cleanup: cleanupMmc,
 }
