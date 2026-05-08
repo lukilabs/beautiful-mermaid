@@ -451,13 +451,26 @@ export function createMapping(graph: AsciiGraph): void {
     externalRootNodes = rootNodes
   }
 
-  // Place external root nodes
-  for (const node of externalRootNodes) {
-    const requested: GridCoord = dir === 'LR'
-      ? { x: 0, y: highestPositionPerLevel[0]! }
-      : { x: highestPositionPerLevel[0]!, y: 0 }
-    reserveSpotInGrid(graph, graph.nodes[node.index]!, requested)
-    highestPositionPerLevel[0] = highestPositionPerLevel[0]! + 4
+  // Place external root nodes, grouped by their immediate downstream target.
+  // Roots feeding into the same target are placed contiguously so that edge
+  // paths from different fan-in groups don't overlap.
+  const rootsByTarget = new Map<string, AsciiNode[]>()
+  for (const root of externalRootNodes) {
+    const children = getChildren(graph, root)
+    const targetName = children.length > 0 ? children[0]!.name : '__ungrouped__'
+    const group = rootsByTarget.get(targetName) ?? []
+    group.push(root)
+    rootsByTarget.set(targetName, group)
+  }
+
+  for (const [, roots] of rootsByTarget) {
+    for (const node of roots) {
+      const requested: GridCoord = dir === 'LR'
+        ? { x: 0, y: highestPositionPerLevel[0]! }
+        : { x: highestPositionPerLevel[0]!, y: 0 }
+      reserveSpotInGrid(graph, graph.nodes[node.index]!, requested)
+      highestPositionPerLevel[0] = highestPositionPerLevel[0]! + 4
+    }
   }
 
   // Place subgraph root nodes at level 4 (one level in from the edge)
@@ -470,6 +483,12 @@ export function createMapping(graph: AsciiGraph): void {
       reserveSpotInGrid(graph, graph.nodes[node.index]!, requested)
       highestPositionPerLevel[subgraphLevel] = highestPositionPerLevel[subgraphLevel]! + 4
     }
+  }
+
+  // Precompute in-degree for fan-in detection
+  const inDegree = new Map<string, number>()
+  for (const edge of graph.edges) {
+    inDegree.set(edge.to.name, (inDegree.get(edge.to.name) ?? 0) + 1)
   }
 
   // Place child nodes level by level
@@ -503,6 +522,11 @@ export function createMapping(graph: AsciiGraph): void {
           // Cross-direction: use parent's perpendicular coordinate
           // This keeps children aligned with parent when direction changes
           highestPosition = edgeDir === 'LR' ? gc.y : gc.x
+        } else if ((inDegree.get(child.name) ?? 0) > 1) {
+          // Fan-in target: align with parent's perpendicular position to keep
+          // the target near its root group and avoid long diagonal edges
+          const parentPerpendicular = graph.config.graphDirection === 'LR' ? gc.y : gc.x
+          highestPosition = Math.max(highestPositionPerLevel[childLevel]!, parentPerpendicular)
         } else {
           // Same direction: use level tracker
           highestPosition = highestPositionPerLevel[childLevel]!
