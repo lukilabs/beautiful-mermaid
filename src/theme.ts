@@ -235,7 +235,17 @@ export function fromShikiTheme(theme: ShikiThemeLike): DiagramColors {
  * a parent element, it's used directly. When unset, the fallback computes
  * a blended value from --fg and --bg using color-mix().
  */
-export function buildStyleBlock(font: string, hasMonoFont: boolean): string {
+/**
+ * @param svgId - Optional SVG root element id. When provided, all selectors
+ *   are scoped to `#svgId` (e.g. `#svgId { … }`, `#svgId text { … }`),
+ *   preventing CSS bleed when multiple SVGs are inlined in the same HTML page.
+ *   Omit (or pass `undefined`) to use the unscoped `svg` selector, which is
+ *   correct for standalone `.svg` files.
+ */
+export function buildStyleBlock(font: string, hasMonoFont: boolean, svgId?: string): string {
+  // Root selector: scoped when svgId is provided, global otherwise.
+  const root = svgId ? `#${svgId}` : 'svg'
+
   const fontImports = [
     `@import url('https://fonts.googleapis.com/css2?family=${encodeURIComponent(font)}:wght@400;500;600;700&amp;display=swap');`,
     ...(hasMonoFont
@@ -263,9 +273,9 @@ export function buildStyleBlock(font: string, hasMonoFont: boolean): string {
   return [
     '<style>',
     `  ${fontImports.join('\n  ')}`,
-    `  text { font-family: '${font}', system-ui, sans-serif; }`,
-    ...(hasMonoFont ? [`  .mono { font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', ui-monospace, monospace; }`] : []),
-    `  svg {${derivedVars}`,
+    `  ${root} text { font-family: '${font}', system-ui, sans-serif; }`,
+    ...(hasMonoFont ? [`  ${root} .mono { font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', ui-monospace, monospace; }`] : []),
+    `  ${root} {${derivedVars}`,
     `  }`,
     '</style>',
   ].join('\n')
@@ -277,12 +287,17 @@ export function buildStyleBlock(font: string, hasMonoFont: boolean): string {
  * will fall back to the color-mix() derivations in the <style> block.
  *
  * @param transparent - If true, omits the background style for transparent SVGs
+ * @param svgId       - Optional unique id to set on the root `<svg>` element.
+ *   Used together with `buildStyleBlock(font, mono, svgId)` to scope the
+ *   generated CSS selectors, preventing style bleed when multiple SVG diagrams
+ *   are inlined in the same HTML page.
  */
 export function svgOpenTag(
   width: number,
   height: number,
   colors: DiagramColors,
   transparent?: boolean,
+  svgId?: string,
 ): string {
   // Build the style string with only the provided color variables
   const vars = [
@@ -296,9 +311,10 @@ export function svgOpenTag(
   ].filter(Boolean).join(';')
 
   const bgStyle = transparent ? '' : ';background:var(--bg)'
+  const idAttr  = svgId ? ` id="${svgId}"` : ''
 
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" ` +
-    `width="${width}" height="${height}" style="${vars}${bgStyle}">`
+    `width="${width}" height="${height}"${idAttr} style="${vars}${bgStyle}">`
   )
 }

@@ -1,0 +1,71 @@
+graph TB
+    %% ============================================
+    %% 订单审核子流程
+    %% ============================================
+
+    classDef startEnd fill:#263238,stroke:#455a64,color:#fff,stroke-width:3px
+    classDef process fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    classDef decision fill:#fffde7,stroke:#f9a825,stroke-width:2px
+    classDef approve fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    classDef reject fill:#ffebee,stroke:#c62828,stroke-width:2px
+
+    START([开始审核]):::startEnd
+
+    START --> CHECK1[基本信息校验]:::process
+    CHECK1 --> CHECK2{格式正确?}
+
+    CHECK2 -->|否| REJECT1[格式错误，拒绝]:::reject
+    CHECK2 -->|是| CHECK3[客户状态检查]:::process
+
+    CHECK3 --> CHECK4{客户状态?}
+
+    CHECK4 -->|冻结| REJECT2[客户冻结，拒绝]:::reject
+    CHECK4 -->|注销| REJECT3[客户注销，拒绝]:::reject
+    CHECK4 -->|正常| CHECK5[信用额度检查]:::process
+
+    CHECK5 --> CHECK6{额度足够?}
+
+    CHECK6 -->|不足| CHECK7{是否预付?}
+    CHECK7 -->|是| APPROVE1[预付订单，通过]:::approve
+    CHECK7 -->|否| REJECT4[额度不足，拒绝]:::reject
+    CHECK6 -->|足够| CHECK8[商品检查]:::process
+
+    CHECK8 --> CHECK9{商品有效?}
+
+    CHECK9 -->|否| REJECT5[商品无效，拒绝]:::reject
+    CHECK9 -->|是| CHECK10[价格检查]:::process
+
+    CHECK10 --> CHECK11{价格匹配?}
+
+    CHECK11 -->|否| CHECK12[重新计算价格]:::process
+    CHECK12 --> CHECK10
+    CHECK11 -->|是| CHECK13[库存检查]:::process
+
+    CHECK13 --> CHECK14{库存充足?}
+
+    CHECK14 -->|不足| CHECK15{是否允许缺货?}
+    CHECK15 -->|是| CHECK16[部分订单]:::process
+    CHECK16 --> APPROVE2[订单通过，待备货]:::approve
+    CHECK15 -->|否| REJECT6[库存不足，拒绝]:::reject
+    CHECK14 -->|充足| APPROVE3[完全满足，通过]:::approve
+
+    REJECT1 --> END1([审核结束])
+    REJECT2 --> END1
+    REJECT3 --> END1
+    REJECT4 --> END1
+    REJECT5 --> END1
+    REJECT6 --> END1
+    APPROVE1 --> END1
+    APPROVE2 --> END1
+    APPROVE3 --> END1
+
+    %% 重新绘制连接到 END1
+    REJECT1 --> END1
+    REJECT2 --> END1
+    REJECT3 --> END1
+    REJECT4 --> END1
+    REJECT5 --> END1
+    REJECT6 --> END1
+    APPROVE1 --> END1
+    APPROVE2 --> END1
+    APPROVE3 --> END1
