@@ -4,12 +4,15 @@
  * Covers: class blocks, attributes, methods, visibility, annotations,
  * relationships (all 6 types), cardinality, labels, inline attributes.
  */
-import { describe, it, expect } from 'bun:test'
+import { describe, expect, it } from 'bun:test'
 import { parseClassDiagram } from '../class/parser.ts'
 
 /** Helper to parse — preprocesses text the same way index.ts does */
 function parse(text: string) {
-  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0 && !l.startsWith('%%'))
+  const lines = text
+    .split('\n')
+    .map(l => l.trim())
+    .filter(l => l.length > 0 && !l.startsWith('%%'))
   return parseClassDiagram(lines)
 }
 

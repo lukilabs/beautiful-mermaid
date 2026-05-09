@@ -1,4 +1,4 @@
-import type { XYChart, XYAxis, XYChartSeries } from './types.ts'
+import type { XYAxis, XYChart, XYChartSeries } from './types.ts'
 
 // ============================================================================
 // XY Chart parser
@@ -54,7 +54,10 @@ export function parseXYChart(lines: string[]): XYChart {
     const xRangeMatch = line.match(/^x-axis\s+(?:"([^"]*)"\s+)?(-?\d+(?:\.\d+)?)\s*-->\s*(-?\d+(?:\.\d+)?)/)
     if (xRangeMatch) {
       if (xRangeMatch[1]) xAxis.title = xRangeMatch[1]
-      xAxis.range = { min: parseFloat(xRangeMatch[2]!), max: parseFloat(xRangeMatch[3]!) }
+      xAxis.range = {
+        min: parseFloat(xRangeMatch[2]!),
+        max: parseFloat(xRangeMatch[3]!),
+      }
       continue
     }
 
@@ -62,7 +65,10 @@ export function parseXYChart(lines: string[]): XYChart {
     const yRangeMatch = line.match(/^y-axis\s+(?:"([^"]*)"\s+)?(-?\d+(?:\.\d+)?)\s*-->\s*(-?\d+(?:\.\d+)?)/)
     if (yRangeMatch) {
       if (yRangeMatch[1]) yAxis.title = yRangeMatch[1]
-      yAxis.range = { min: parseFloat(yRangeMatch[2]!), max: parseFloat(yRangeMatch[3]!) }
+      yAxis.range = {
+        min: parseFloat(yRangeMatch[2]!),
+        max: parseFloat(yRangeMatch[3]!),
+      }
       continue
     }
 
@@ -84,7 +90,6 @@ export function parseXYChart(lines: string[]): XYChart {
     const lineMatch = line.match(/^line\s+\[([^\]]+)\]/)
     if (lineMatch) {
       series.push({ type: 'line', data: parseNumericArray(lineMatch[1]!) })
-      continue
     }
   }
 

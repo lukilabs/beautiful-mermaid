@@ -7,8 +7,8 @@
  *
  * The key invariant: disconnected components should NEVER overlap.
  */
-import { describe, it, expect } from 'bun:test'
-import { renderMermaidSync, parseMermaid } from '../index.ts'
+import { describe, expect, it } from 'bun:test'
+import { parseMermaid, renderMermaidSync } from '../index.ts'
 import { layoutGraphSync } from '../layout.ts'
 
 // ============================================================================
@@ -18,21 +18,26 @@ import { layoutGraphSync } from '../layout.ts'
 /** Check if two rectangles overlap */
 function rectanglesOverlap(
   r1: { x: number; y: number; width: number; height: number },
-  r2: { x: number; y: number; width: number; height: number }
+  r2: { x: number; y: number; width: number; height: number },
 ): boolean {
   return !(
-    r1.x + r1.width <= r2.x ||   // r1 is left of r2
-    r2.x + r2.width <= r1.x ||   // r2 is left of r1
-    r1.y + r1.height <= r2.y ||  // r1 is above r2
-    r2.y + r2.height <= r1.y     // r2 is above r1
+    (
+      r1.x + r1.width <= r2.x || // r1 is left of r2
+      r2.x + r2.width <= r1.x || // r2 is left of r1
+      r1.y + r1.height <= r2.y || // r1 is above r2
+      r2.y + r2.height <= r1.y
+    ) // r2 is above r1
   )
 }
 
 /** Get bounding box from positioned elements */
-function getBoundingBox(items: Array<{ x: number; y: number; width: number; height: number }>) {
+function _getBoundingBox(items: Array<{ x: number; y: number; width: number; height: number }>) {
   if (items.length === 0) return { x: 0, y: 0, width: 0, height: 0 }
 
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  let minX = Infinity,
+    minY = Infinity,
+    maxX = -Infinity,
+    maxY = -Infinity
   for (const item of items) {
     minX = Math.min(minX, item.x)
     minY = Math.min(minY, item.y)
@@ -114,8 +119,7 @@ describe('layoutGraph – two disconnected subgraphs', () => {
 
     // In LR mode, subgraphs should be stacked vertically (perpendicular to flow)
     // One should be above the other
-    const isVerticallyArranged =
-      (s1.y + s1.height <= s2.y) || (s2.y + s2.height <= s1.y)
+    const isVerticallyArranged = s1.y + s1.height <= s2.y || s2.y + s2.height <= s1.y
 
     expect(isVerticallyArranged).toBe(true)
   })
@@ -139,8 +143,7 @@ describe('layoutGraph – two disconnected subgraphs', () => {
     // ELK may arrange disconnected components in various ways
     // The key requirement is that they don't overlap
     const noOverlap =
-      (s1.x + s1.width <= s2.x) || (s2.x + s2.width <= s1.x) ||
-      (s1.y + s1.height <= s2.y) || (s2.y + s2.height <= s1.y)
+      s1.x + s1.width <= s2.x || s2.x + s2.width <= s1.x || s1.y + s1.height <= s2.y || s2.y + s2.height <= s1.y
 
     expect(noOverlap).toBe(true)
   })
@@ -195,10 +198,7 @@ describe('layoutGraph – multiple disconnected components', () => {
     for (let i = 0; i < result.nodes.length; i++) {
       for (let j = i + 1; j < result.nodes.length; j++) {
         const overlap = rectanglesOverlap(result.nodes[i]!, result.nodes[j]!)
-        expect(
-          overlap,
-          `Nodes ${result.nodes[i]!.id} and ${result.nodes[j]!.id} overlap`
-        ).toBe(false)
+        expect(overlap, `Nodes ${result.nodes[i]!.id} and ${result.nodes[j]!.id} overlap`).toBe(false)
       }
     }
   })
@@ -248,10 +248,7 @@ describe('layoutGraph – mixed connected and disconnected', () => {
 
     // Isolated node should not overlap with any connected node
     for (const node of connectedNodes) {
-      expect(
-        rectanglesOverlap(nodeD, node),
-        `Node D overlaps with node ${node.id}`
-      ).toBe(false)
+      expect(rectanglesOverlap(nodeD, node), `Node D overlaps with node ${node.id}`).toBe(false)
     }
   })
 })

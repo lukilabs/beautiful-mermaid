@@ -2,10 +2,10 @@
  * Tests for styles module — text measurement and constants.
  * Theme resolution tests are in theme.test.ts (CSS custom property system).
  */
-import { describe, it, expect } from 'bun:test'
-import { estimateTextWidth, FONT_SIZES, FONT_WEIGHTS, NODE_PADDING, STROKE_WIDTHS, ARROW_HEAD } from '../styles.ts'
-import { THEMES, DEFAULTS, fromShikiTheme, buildStyleBlock, svgOpenTag } from '../theme.ts'
+import { describe, expect, it } from 'bun:test'
+import { ARROW_HEAD, estimateTextWidth, FONT_SIZES, FONT_WEIGHTS, NODE_PADDING, STROKE_WIDTHS } from '../styles.ts'
 import type { DiagramColors } from '../theme.ts'
+import { buildStyleBlock, DEFAULTS, fromShikiTheme, svgOpenTag, THEMES } from '../theme.ts'
 
 // ============================================================================
 // Theme system (CSS custom properties)
@@ -17,11 +17,11 @@ describe('THEMES', () => {
     expect(THEMES['zinc-dark']).toBeDefined()
     expect(THEMES['tokyo-night']).toBeDefined()
     expect(THEMES['catppuccin-mocha']).toBeDefined()
-    expect(THEMES['nord']).toBeDefined()
+    expect(THEMES.nord).toBeDefined()
   })
 
   it('each theme has valid bg and fg colors', () => {
-    for (const [name, colors] of Object.entries(THEMES)) {
+    for (const [_name, colors] of Object.entries(THEMES)) {
       expect(colors.bg).toMatch(/^#[0-9a-fA-F]{6}$/)
       expect(colors.fg).toMatch(/^#[0-9a-fA-F]{6}$/)
     }
@@ -45,8 +45,10 @@ describe('svgOpenTag', () => {
 
   it('includes optional enrichment variables when provided', () => {
     const colors: DiagramColors = {
-      bg: '#1a1b26', fg: '#a9b1d6',
-      line: '#3d59a1', accent: '#7aa2f7',
+      bg: '#1a1b26',
+      fg: '#a9b1d6',
+      line: '#3d59a1',
+      accent: '#7aa2f7',
     }
     const tag = svgOpenTag(400, 300, colors)
     expect(tag).toContain('--line:#3d59a1')

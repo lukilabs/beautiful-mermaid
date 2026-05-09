@@ -11,12 +11,10 @@
 //   - routeBundledEdges(): Routes edges through junction points
 // ============================================================================
 
-import type {
-  AsciiGraph, AsciiNode, AsciiEdge, EdgeBundle, GridCoord, Direction,
-} from './types.ts'
-import { Up, Down, Left, Right, Middle, gridKey, gridCoordEquals } from './types.ts'
-import { getPath, mergePath } from './pathfinder.ts'
 import { getNodeSubgraph } from './grid.ts'
+import { getPath, mergePath } from './pathfinder.ts'
+import type { AsciiEdge, AsciiGraph, AsciiNode, EdgeBundle, GridCoord } from './types.ts'
+import { Down, Left, Middle, Right, Up } from './types.ts'
 
 // ============================================================================
 // Bundle analysis
@@ -175,10 +173,7 @@ function canBundle(edges: AsciiEdge[], graph: AsciiGraph): boolean {
  *   - In TD: below the source, horizontally centered between targets
  *   - In LR: right of the source, vertically centered between targets
  */
-export function calculateJunctionPoint(
-  graph: AsciiGraph,
-  bundle: EdgeBundle,
-): GridCoord {
+export function calculateJunctionPoint(graph: AsciiGraph, bundle: EdgeBundle): GridCoord {
   const dir = graph.config.graphDirection
   const sharedCoord = bundle.sharedNode.gridCoord!
   const otherCoords = bundle.otherNodes.map(n => n.gridCoord!)
@@ -188,15 +183,15 @@ export function calculateJunctionPoint(
     // Calculate center of sources
     const minX = Math.min(...otherCoords.map(c => c.x))
     const maxX = Math.max(...otherCoords.map(c => c.x))
-    const minY = Math.min(...otherCoords.map(c => c.y))
-    const maxY = Math.max(...otherCoords.map(c => c.y))
+    const _minY = Math.min(...otherCoords.map(c => c.y))
+    const _maxY = Math.max(...otherCoords.map(c => c.y))
 
     if (dir === 'TD') {
       // Junction above target, centered between sources
       // Place it one row above the target's entry point
       const junctionY = sharedCoord.y - 1
       // X is centered between sources, but clamped to shared node's X for alignment
-      const centerX = Math.floor((minX + maxX) / 2) + 1 // +1 for center of 3x3 block
+      const _centerX = Math.floor((minX + maxX) / 2) + 1 // +1 for center of 3x3 block
       const junctionX = sharedCoord.x + 1 // Align with target's center
 
       return { x: junctionX, y: junctionY }
@@ -209,10 +204,10 @@ export function calculateJunctionPoint(
     }
   } else {
     // fan-out: Junction is AFTER the shared source
-    const minX = Math.min(...otherCoords.map(c => c.x))
-    const maxX = Math.max(...otherCoords.map(c => c.x))
-    const minY = Math.min(...otherCoords.map(c => c.y))
-    const maxY = Math.max(...otherCoords.map(c => c.y))
+    const _minX = Math.min(...otherCoords.map(c => c.x))
+    const _maxX = Math.max(...otherCoords.map(c => c.x))
+    const _minY = Math.min(...otherCoords.map(c => c.y))
+    const _maxY = Math.max(...otherCoords.map(c => c.y))
 
     if (dir === 'TD') {
       // Junction below source, will then split to targets
@@ -260,9 +255,10 @@ export function routeBundledEdges(graph: AsciiGraph, bundle: EdgeBundle): void {
 
     // Route junction → target (shared path)
     const targetCoord = bundle.sharedNode.gridCoord!
-    const targetEntry = dir === 'TD'
-      ? { x: targetCoord.x + 1, y: targetCoord.y } // Top center of target
-      : { x: targetCoord.x, y: targetCoord.y + 1 } // Left center of target
+    const targetEntry =
+      dir === 'TD'
+        ? { x: targetCoord.x + 1, y: targetCoord.y } // Top center of target
+        : { x: targetCoord.x, y: targetCoord.y + 1 } // Left center of target
 
     const sharedPath = getPath(graph.grid, junction, targetEntry)
     bundle.sharedPath = sharedPath ? mergePath(sharedPath) : [junction, targetEntry]
@@ -270,9 +266,10 @@ export function routeBundledEdges(graph: AsciiGraph, bundle: EdgeBundle): void {
     // Route each source → junction
     for (const edge of bundle.edges) {
       const sourceCoord = edge.from.gridCoord!
-      const sourceExit = dir === 'TD'
-        ? { x: sourceCoord.x + 1, y: sourceCoord.y + 2 } // Bottom center of source
-        : { x: sourceCoord.x + 2, y: sourceCoord.y + 1 } // Right center of source
+      const sourceExit =
+        dir === 'TD'
+          ? { x: sourceCoord.x + 1, y: sourceCoord.y + 2 } // Bottom center of source
+          : { x: sourceCoord.x + 2, y: sourceCoord.y + 1 } // Right center of source
 
       const pathToJunction = getPath(graph.grid, sourceExit, junction)
       edge.pathToJunction = pathToJunction ? mergePath(pathToJunction) : [sourceExit, junction]
@@ -291,9 +288,10 @@ export function routeBundledEdges(graph: AsciiGraph, bundle: EdgeBundle): void {
 
     // Route source → junction (shared path)
     const sourceCoord = bundle.sharedNode.gridCoord!
-    const sourceExit = dir === 'TD'
-      ? { x: sourceCoord.x + 1, y: sourceCoord.y + 2 } // Bottom center of source
-      : { x: sourceCoord.x + 2, y: sourceCoord.y + 1 } // Right center of source
+    const sourceExit =
+      dir === 'TD'
+        ? { x: sourceCoord.x + 1, y: sourceCoord.y + 2 } // Bottom center of source
+        : { x: sourceCoord.x + 2, y: sourceCoord.y + 1 } // Right center of source
 
     const sharedPath = getPath(graph.grid, sourceExit, junction)
     bundle.sharedPath = sharedPath ? mergePath(sharedPath) : [sourceExit, junction]
@@ -301,9 +299,10 @@ export function routeBundledEdges(graph: AsciiGraph, bundle: EdgeBundle): void {
     // Route junction → each target
     for (const edge of bundle.edges) {
       const targetCoord = edge.to.gridCoord!
-      const targetEntry = dir === 'TD'
-        ? { x: targetCoord.x + 1, y: targetCoord.y } // Top center of target
-        : { x: targetCoord.x, y: targetCoord.y + 1 } // Left center of target
+      const targetEntry =
+        dir === 'TD'
+          ? { x: targetCoord.x + 1, y: targetCoord.y } // Top center of target
+          : { x: targetCoord.x, y: targetCoord.y + 1 } // Left center of target
 
       const pathToJunction = getPath(graph.grid, junction, targetEntry)
       edge.pathToJunction = pathToJunction ? mergePath(pathToJunction) : [junction, targetEntry]

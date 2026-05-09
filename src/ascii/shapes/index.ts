@@ -2,28 +2,27 @@
 // Shape registry — pluggable ASCII shape renderers
 // ============================================================================
 
-import type { AsciiNodeShape, Canvas, DrawingCoord, Direction } from '../types.ts'
-import type { ShapeRenderer, ShapeDimensions, ShapeRenderOptions, ShapeRegistry } from './types.ts'
-
+import type { AsciiNodeShape, Canvas, Direction, DrawingCoord } from '../types.ts'
+import { circleRenderer } from './circle.ts'
+import { diamondRenderer } from './diamond.ts'
+import { hexagonRenderer } from './hexagon.ts'
 // Import all shape renderers
 import { rectangleRenderer } from './rectangle.ts'
-import { diamondRenderer } from './diamond.ts'
-import { circleRenderer } from './circle.ts'
-import { stateStartRenderer, stateEndRenderer } from './state.ts'
 import { roundedRenderer } from './rounded.ts'
-import { stadiumRenderer } from './stadium.ts'
-import { hexagonRenderer } from './hexagon.ts'
 import {
-  subroutineRenderer,
-  doublecircleRenderer,
-  cylinderRenderer,
   asymmetricRenderer,
-  trapezoidRenderer,
+  cylinderRenderer,
+  doublecircleRenderer,
+  subroutineRenderer,
   trapezoidAltRenderer,
+  trapezoidRenderer,
 } from './special.ts'
+import { stadiumRenderer } from './stadium.ts'
+import { stateEndRenderer, stateStartRenderer } from './state.ts'
+import type { ShapeDimensions, ShapeRegistry, ShapeRenderer, ShapeRenderOptions } from './types.ts'
 
 // Re-export types
-export type { ShapeRenderer, ShapeDimensions, ShapeRenderOptions, ShapeRegistry }
+export type { ShapeDimensions, ShapeRegistry, ShapeRenderer, ShapeRenderOptions }
 
 /**
  * Global shape registry — maps shape types to their renderers.
@@ -64,11 +63,7 @@ export function getShapeRenderer(shape: AsciiNodeShape): ShapeRenderer {
  * Render a node shape to a canvas.
  * This is the main entry point for shape rendering.
  */
-export function renderShape(
-  shape: AsciiNodeShape,
-  label: string,
-  options: ShapeRenderOptions
-): Canvas {
+export function renderShape(shape: AsciiNodeShape, label: string, options: ShapeRenderOptions): Canvas {
   const renderer = getShapeRenderer(shape)
   const dimensions = renderer.getDimensions(label, options)
   return renderer.render(label, dimensions, options)
@@ -78,11 +73,7 @@ export function renderShape(
  * Get dimensions for a shape given a label.
  * Used during layout to determine node size.
  */
-export function getShapeDimensions(
-  shape: AsciiNodeShape,
-  label: string,
-  options: ShapeRenderOptions
-): ShapeDimensions {
+export function getShapeDimensions(shape: AsciiNodeShape, label: string, options: ShapeRenderOptions): ShapeDimensions {
   const renderer = getShapeRenderer(shape)
   return renderer.getDimensions(label, options)
 }
@@ -94,7 +85,7 @@ export function getShapeAttachmentPoint(
   shape: AsciiNodeShape,
   dir: Direction,
   dimensions: ShapeDimensions,
-  baseCoord: DrawingCoord
+  baseCoord: DrawingCoord,
 ): DrawingCoord {
   const renderer = getShapeRenderer(shape)
   return renderer.getAttachmentPoint(dir, dimensions, baseCoord)

@@ -4,7 +4,7 @@
  * Tests bar charts, line charts, mixed charts, horizontal orientation,
  * multi-series support, staircase line routing, and edge cases.
  */
-import { describe, it, expect } from 'bun:test'
+import { describe, expect, it } from 'bun:test'
 import { renderMermaidASCII } from '../ascii/index.ts'
 
 // ============================================================================
@@ -31,9 +31,12 @@ describe('xychart ASCII – bar charts', () => {
   })
 
   it('renders bars with # in ASCII mode', () => {
-    const result = render(`xychart-beta
+    const result = render(
+      `xychart-beta
       x-axis [A, B, C]
-      bar [10, 20, 30]`, true)
+      bar [10, 20, 30]`,
+      true,
+    )
     expect(result).toContain('#')
     expect(result).not.toContain('█')
   })
@@ -128,9 +131,12 @@ describe('xychart ASCII – line charts', () => {
   })
 
   it('uses + for corners in ASCII mode', () => {
-    const result = render(`xychart-beta
+    const result = render(
+      `xychart-beta
       x-axis [A, B]
-      line [10, 50]`, true)
+      line [10, 50]`,
+      true,
+    )
     expect(result).toContain('+')
     expect(result).not.toContain('╭')
     expect(result).not.toContain('╰')
@@ -298,10 +304,13 @@ describe('xychart ASCII – axis structure', () => {
   })
 
   it('uses + for axis characters in ASCII mode', () => {
-    const result = render(`xychart-beta
+    const result = render(
+      `xychart-beta
       x-axis [A, B, C]
       y-axis 0 --> 100
-      bar [25, 50, 75]`, true)
+      bar [25, 50, 75]`,
+      true,
+    )
     expect(result).toContain('+')
     expect(result).not.toContain('┤')
     expect(result).not.toContain('┬')

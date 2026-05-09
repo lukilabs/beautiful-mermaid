@@ -10,11 +10,11 @@
 // ============================================================================
 
 import { parseErDiagram } from '../er/parser.ts'
-import type { ErDiagram, ErEntity, ErAttribute, Cardinality } from '../er/types.ts'
-import type { Canvas, AsciiConfig, RoleCanvas, CharRole, AsciiTheme, ColorMode } from './types.ts'
-import { mkCanvas, mkRoleCanvas, canvasToString, increaseSize, increaseRoleCanvasSize, setRole } from './canvas.ts'
+import type { Cardinality, ErAttribute, ErDiagram, ErEntity } from '../er/types.ts'
+import { canvasToString, increaseRoleCanvasSize, increaseSize, mkCanvas, mkRoleCanvas, setRole } from './canvas.ts'
 import { drawMultiBox } from './draw.ts'
 import { splitLines } from './multiline-utils.ts'
+import type { AsciiConfig, AsciiTheme, CharRole, ColorMode } from './types.ts'
 
 /** Classify a character from a box drawing as 'border' or 'text'. */
 function classifyBoxChar(ch: string): CharRole {
@@ -28,7 +28,7 @@ function classifyBoxChar(ch: string): CharRole {
 
 /** Format an attribute line: "PK type name" or "FK type name" etc. */
 function formatAttribute(attr: ErAttribute): string {
-  const keyStr = attr.keys.length > 0 ? attr.keys.join(',') + ' ' : '   '
+  const keyStr = attr.keys.length > 0 ? `${attr.keys.join(',')} ` : '   '
   return `${keyStr}${attr.type} ${attr.name}`
 }
 
@@ -62,18 +62,26 @@ function buildEntitySections(entity: ErEntity): string[][] {
 function getCrowsFootChars(card: Cardinality, useAscii: boolean, isRight = false): string {
   if (useAscii) {
     switch (card) {
-      case 'one':       return '|'
-      case 'zero-one':  return 'o|'
-      case 'many':      return isRight ? '<' : '>'
-      case 'zero-many': return isRight ? 'o<' : '>o'
+      case 'one':
+        return '|'
+      case 'zero-one':
+        return 'o|'
+      case 'many':
+        return isRight ? '<' : '>'
+      case 'zero-many':
+        return isRight ? 'o<' : '>o'
     }
   } else {
     // Use cleaner Unicode characters
     switch (card) {
-      case 'one':       return '│'
-      case 'zero-one':  return '○│'
-      case 'many':      return isRight ? '╟' : '╢'
-      case 'zero-many': return isRight ? '○╟' : '╢○'
+      case 'one':
+        return '│'
+      case 'zero-one':
+        return '○│'
+      case 'many':
+        return isRight ? '╟' : '╢'
+      case 'zero-many':
+        return isRight ? '○╟' : '╢○'
     }
   }
 }
@@ -157,15 +165,18 @@ function findConnectedComponents(diagram: ErDiagram): Set<string>[] {
  * Pipeline: parse → build boxes → component-aware layout → draw boxes → draw relationships → string.
  */
 export function renderErAscii(text: string, config: AsciiConfig, colorMode?: ColorMode, theme?: AsciiTheme): string {
-  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0 && !l.startsWith('%%'))
+  const lines = text
+    .split('\n')
+    .map(l => l.trim())
+    .filter(l => l.length > 0 && !l.startsWith('%%'))
   const diagram = parseErDiagram(lines)
 
   if (diagram.entities.length === 0) return ''
 
   const useAscii = config.useAscii
-  const hGap = 6  // horizontal gap between entity boxes
-  const vGap = 4  // vertical gap between rows (for relationship lines)
-  const componentGap = 6  // vertical gap between disconnected components
+  const hGap = 6 // horizontal gap between entity boxes
+  const vGap = 4 // vertical gap between rows (for relationship lines)
+  const componentGap = 6 // vertical gap between disconnected components
 
   // --- Build entity box dimensions ---
   const entitySections = new Map<string, string[][]>()
@@ -210,7 +221,7 @@ export function renderErAscii(text: string, config: AsciiConfig, colorMode?: Col
     let currentX = 0
     let maxRowH = 0
     let colCount = 0
-    const componentStartY = currentY
+    const _componentStartY = currentY
 
     for (const ent of componentEntities) {
       const w = entityBoxW.get(ent.id)!
@@ -308,9 +319,8 @@ export function renderErAscii(text: string, config: AsciiConfig, colorMode?: Col
     if (sameRow) {
       // Horizontal connection: right side of left entity → left side of right entity
       const [left, right] = e1CX < e2CX ? [e1, e2] : [e2, e1]
-      const [leftCard, rightCard] = e1CX < e2CX
-        ? [rel.cardinality1, rel.cardinality2]
-        : [rel.cardinality2, rel.cardinality1]
+      const [leftCard, rightCard] =
+        e1CX < e2CX ? [rel.cardinality1, rel.cardinality2] : [rel.cardinality2, rel.cardinality1]
 
       const startX = left.x + left.width
       const endX = right.x - 1
@@ -360,9 +370,8 @@ export function renderErAscii(text: string, config: AsciiConfig, colorMode?: Col
     } else {
       // Vertical connection: bottom of upper entity → top of lower entity
       const [upper, lower] = e1CY < e2CY ? [e1, e2] : [e2, e1]
-      const [upperCard, lowerCard] = e1CY < e2CY
-        ? [rel.cardinality1, rel.cardinality2]
-        : [rel.cardinality2, rel.cardinality1]
+      const [upperCard, lowerCard] =
+        e1CY < e2CY ? [rel.cardinality1, rel.cardinality2] : [rel.cardinality2, rel.cardinality1]
 
       const startY = upper.y + upper.height
       const endY = lower.y - 1

@@ -11,11 +11,11 @@
 // Multi-series support: each series gets a distinct color from a palette.
 // ============================================================================
 
+import { CHART_ACCENT_FALLBACK, getSeriesColor } from '../xychart/colors.ts'
 import { parseXYChart } from '../xychart/parser.ts'
 import type { XYChart } from '../xychart/types.ts'
-import type { AsciiConfig, AsciiTheme, ColorMode, CharRole, Canvas, RoleCanvas } from './types.ts'
 import { colorizeText } from './ansi.ts'
-import { getSeriesColor, CHART_ACCENT_FALLBACK } from '../xychart/colors.ts'
+import type { AsciiConfig, AsciiTheme, Canvas, CharRole, ColorMode, RoleCanvas } from './types.ts'
 
 // ============================================================================
 // Constants
@@ -33,10 +33,10 @@ const UNI = {
   xTick: '┬',
   bar: '█',
   grid: '·',
-  cornerTL: '╭',  // top-left: down+right
-  cornerTR: '╮',  // top-right: down+left
-  cornerBL: '╰',  // bottom-left: up+right
-  cornerBR: '╯',  // bottom-right: up+left
+  cornerTL: '╭', // top-left: down+right
+  cornerTR: '╮', // top-right: down+left
+  cornerBL: '╰', // bottom-left: up+right
+  cornerBR: '╯', // bottom-right: up+left
 } as const
 
 // ASCII fallback characters
@@ -71,13 +71,20 @@ function getSeriesColors(total: number, theme: AsciiTheme): string[] {
 /** Map a CharRole to its hex color from the theme (for canvasToString fallback). */
 function roleToHex(role: CharRole, theme: AsciiTheme): string {
   switch (role) {
-    case 'text': return theme.fg
-    case 'border': return theme.border
-    case 'line': return theme.line
-    case 'arrow': return theme.arrow
-    case 'corner': return theme.corner ?? theme.line
-    case 'junction': return theme.junction ?? theme.border
-    default: return theme.fg
+    case 'text':
+      return theme.fg
+    case 'border':
+      return theme.border
+    case 'line':
+      return theme.line
+    case 'arrow':
+      return theme.arrow
+    case 'corner':
+      return theme.corner ?? theme.line
+    case 'junction':
+      return theme.junction ?? theme.border
+    default:
+      return theme.fg
   }
 }
 
@@ -85,13 +92,11 @@ function roleToHex(role: CharRole, theme: AsciiTheme): string {
 // Public API
 // ============================================================================
 
-export function renderXYChartAscii(
-  text: string,
-  config: AsciiConfig,
-  colorMode: ColorMode,
-  theme: AsciiTheme,
-): string {
-  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0 && !l.startsWith('%%'))
+export function renderXYChartAscii(text: string, config: AsciiConfig, colorMode: ColorMode, theme: AsciiTheme): string {
+  const lines = text
+    .split('\n')
+    .map(l => l.trim())
+    .filter(l => l.length > 0 && !l.startsWith('%%'))
   const chart = parseXYChart(lines)
   const ch = config.useAscii ? ASC : UNI
 
@@ -105,12 +110,7 @@ export function renderXYChartAscii(
 // Vertical chart layout + rendering
 // ============================================================================
 
-function renderVertical(
-  chart: XYChart,
-  ch: typeof UNI | typeof ASC,
-  colorMode: ColorMode,
-  theme: AsciiTheme,
-): string {
+function renderVertical(chart: XYChart, ch: typeof UNI | typeof ASC, colorMode: ColorMode, theme: AsciiTheme): string {
   const dataCount = getDataCount(chart)
   if (dataCount === 0) return ''
 
@@ -257,7 +257,20 @@ function renderVertical(
   for (const entry of lineEntries) {
     if (entry.data.length === 0) continue
     const hexColor = seriesColors[entry.globalIdx]!
-    drawStaircaseLine(canvas, roles, entry.data, bandCenter, valueToRow, plotTop, plotH, plotLeft, bandW * dataCount, ch, hexColors, hexColor)
+    drawStaircaseLine(
+      canvas,
+      roles,
+      entry.data,
+      bandCenter,
+      valueToRow,
+      plotTop,
+      plotH,
+      plotLeft,
+      bandW * dataCount,
+      ch,
+      hexColors,
+      hexColor,
+    )
   }
 
   return canvasToString(canvas, roles, hexColors, colorMode, theme)
@@ -402,7 +415,20 @@ function renderHorizontal(
   for (const entry of lineEntries) {
     if (entry.data.length === 0) continue
     const hexColor = seriesColors[entry.globalIdx]!
-    drawHorizontalStaircaseLine(canvas, roles, entry.data, bandMid, valueToCol, plotTop, plotH, plotLeft, plotW, ch, hexColors, hexColor)
+    drawHorizontalStaircaseLine(
+      canvas,
+      roles,
+      entry.data,
+      bandMid,
+      valueToCol,
+      plotTop,
+      plotH,
+      plotLeft,
+      plotW,
+      ch,
+      hexColors,
+      hexColor,
+    )
   }
 
   return canvasToString(canvas, roles, hexColors, colorMode, theme)
@@ -630,14 +656,19 @@ function drawLegend(
   // Build legend items with global series indices
   type LegendItem = { symbol: string; label: string; globalIdx: number }
   const items: LegendItem[] = []
-  let barIdx = 0, lineIdx = 0
+  let barIdx = 0,
+    lineIdx = 0
   for (let si = 0; si < chart.series.length; si++) {
     const s = chart.series[si]!
     if (s.type === 'bar') {
       items.push({ symbol: ch.bar, label: `Bar ${barIdx + 1}`, globalIdx: si })
       barIdx++
     } else {
-      items.push({ symbol: ch.hLine, label: `Line ${lineIdx + 1}`, globalIdx: si })
+      items.push({
+        symbol: ch.hLine,
+        label: `Line ${lineIdx + 1}`,
+        globalIdx: si,
+      })
       lineIdx++
     }
   }
@@ -683,9 +714,14 @@ function createHexCanvas(width: number, height: number): HexCanvas {
 }
 
 function set(
-  canvas: Canvas, roles: RoleCanvas, row: number, col: number,
-  char: string, role: CharRole,
-  hexCanvas?: HexCanvas, hex?: string | null,
+  canvas: Canvas,
+  roles: RoleCanvas,
+  row: number,
+  col: number,
+  char: string,
+  role: CharRole,
+  hexCanvas?: HexCanvas,
+  hex?: string | null,
 ): void {
   if (col >= 0 && col < canvas.length && row >= 0 && row < canvas[0]!.length) {
     canvas[col]![row] = char
@@ -701,7 +737,14 @@ function get(canvas: Canvas, row: number, col: number): string {
   return ' '
 }
 
-function writeText(canvas: Canvas, roles: RoleCanvas, row: number, startCol: number, text: string, role: CharRole): void {
+function writeText(
+  canvas: Canvas,
+  roles: RoleCanvas,
+  row: number,
+  startCol: number,
+  text: string,
+  role: CharRole,
+): void {
   for (let i = 0; i < text.length; i++) {
     set(canvas, roles, row, startCol + i, text[i]!, role)
   }
@@ -738,13 +781,9 @@ function canvasToString(
     if (end < 0) {
       lines.push('')
     } else {
-      lines.push(colorizeRow(
-        chars.slice(0, end + 1),
-        rowRoles.slice(0, end + 1),
-        rowHex.slice(0, end + 1),
-        theme,
-        colorMode,
-      ))
+      lines.push(
+        colorizeRow(chars.slice(0, end + 1), rowRoles.slice(0, end + 1), rowHex.slice(0, end + 1), theme, colorMode),
+      )
     }
   }
 
@@ -841,7 +880,7 @@ function niceTickValues(min: number, max: number): number[] {
   if (range <= 0) return [min]
 
   const rawInterval = range / 6
-  const magnitude = Math.pow(10, Math.floor(Math.log10(rawInterval)))
+  const magnitude = 10 ** Math.floor(Math.log10(rawInterval))
   const residual = rawInterval / magnitude
   let niceInterval: number
   if (residual <= 1.5) niceInterval = magnitude

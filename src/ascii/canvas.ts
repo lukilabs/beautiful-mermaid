@@ -6,8 +6,8 @@
 // canvas[x][y] gives the character at column x, row y.
 // ============================================================================
 
-import type { Canvas, DrawingCoord, RoleCanvas, CharRole, AsciiTheme, ColorMode } from './types.ts'
 import { colorizeLine, DEFAULT_ASCII_THEME } from './ansi.ts'
+import type { AsciiTheme, Canvas, CharRole, ColorMode, DrawingCoord, RoleCanvas } from './types.ts'
 
 /**
  * Create a blank canvas filled with spaces.
@@ -95,11 +95,7 @@ export function setRole(roleCanvas: RoleCanvas, x: number, y: number, role: Char
  * Merge role canvases — same logic as mergeCanvases but for roles.
  * Non-null roles in overlays overwrite null roles in base.
  */
-export function mergeRoleCanvases(
-  base: RoleCanvas,
-  offset: DrawingCoord,
-  ...overlays: RoleCanvas[]
-): RoleCanvas {
+export function mergeRoleCanvases(base: RoleCanvas, offset: DrawingCoord, ...overlays: RoleCanvas[]): RoleCanvas {
   let maxX = base.length - 1
   let maxY = (base[0]?.length ?? 1) - 1
 
@@ -170,9 +166,7 @@ export function increaseSize(canvas: Canvas, newX: number, newY: number): Canvas
 // ============================================================================
 
 /** All Unicode box-drawing characters that participate in junction merging. */
-const JUNCTION_CHARS = new Set([
-  '─', '│', '┌', '┐', '└', '┘', '├', '┤', '┬', '┴', '┼', '╴', '╵', '╶', '╷',
-])
+const JUNCTION_CHARS = new Set(['─', '│', '┌', '┐', '└', '┘', '├', '┤', '┬', '┴', '┼', '╴', '╵', '╶', '╷'])
 
 export function isJunctionChar(c: string): boolean {
   return JUNCTION_CHARS.has(c)
@@ -189,16 +183,116 @@ function isAlphanumeric(c: string): boolean {
  * E.g., '─' overlapping '│' becomes '┼'.
  */
 const JUNCTION_MAP: Record<string, Record<string, string>> = {
-  '─': { '│': '┼', '┌': '┬', '┐': '┬', '└': '┴', '┘': '┴', '├': '┼', '┤': '┼', '┬': '┬', '┴': '┴' },
-  '│': { '─': '┼', '┌': '├', '┐': '┤', '└': '├', '┘': '┤', '├': '├', '┤': '┤', '┬': '┼', '┴': '┼' },
-  '┌': { '─': '┬', '│': '├', '┐': '┬', '└': '├', '┘': '┼', '├': '├', '┤': '┼', '┬': '┬', '┴': '┼' },
-  '┐': { '─': '┬', '│': '┤', '┌': '┬', '└': '┼', '┘': '┤', '├': '┼', '┤': '┤', '┬': '┬', '┴': '┼' },
-  '└': { '─': '┴', '│': '├', '┌': '├', '┐': '┼', '┘': '┴', '├': '├', '┤': '┼', '┬': '┼', '┴': '┴' },
-  '┘': { '─': '┴', '│': '┤', '┌': '┼', '┐': '┤', '└': '┴', '├': '┼', '┤': '┤', '┬': '┼', '┴': '┴' },
-  '├': { '─': '┼', '│': '├', '┌': '├', '┐': '┼', '└': '├', '┘': '┼', '┤': '┼', '┬': '┼', '┴': '┼' },
-  '┤': { '─': '┼', '│': '┤', '┌': '┼', '┐': '┤', '└': '┼', '┘': '┤', '├': '┼', '┬': '┼', '┴': '┼' },
-  '┬': { '─': '┬', '│': '┼', '┌': '┬', '┐': '┬', '└': '┼', '┘': '┼', '├': '┼', '┤': '┼', '┴': '┼' },
-  '┴': { '─': '┴', '│': '┼', '┌': '┼', '┐': '┼', '└': '┴', '┘': '┴', '├': '┼', '┤': '┼', '┬': '┼' },
+  '─': {
+    '│': '┼',
+    '┌': '┬',
+    '┐': '┬',
+    '└': '┴',
+    '┘': '┴',
+    '├': '┼',
+    '┤': '┼',
+    '┬': '┬',
+    '┴': '┴',
+  },
+  '│': {
+    '─': '┼',
+    '┌': '├',
+    '┐': '┤',
+    '└': '├',
+    '┘': '┤',
+    '├': '├',
+    '┤': '┤',
+    '┬': '┼',
+    '┴': '┼',
+  },
+  '┌': {
+    '─': '┬',
+    '│': '├',
+    '┐': '┬',
+    '└': '├',
+    '┘': '┼',
+    '├': '├',
+    '┤': '┼',
+    '┬': '┬',
+    '┴': '┼',
+  },
+  '┐': {
+    '─': '┬',
+    '│': '┤',
+    '┌': '┬',
+    '└': '┼',
+    '┘': '┤',
+    '├': '┼',
+    '┤': '┤',
+    '┬': '┬',
+    '┴': '┼',
+  },
+  '└': {
+    '─': '┴',
+    '│': '├',
+    '┌': '├',
+    '┐': '┼',
+    '┘': '┴',
+    '├': '├',
+    '┤': '┼',
+    '┬': '┼',
+    '┴': '┴',
+  },
+  '┘': {
+    '─': '┴',
+    '│': '┤',
+    '┌': '┼',
+    '┐': '┤',
+    '└': '┴',
+    '├': '┼',
+    '┤': '┤',
+    '┬': '┼',
+    '┴': '┴',
+  },
+  '├': {
+    '─': '┼',
+    '│': '├',
+    '┌': '├',
+    '┐': '┼',
+    '└': '├',
+    '┘': '┼',
+    '┤': '┼',
+    '┬': '┼',
+    '┴': '┼',
+  },
+  '┤': {
+    '─': '┼',
+    '│': '┤',
+    '┌': '┼',
+    '┐': '┤',
+    '└': '┼',
+    '┘': '┤',
+    '├': '┼',
+    '┬': '┼',
+    '┴': '┼',
+  },
+  '┬': {
+    '─': '┬',
+    '│': '┼',
+    '┌': '┬',
+    '┐': '┬',
+    '└': '┼',
+    '┘': '┼',
+    '├': '┼',
+    '┤': '┼',
+    '┴': '┼',
+  },
+  '┴': {
+    '─': '┴',
+    '│': '┼',
+    '┌': '┼',
+    '┐': '┼',
+    '└': '┴',
+    '┘': '┴',
+    '├': '┼',
+    '┤': '┼',
+    '┬': '┼',
+  },
 }
 
 export function mergeJunctions(c1: string, c2: string): string {
@@ -214,12 +308,7 @@ export function mergeJunctions(c1: string, c2: string): string {
  * Non-space characters in overlays overwrite the base.
  * When both characters are Unicode junction chars, they're merged intelligently.
  */
-export function mergeCanvases(
-  base: Canvas,
-  offset: DrawingCoord,
-  useAscii: boolean,
-  ...overlays: Canvas[]
-): Canvas {
+export function mergeCanvases(base: Canvas, offset: DrawingCoord, useAscii: boolean, ...overlays: Canvas[]): Canvas {
   let [maxX, maxY] = getCanvasSize(base)
   for (const overlay of overlays) {
     const [oX, oY] = getCanvasSize(overlay)
@@ -326,18 +415,26 @@ export function canvasToString(canvas: Canvas, options?: CanvasToStringOptions):
  */
 const VERTICAL_FLIP_MAP: Record<string, string> = {
   // Unicode arrows
-  '▲': '▼', '▼': '▲',
-  '◤': '◣', '◣': '◤',
-  '◥': '◢', '◢': '◥',
+  '▲': '▼',
+  '▼': '▲',
+  '◤': '◣',
+  '◣': '◤',
+  '◥': '◢',
+  '◢': '◥',
   // ASCII arrows
-  '^': 'v', 'v': '^',
+  '^': 'v',
+  v: '^',
   // Unicode corners
-  '┌': '└', '└': '┌',
-  '┐': '┘', '┘': '┐',
+  '┌': '└',
+  '└': '┌',
+  '┐': '┘',
+  '┘': '┐',
   // Unicode junctions (T-pieces flip vertically)
-  '┬': '┴', '┴': '┬',
+  '┬': '┴',
+  '┴': '┬',
   // Box-start junctions (exit points from node boxes)
-  '╵': '╷', '╷': '╵',
+  '╵': '╷',
+  '╷': '╵',
 }
 
 /**
@@ -381,12 +478,7 @@ export function flipRoleCanvasVertically(roleCanvas: RoleCanvas): RoleCanvas {
  * By default, preserves existing non-space characters (labels don't overwrite each other).
  * Set forceOverwrite=true to always overwrite (for box content).
  */
-export function drawText(
-  canvas: Canvas,
-  start: DrawingCoord,
-  text: string,
-  forceOverwrite = false
-): void {
+export function drawText(canvas: Canvas, start: DrawingCoord, text: string, forceOverwrite = false): void {
   increaseSize(canvas, start.x + text.length, start.y)
   for (let i = 0; i < text.length; i++) {
     const x = start.x + i

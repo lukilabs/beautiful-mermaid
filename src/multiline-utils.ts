@@ -16,14 +16,16 @@ import { LINE_HEIGHT_RATIO } from './text-metrics.ts'
 export function normalizeBrTags(label: string): string {
   // Strip surrounding double quotes (Mermaid uses them for special chars in labels)
   const unquoted = label.startsWith('"') && label.endsWith('"') ? label.slice(1, -1) : label
-  return unquoted
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/\\n/g, '\n')
-    .replace(/<\/?(?:sub|sup|small|mark)\s*>/gi, '')
-    // Markdown formatting → HTML tags (order matters: ** before *)
-    .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
-    .replace(/(?<!\*)\*([^\s*](?:[^*]*[^\s*])?)\*(?!\*)/g, '<i>$1</i>')
-    .replace(/~~(.+?)~~/g, '<s>$1</s>')
+  return (
+    unquoted
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/\\n/g, '\n')
+      .replace(/<\/?(?:sub|sup|small|mark)\s*>/gi, '')
+      // Markdown formatting → HTML tags (order matters: ** before *)
+      .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+      .replace(/(?<!\*)\*([^\s*](?:[^*]*[^\s*])?)\*(?!\*)/g, '<i>$1</i>')
+      .replace(/~~(.+?)~~/g, '<s>$1</s>')
+  )
 }
 
 /**
@@ -67,7 +69,10 @@ const FORMAT_TAG_REGEX = /<(\/)?(?:(b|strong)|(i|em)|(u)|(s|del))\s*>/gi
  */
 function parseInlineFormatting(line: string): StyledSegment[] {
   const segments: StyledSegment[] = []
-  let bold = false, italic = false, underline = false, strikethrough = false
+  let bold = false,
+    italic = false,
+    underline = false,
+    strikethrough = false
   let lastIndex = 0
 
   // Reset lastIndex for global regex
@@ -77,7 +82,13 @@ function parseInlineFormatting(line: string): StyledSegment[] {
   while ((match = FORMAT_TAG_REGEX.exec(line)) !== null) {
     // Capture text before this tag
     if (match.index > lastIndex) {
-      segments.push({ text: line.slice(lastIndex, match.index), bold, italic, underline, strikethrough })
+      segments.push({
+        text: line.slice(lastIndex, match.index),
+        bold,
+        italic,
+        underline,
+        strikethrough,
+      })
     }
     lastIndex = match.index + match[0].length
 
@@ -91,7 +102,13 @@ function parseInlineFormatting(line: string): StyledSegment[] {
 
   // Remaining text after last tag
   if (lastIndex < line.length) {
-    segments.push({ text: line.slice(lastIndex), bold, italic, underline, strikethrough })
+    segments.push({
+      text: line.slice(lastIndex),
+      bold,
+      italic,
+      underline,
+      strikethrough,
+    })
   }
 
   return segments
@@ -115,21 +132,23 @@ function renderLineContent(line: string): string {
   const allPlain = segments.every(s => !s.bold && !s.italic && !s.underline && !s.strikethrough)
   if (allPlain) return segments.map(s => escapeXml(s.text)).join('')
 
-  return segments.map(seg => {
-    const escaped = escapeXml(seg.text)
-    if (!seg.bold && !seg.italic && !seg.underline && !seg.strikethrough) return escaped
+  return segments
+    .map(seg => {
+      const escaped = escapeXml(seg.text)
+      if (!seg.bold && !seg.italic && !seg.underline && !seg.strikethrough) return escaped
 
-    const attrs: string[] = []
-    if (seg.bold) attrs.push('font-weight="bold"')
-    if (seg.italic) attrs.push('font-style="italic"')
-    // SVG text-decoration can combine values
-    const deco: string[] = []
-    if (seg.underline) deco.push('underline')
-    if (seg.strikethrough) deco.push('line-through')
-    if (deco.length) attrs.push(`text-decoration="${deco.join(' ')}"`)
+      const attrs: string[] = []
+      if (seg.bold) attrs.push('font-weight="bold"')
+      if (seg.italic) attrs.push('font-style="italic"')
+      // SVG text-decoration can combine values
+      const deco: string[] = []
+      if (seg.underline) deco.push('underline')
+      if (seg.strikethrough) deco.push('line-through')
+      if (deco.length) attrs.push(`text-decoration="${deco.join(' ')}"`)
 
-    return `<tspan ${attrs.join(' ')}>${escaped}</tspan>`
-  }).join('')
+      return `<tspan ${attrs.join(' ')}>${escaped}</tspan>`
+    })
+    .join('')
 }
 
 // ============================================================================
@@ -157,7 +176,7 @@ export function renderMultilineText(
   cy: number,
   fontSize: number,
   attrs: string,
-  baselineShift: number = 0.35
+  baselineShift: number = 0.35,
 ): string {
   const lines = text.split('\n')
 
@@ -172,10 +191,12 @@ export function renderMultilineText(
   // First line dy: shift up by (n-1)/2 line heights, then add baseline shift
   const firstDy = -((lines.length - 1) / 2) * lineHeight + fontSize * baselineShift
 
-  const tspans = lines.map((line, i) => {
-    const dy = i === 0 ? firstDy : lineHeight
-    return `<tspan x="${cx}" dy="${dy}">${renderLineContent(line)}</tspan>`
-  }).join('')
+  const tspans = lines
+    .map((line, i) => {
+      const dy = i === 0 ? firstDy : lineHeight
+      return `<tspan x="${cx}" dy="${dy}">${renderLineContent(line)}</tspan>`
+    })
+    .join('')
 
   return `<text x="${cx}" y="${cy}" ${attrs}>${tspans}</text>`
 }
@@ -205,13 +226,13 @@ export function renderMultilineTextWithBackground(
   fontSize: number,
   padding: number,
   textAttrs: string,
-  bgAttrs: string
+  bgAttrs: string,
 ): string {
   const bgWidth = textWidth + padding * 2
   const bgHeight = textHeight + padding * 2
 
-  const rect = `<rect x="${cx - bgWidth / 2}" y="${cy - bgHeight / 2}" ` +
-    `width="${bgWidth}" height="${bgHeight}" ${bgAttrs} />`
+  const rect =
+    `<rect x="${cx - bgWidth / 2}" y="${cy - bgHeight / 2}" ` + `width="${bgWidth}" height="${bgHeight}" ${bgAttrs} />`
 
   const textEl = renderMultilineText(text, cx, cy, fontSize, textAttrs)
 

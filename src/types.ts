@@ -31,17 +31,17 @@ export type NodeShape =
   | 'stadium'
   | 'circle'
   // Batch 1 additions
-  | 'subroutine'     // [[text]]  — double-bordered rectangle
-  | 'doublecircle'   // (((text))) — concentric circles
-  | 'hexagon'        // {{text}}  — six-sided polygon
+  | 'subroutine' // [[text]]  — double-bordered rectangle
+  | 'doublecircle' // (((text))) — concentric circles
+  | 'hexagon' // {{text}}  — six-sided polygon
   // Batch 2 additions
-  | 'cylinder'       // [(text)]  — database cylinder
-  | 'asymmetric'     // >text]    — flag/banner shape
-  | 'trapezoid'      // [/text\]  — wider bottom
-  | 'trapezoid-alt'  // [\text/]  — wider top
+  | 'cylinder' // [(text)]  — database cylinder
+  | 'asymmetric' // >text]    — flag/banner shape
+  | 'trapezoid' // [/text\]  — wider bottom
+  | 'trapezoid-alt' // [\text/]  — wider top
   // Batch 3 state diagram pseudostates
-  | 'state-start'    // filled circle (start pseudostate)
-  | 'state-end'      // bullseye circle (end pseudostate)
+  | 'state-start' // filled circle (start pseudostate)
+  | 'state-end' // bullseye circle (end pseudostate)
 
 export interface MermaidEdge {
   source: string

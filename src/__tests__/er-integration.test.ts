@@ -1,7 +1,7 @@
 /**
  * Integration tests for ER diagrams — end-to-end parse → layout → render.
  */
-import { describe, it, expect } from 'bun:test'
+import { describe, expect, it } from 'bun:test'
 import { renderMermaidSVG } from '../index.ts'
 
 describe('renderMermaidSVG – ER diagrams', () => {
@@ -38,7 +38,7 @@ describe('renderMermaidSVG – ER diagrams', () => {
     expect(svg).toContain('<polyline')
   })
 
-  it('renders crow\'s foot cardinality markers', () => {
+  it("renders crow's foot cardinality markers", () => {
     const svg = renderMermaidSVG(`erDiagram
       CUSTOMER ||--o{ ORDER : places`)
     // Crow's foot markers are rendered as lines
@@ -62,8 +62,11 @@ describe('renderMermaidSVG – ER diagrams', () => {
   })
 
   it('renders with dark colors', () => {
-    const svg = renderMermaidSVG(`erDiagram
-      A ||--|| B : links`, { bg: '#18181B', fg: '#FAFAFA' })
+    const svg = renderMermaidSVG(
+      `erDiagram
+      A ||--|| B : links`,
+      { bg: '#18181B', fg: '#FAFAFA' },
+    )
     expect(svg).toContain('--bg:#18181B')
   })
 
@@ -118,26 +121,34 @@ describe('renderMermaidSVG – ER diagrams', () => {
 // ============================================================================
 
 /** Extract entity box rects from SVG: returns Map<label, {x, y, width, height, rightEdge}> */
-function extractEntityBoxes(svg: string): Map<string, { x: number; y: number; width: number; height: number; rightEdge: number }> {
+function extractEntityBoxes(
+  svg: string,
+): Map<string, { x: number; y: number; width: number; height: number; rightEdge: number }> {
   const boxes = new Map<string, { x: number; y: number; width: number; height: number; rightEdge: number }>()
 
   // Entity header text: <text x="..." y="..." ... font-weight="700" ...>LABEL</text>
   const headerPattern = /<text x="([\d.]+)" y="([\d.]+)"[^>]*font-weight="700"[^>]*>([^<]+)<\/text>/g
-  let match
+  let match: RegExpExecArray | null
   while ((match = headerPattern.exec(svg)) !== null) {
     const centerX = parseFloat(match[1]!)
     const label = match[3]!
 
     // Find the corresponding outer rect that contains this text.
     const rectPattern = /<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)" rx="0" ry="0"/g
-    let rectMatch
+    let rectMatch: RegExpExecArray | null
     while ((rectMatch = rectPattern.exec(svg)) !== null) {
       const rx = parseFloat(rectMatch[1]!)
       const ry = parseFloat(rectMatch[2]!)
       const rw = parseFloat(rectMatch[3]!)
       const rh = parseFloat(rectMatch[4]!)
       if (centerX >= rx && centerX <= rx + rw) {
-        boxes.set(label, { x: rx, y: ry, width: rw, height: rh, rightEdge: rx + rw })
+        boxes.set(label, {
+          x: rx,
+          y: ry,
+          width: rw,
+          height: rh,
+          rightEdge: rx + rw,
+        })
         break
       }
     }
@@ -152,9 +163,12 @@ function extractLabelPositions(svg: string): Map<string, { x: number; y: number 
   // Relationship labels use font-size="11" font-weight="400" — match flexibly
   // regardless of attribute order
   const labelPattern = /<text x="([\d.]+)" y="([\d.]+)"[^>]*font-size="11"[^>]*font-weight="400"[^>]*>([^<]+)<\/text>/g
-  let match
+  let match: RegExpExecArray | null
   while ((match = labelPattern.exec(svg)) !== null) {
-    labels.set(match[3]!, { x: parseFloat(match[1]!), y: parseFloat(match[2]!) })
+    labels.set(match[3]!, {
+      x: parseFloat(match[1]!),
+      y: parseFloat(match[2]!),
+    })
   }
   return labels
 }
@@ -164,7 +178,7 @@ function extractPolylines(svg: string): Array<Array<{ x: number; y: number }>> {
   const polylines: Array<Array<{ x: number; y: number }>> = []
   // Match polylines with points attribute anywhere in the tag
   const pattern = /<polyline[^>]*points="([^"]+)"[^>]*>/g
-  let match
+  let match: RegExpExecArray | null
   while ((match = pattern.exec(svg)) !== null) {
     const points = match[1]!.split(' ').map(p => {
       const [x, y] = p.split(',')
@@ -192,7 +206,11 @@ function distanceToPolyline(point: { x: number; y: number }, polyline: Array<{ x
 }
 
 /** Distance from point P to line segment AB */
-function pointToSegmentDist(p: { x: number; y: number }, a: { x: number; y: number }, b: { x: number; y: number }): number {
+function pointToSegmentDist(
+  p: { x: number; y: number },
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+): number {
   const dx = b.x - a.x
   const dy = b.y - a.y
   const lenSq = dx * dx + dy * dy
@@ -208,7 +226,10 @@ function pointToSegmentDist(p: { x: number; y: number }, a: { x: number; y: numb
  * Find the polyline closest to a label position.
  * Returns the minimum distance from the label to any polyline.
  */
-function closestPolylineDistance(label: { x: number; y: number }, polylines: Array<Array<{ x: number; y: number }>>): number {
+function closestPolylineDistance(
+  label: { x: number; y: number },
+  polylines: Array<Array<{ x: number; y: number }>>,
+): number {
   let minDist = Infinity
   for (const pl of polylines) {
     const dist = distanceToPolyline(label, pl)
@@ -412,7 +433,7 @@ describe('renderMermaidSVG – ER label positioning (multi-segment paths)', () =
 
     // Find the background pill rect (rx="2" ry="2" near the label position)
     const pillPattern = /<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)" rx="2" ry="2"/g
-    let pillMatch
+    let pillMatch: RegExpExecArray | null
     let foundPill = false
     while ((pillMatch = pillPattern.exec(svg)) !== null) {
       const px = parseFloat(pillMatch[1]!)

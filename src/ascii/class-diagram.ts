@@ -11,11 +11,11 @@
 // ============================================================================
 
 import { parseClassDiagram } from '../class/parser.ts'
-import type { ClassDiagram, ClassNode, ClassMember, ClassRelationship, RelationshipType } from '../class/types.ts'
-import type { Canvas, AsciiConfig, RoleCanvas, CharRole, AsciiTheme, ColorMode } from './types.ts'
-import { mkCanvas, mkRoleCanvas, canvasToString, increaseSize, increaseRoleCanvasSize, setRole } from './canvas.ts'
+import type { ClassMember, ClassNode, RelationshipType } from '../class/types.ts'
+import { canvasToString, increaseRoleCanvasSize, increaseSize, mkCanvas, mkRoleCanvas, setRole } from './canvas.ts'
 import { drawMultiBox } from './draw.ts'
 import { splitLines } from './multiline-utils.ts'
+import type { AsciiConfig, AsciiTheme, CharRole, ColorMode } from './types.ts'
 
 /** Classify a character from a box drawing as 'border' or 'text'. */
 function classifyBoxChar(ch: string): CharRole {
@@ -87,7 +87,7 @@ function getRelMarker(type: RelationshipType, markerAt: 'from' | 'to'): RelMarke
 function getMarkerShape(
   type: RelationshipType,
   useAscii: boolean,
-  direction?: 'up' | 'down' | 'left' | 'right'
+  direction?: 'up' | 'down' | 'left' | 'right',
 ): string {
   switch (type) {
     case 'inheritance':
@@ -149,14 +149,17 @@ interface PlacedClass {
  * Pipeline: parse → build boxes → level-based layout → draw boxes → draw relationships → string.
  */
 export function renderClassAscii(text: string, config: AsciiConfig, colorMode?: ColorMode, theme?: AsciiTheme): string {
-  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0 && !l.startsWith('%%'))
+  const lines = text
+    .split('\n')
+    .map(l => l.trim())
+    .filter(l => l.length > 0 && !l.startsWith('%%'))
   const diagram = parseClassDiagram(lines)
 
   if (diagram.classes.length === 0) return ''
 
   const useAscii = config.useAscii
-  const hGap = 4  // horizontal gap between class boxes
-  const vGap = 3  // vertical gap between levels (enough for relationship lines)
+  const hGap = 4 // horizontal gap between class boxes
+  const vGap = 3 // vertical gap between levels (enough for relationship lines)
 
   // --- Build box dimensions for each class ---
   const classSections = new Map<string, string[][]>()
@@ -194,7 +197,7 @@ export function renderClassAscii(text: string, config: AsciiConfig, colorMode?: 
   const classById = new Map<string, ClassNode>()
   for (const cls of diagram.classes) classById.set(cls.id, cls)
 
-  const parents = new Map<string, Set<string>>()  // child → set of parent IDs
+  const parents = new Map<string, Set<string>>() // child → set of parent IDs
   const children = new Map<string, Set<string>>() // parent → set of child IDs
 
   for (const rel of diagram.relationships) {
@@ -671,7 +674,7 @@ export function renderClassAscii(text: string, config: AsciiConfig, colorMode?: 
       const startY = labelY - halfHeight
 
       for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
-        const paddedLine = ` ${lines[lineIdx]!} `  // Add space padding on both sides
+        const paddedLine = ` ${lines[lineIdx]!} ` // Add space padding on both sides
         // Calculate label start, but ensure it doesn't go negative
         const idealLabelStart = idealMidX - Math.floor(paddedLine.length / 2)
         const labelStart = Math.max(0, idealLabelStart)

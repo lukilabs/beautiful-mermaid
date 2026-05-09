@@ -6,13 +6,13 @@
 // The renderBox() function accepts custom corner characters, allowing different
 // shapes to reuse the same rendering logic with different visual markers.
 
-import type { Canvas, DrawingCoord, Direction } from '../types.ts'
-import { Up, Down, Left, Right, UpperLeft, UpperRight, LowerLeft, LowerRight, Middle } from '../types.ts'
 import { mkCanvas } from '../canvas.ts'
-import { splitLines } from '../multiline-utils.ts'
-import type { ShapeRenderer, ShapeDimensions, ShapeRenderOptions } from './types.ts'
 import { dirEquals } from '../edge-routing.ts'
+import { splitLines } from '../multiline-utils.ts'
+import type { Canvas, Direction, DrawingCoord } from '../types.ts'
+import { Down, Left, LowerLeft, LowerRight, Right, Up, UpperLeft, UpperRight } from '../types.ts'
 import { type CornerChars, getCorners } from './corners.ts'
+import type { ShapeDimensions, ShapeRenderer, ShapeRenderOptions } from './types.ts'
 
 // ============================================================================
 // Shared dimension calculation
@@ -65,12 +65,7 @@ export function getBoxDimensions(label: string, options: ShapeRenderOptions): Sh
  * @param corners - Corner characters (tl, tr, bl, br)
  * @param useAscii - Whether to use ASCII or Unicode for lines
  */
-export function renderBox(
-  label: string,
-  dimensions: ShapeDimensions,
-  corners: CornerChars,
-  useAscii: boolean
-): Canvas {
+export function renderBox(label: string, dimensions: ShapeDimensions, corners: CornerChars, useAscii: boolean): Canvas {
   const { width, height } = dimensions
   const canvas = mkCanvas(width - 1, height - 1)
 
@@ -101,7 +96,7 @@ export function renderBox(
 
   // Center the multi-line label
   const lines = splitLines(label)
-  const w = width - 1  // Match original grid-based width calculation
+  const w = width - 1 // Match original grid-based width calculation
   const h = height - 1
   const centerY = Math.floor(h / 2)
   const startY = centerY - Math.floor((lines.length - 1) / 2)
@@ -132,7 +127,7 @@ export function renderBox(
 export function getBoxAttachmentPoint(
   dir: Direction,
   dimensions: ShapeDimensions,
-  baseCoord: DrawingCoord
+  baseCoord: DrawingCoord,
 ): DrawingCoord {
   const { width, height } = dimensions
   const centerX = baseCoord.x + Math.floor(width / 2)

@@ -6,8 +6,8 @@
 // centered rendering across all diagram types.
 // ============================================================================
 
-import type { Canvas } from './types.ts'
 import { drawText } from './canvas.ts'
+import type { Canvas } from './types.ts'
 
 /**
  * Split a label into lines.
@@ -39,12 +39,7 @@ export function lineCount(label: string): number {
  * Expands vertically from the center point.
  * Each line is horizontally centered independently.
  */
-export function drawMultilineTextCentered(
-  canvas: Canvas,
-  label: string,
-  cx: number,
-  cy: number
-): void {
+export function drawMultilineTextCentered(canvas: Canvas, label: string, cx: number, cy: number): void {
   const lines = splitLines(label)
   const totalHeight = lines.length
   // Center vertically: start y positions lines evenly around cy
@@ -63,12 +58,7 @@ export function drawMultilineTextCentered(
  * Draw multi-line text left-aligned starting at (x, y).
  * Each subsequent line is placed one row below.
  */
-export function drawMultilineTextLeft(
-  canvas: Canvas,
-  label: string,
-  x: number,
-  y: number
-): void {
+export function drawMultilineTextLeft(canvas: Canvas, label: string, x: number, y: number): void {
   const lines = splitLines(label)
   for (let i = 0; i < lines.length; i++) {
     // Force overwrite for node labels (they take priority)

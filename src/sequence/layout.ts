@@ -1,6 +1,15 @@
-import type { SequenceDiagram, PositionedSequenceDiagram, PositionedActor, Lifeline, PositionedMessage, Activation, PositionedBlock, PositionedNote } from './types.ts'
-import type { RenderOptions } from '../types.ts'
 import { estimateTextWidth, FONT_SIZES, FONT_WEIGHTS } from '../styles.ts'
+import type { RenderOptions } from '../types.ts'
+import type {
+  Activation,
+  Lifeline,
+  PositionedActor,
+  PositionedBlock,
+  PositionedMessage,
+  PositionedNote,
+  PositionedSequenceDiagram,
+  SequenceDiagram,
+} from './types.ts'
 
 // ============================================================================
 // Sequence diagram layout engine
@@ -54,10 +63,19 @@ const SEQ = {
  */
 export function layoutSequenceDiagram(
   diagram: SequenceDiagram,
-  _options: RenderOptions = {}
+  _options: RenderOptions = {},
 ): PositionedSequenceDiagram {
   if (diagram.actors.length === 0) {
-    return { width: 0, height: 0, actors: [], lifelines: [], messages: [], activations: [], blocks: [], notes: [] }
+    return {
+      width: 0,
+      height: 0,
+      actors: [],
+      lifelines: [],
+      messages: [],
+      activations: [],
+      blocks: [],
+      notes: [],
+    }
   }
 
   // 1. Calculate actor widths and assign horizontal positions (center X)
@@ -151,7 +169,8 @@ export function layoutSequenceDiagram(
       label: msg.label,
       lineStyle: msg.lineStyle,
       arrowHead: msg.arrowHead,
-      x1, x2,
+      x1,
+      x2,
       y: messageY,
       isSelf,
     })
@@ -201,7 +220,7 @@ export function layoutSequenceDiagram(
       for (const note of notesForMsg) {
         const noteW = Math.max(
           SEQ.noteWidth,
-          estimateTextWidth(note.text, FONT_SIZES.edgeLabel, FONT_WEIGHTS.edgeLabel) + SEQ.notePadX * 2
+          estimateTextWidth(note.text, FONT_SIZES.edgeLabel, FONT_WEIGHTS.edgeLabel) + SEQ.notePadX * 2,
         )
         const noteH = FONT_SIZES.edgeLabel + SEQ.notePadY * 2
 
@@ -310,9 +329,7 @@ export function layoutSequenceDiagram(
         const msgLabelW = estimateTextWidth(msg.label, FONT_SIZES.edgeLabel, FONT_WEIGHTS.edgeLabel)
         // Self-messages render labels at x1 + 36 (left-aligned); normal
         // messages center the label between the two actor lifelines.
-        const msgLabelLeft = msg.isSelf
-          ? msg.x1 + 36
-          : (msg.x1 + msg.x2) / 2 - msgLabelW / 2
+        const msgLabelLeft = msg.isSelf ? msg.x1 + 36 : (msg.x1 + msg.x2) / 2 - msgLabelW / 2
         const msgLabelRight = msgLabelLeft + msgLabelW
 
         if (divLabelRight > msgLabelLeft && divLabelLeft < msgLabelRight) {
@@ -377,9 +394,14 @@ export function layoutSequenceDiagram(
   const shiftX = globalMinX < SEQ.padding ? SEQ.padding - globalMinX : 0
   if (shiftX > 0) {
     for (const a of actors) a.x += shiftX
-    for (const m of messages) { m.x1 += shiftX; m.x2 += shiftX }
+    for (const m of messages) {
+      m.x1 += shiftX
+      m.x2 += shiftX
+    }
     for (const act of activations) act.x += shiftX
-    for (const b of blocks) { b.x += shiftX; }
+    for (const b of blocks) {
+      b.x += shiftX
+    }
     for (const n of notes) n.x += shiftX
     // Also shift actor center X array (used for lifelines below)
     for (let i = 0; i < actorCenterX.length; i++) actorCenterX[i]! += shiftX

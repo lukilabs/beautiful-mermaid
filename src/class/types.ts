@@ -45,12 +45,12 @@ export interface ClassMember {
 
 /** Relationship types following UML conventions */
 export type RelationshipType =
-  | 'inheritance'   // A <|-- B   (solid line, hollow triangle)
-  | 'composition'   // A *-- B    (solid line, filled diamond)
-  | 'aggregation'   // A o-- B    (solid line, hollow diamond)
-  | 'association'   // A --> B    (solid line, open arrow)
-  | 'dependency'    // A ..> B    (dashed line, open arrow)
-  | 'realization'   // A ..|> B   (dashed line, hollow triangle)
+  | 'inheritance' // A <|-- B   (solid line, hollow triangle)
+  | 'composition' // A *-- B    (solid line, filled diamond)
+  | 'aggregation' // A o-- B    (solid line, hollow diamond)
+  | 'association' // A --> B    (solid line, open arrow)
+  | 'dependency' // A ..> B    (dashed line, open arrow)
+  | 'realization' // A ..|> B   (dashed line, hollow triangle)
 
 export interface ClassRelationship {
   from: string

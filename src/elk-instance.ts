@@ -14,7 +14,7 @@
  */
 
 import type { ElkNode } from 'elkjs'
-// @ts-ignore — static import of bundled ELK
+// @ts-expect-error — static import of bundled ELK
 import ELKBundled from 'elkjs/lib/elk.bundled.js'
 
 interface RawFakeWorker {
@@ -42,9 +42,12 @@ function ensureElk(): void {
   // Capture setTimeout(0) callbacks queued during ELK construction
   const pending: (() => void)[] = []
   const origSetTimeout = globalThis.setTimeout
-  // @ts-ignore — simplified signature for our interception
+  // @ts-expect-error — simplified signature for our interception
   globalThis.setTimeout = (fn: () => void, delay?: number) => {
-    if (delay === 0) { pending.push(fn); return 0 }
+    if (delay === 0) {
+      pending.push(fn)
+      return 0
+    }
     return origSetTimeout(fn, delay)
   }
 
@@ -67,7 +70,9 @@ function ensureElk(): void {
   globalThis.setTimeout = origSetTimeout
 
   // Flush captured callbacks synchronously — registers layout algorithms
-  pending.forEach(fn => fn())
+  pending.forEach(fn => {
+    fn()
+  })
 
   // Cache the raw FakeWorker for elkLayoutSync()
   rawWorker = (elk as unknown as { worker: { worker: RawFakeWorker } }).worker.worker
@@ -102,7 +107,9 @@ export function elkLayoutSync(graph: ElkNode): ElkNode {
   // Call dispatcher.saveDispatch directly — bypasses FakeWorker.postMessage's
   // setTimeout(0) wrapper. The dispatcher processes the layout synchronously
   // and calls rawWorker.onmessage with the result.
-  rawWorker!.dispatcher.saveDispatch({ data: { id: 0, cmd: 'layout', graph } as unknown as Record<string, unknown> })
+  rawWorker!.dispatcher.saveDispatch({
+    data: { id: 0, cmd: 'layout', graph } as unknown as Record<string, unknown>,
+  })
 
   // Restore original handler
   rawWorker!.onmessage = origOnmessage

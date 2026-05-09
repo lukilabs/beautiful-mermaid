@@ -6,13 +6,21 @@
 // and dual-path comparison for optimal edge routing.
 // ============================================================================
 
-import type { GridCoord, Direction, AsciiEdge, AsciiGraph } from './types.ts'
-import {
-  Up, Down, Left, Right, UpperRight, UpperLeft, LowerRight, LowerLeft, Middle,
-  gridCoordDirection,
-} from './types.ts'
+import { getNodeSubgraph } from './grid.ts'
 import { getPath, mergePath } from './pathfinder.ts'
-import { getEffectiveDirection, getNodeSubgraph } from './grid.ts'
+import type { AsciiEdge, AsciiGraph, Direction, GridCoord } from './types.ts'
+import {
+  Down,
+  gridCoordDirection,
+  Left,
+  LowerLeft,
+  LowerRight,
+  Middle,
+  Right,
+  Up,
+  UpperLeft,
+  UpperRight,
+} from './types.ts'
 
 // ============================================================================
 // Direction utilities
@@ -81,57 +89,82 @@ export function determineStartAndEndDir(
   let alternativeDir: Direction
   let alternativeOppositeDir: Direction
 
-  const isBackwards = graphDirection === 'LR'
-    ? (dirEquals(d, Left) || dirEquals(d, UpperLeft) || dirEquals(d, LowerLeft))
-    : (dirEquals(d, Up) || dirEquals(d, UpperLeft) || dirEquals(d, UpperRight))
+  const isBackwards =
+    graphDirection === 'LR'
+      ? dirEquals(d, Left) || dirEquals(d, UpperLeft) || dirEquals(d, LowerLeft)
+      : dirEquals(d, Up) || dirEquals(d, UpperLeft) || dirEquals(d, UpperRight)
 
   if (dirEquals(d, LowerRight)) {
     if (graphDirection === 'LR') {
-      preferredDir = Down; preferredOppositeDir = Left
-      alternativeDir = Right; alternativeOppositeDir = Up
+      preferredDir = Down
+      preferredOppositeDir = Left
+      alternativeDir = Right
+      alternativeOppositeDir = Up
     } else {
-      preferredDir = Right; preferredOppositeDir = Up
-      alternativeDir = Down; alternativeOppositeDir = Left
+      preferredDir = Right
+      preferredOppositeDir = Up
+      alternativeDir = Down
+      alternativeOppositeDir = Left
     }
   } else if (dirEquals(d, UpperRight)) {
     if (graphDirection === 'LR') {
-      preferredDir = Up; preferredOppositeDir = Left
-      alternativeDir = Right; alternativeOppositeDir = Down
+      preferredDir = Up
+      preferredOppositeDir = Left
+      alternativeDir = Right
+      alternativeOppositeDir = Down
     } else {
-      preferredDir = Right; preferredOppositeDir = Down
-      alternativeDir = Up; alternativeOppositeDir = Left
+      preferredDir = Right
+      preferredOppositeDir = Down
+      alternativeDir = Up
+      alternativeOppositeDir = Left
     }
   } else if (dirEquals(d, LowerLeft)) {
     if (graphDirection === 'LR') {
-      preferredDir = Down; preferredOppositeDir = Down
-      alternativeDir = Left; alternativeOppositeDir = Up
+      preferredDir = Down
+      preferredOppositeDir = Down
+      alternativeDir = Left
+      alternativeOppositeDir = Up
     } else {
-      preferredDir = Left; preferredOppositeDir = Up
-      alternativeDir = Down; alternativeOppositeDir = Right
+      preferredDir = Left
+      preferredOppositeDir = Up
+      alternativeDir = Down
+      alternativeOppositeDir = Right
     }
   } else if (dirEquals(d, UpperLeft)) {
     if (graphDirection === 'LR') {
-      preferredDir = Down; preferredOppositeDir = Down
-      alternativeDir = Left; alternativeOppositeDir = Down
+      preferredDir = Down
+      preferredOppositeDir = Down
+      alternativeDir = Left
+      alternativeOppositeDir = Down
     } else {
-      preferredDir = Right; preferredOppositeDir = Right
-      alternativeDir = Up; alternativeOppositeDir = Right
+      preferredDir = Right
+      preferredOppositeDir = Right
+      alternativeDir = Up
+      alternativeOppositeDir = Right
     }
   } else if (isBackwards) {
     if (graphDirection === 'LR' && dirEquals(d, Left)) {
-      preferredDir = Down; preferredOppositeDir = Down
-      alternativeDir = Left; alternativeOppositeDir = Right
+      preferredDir = Down
+      preferredOppositeDir = Down
+      alternativeDir = Left
+      alternativeOppositeDir = Right
     } else if (graphDirection === 'TD' && dirEquals(d, Up)) {
-      preferredDir = Right; preferredOppositeDir = Right
-      alternativeDir = Up; alternativeOppositeDir = Down
+      preferredDir = Right
+      preferredOppositeDir = Right
+      alternativeDir = Up
+      alternativeOppositeDir = Down
     } else {
-      preferredDir = d; preferredOppositeDir = getOpposite(d)
-      alternativeDir = d; alternativeOppositeDir = getOpposite(d)
+      preferredDir = d
+      preferredOppositeDir = getOpposite(d)
+      alternativeDir = d
+      alternativeOppositeDir = getOpposite(d)
     }
   } else {
     // Default: go in the natural direction
-    preferredDir = d; preferredOppositeDir = getOpposite(d)
-    alternativeDir = d; alternativeOppositeDir = getOpposite(d)
+    preferredDir = d
+    preferredOppositeDir = getOpposite(d)
+    alternativeDir = d
+    alternativeOppositeDir = getOpposite(d)
   }
 
   return [preferredDir, preferredOppositeDir, alternativeDir, alternativeOppositeDir]
@@ -158,12 +191,13 @@ export function determinePath(graph: AsciiGraph, edge: AsciiEdge): void {
   // Otherwise, use the graph's direction (not source's effective direction)
   const sourceSg = getNodeSubgraph(graph, edge.from)
   const targetSg = getNodeSubgraph(graph, edge.to)
-  const effectiveDir = (sourceSg && sourceSg === targetSg && sourceSg.direction)
-    ? sourceSg.direction
-    : graph.config.graphDirection
+  const effectiveDir =
+    sourceSg && sourceSg === targetSg && sourceSg.direction ? sourceSg.direction : graph.config.graphDirection
 
-  const [preferredDir, preferredOppositeDir, alternativeDir, alternativeOppositeDir] =
-    determineStartAndEndDir(edge, effectiveDir)
+  const [preferredDir, preferredOppositeDir, alternativeDir, alternativeOppositeDir] = determineStartAndEndDir(
+    edge,
+    effectiveDir,
+  )
 
   // Try preferred path
   const prefFrom = gridCoordDirection(edge.from.gridCoord!, preferredDir)
@@ -229,7 +263,7 @@ export function determineLabelLine(graph: AsciiGraph, edge: AsciiEdge): void {
 
   const lenLabel = edge.text.length
   const pathLen = edge.path.length
-  const isVerticalFlow = graph.config.graphDirection === 'TD'
+  const _isVerticalFlow = graph.config.graphDirection === 'TD'
 
   // Collect all segments with their widths and orientation
   const segments: {

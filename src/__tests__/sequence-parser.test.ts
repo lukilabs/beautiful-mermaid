@@ -4,12 +4,15 @@
  * Covers: participants, actors, messages (solid/dashed, filled/open arrows),
  * activation/deactivation, blocks (loop/alt/opt/par), notes, auto-created actors.
  */
-import { describe, it, expect } from 'bun:test'
+import { describe, expect, it } from 'bun:test'
 import { parseSequenceDiagram } from '../sequence/parser.ts'
 
 /** Helper to parse — preprocesses text the same way index.ts does */
 function parse(text: string) {
-  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0 && !l.startsWith('%%'))
+  const lines = text
+    .split('\n')
+    .map(l => l.trim())
+    .filter(l => l.length > 0 && !l.startsWith('%%'))
   return parseSequenceDiagram(lines)
 }
 

@@ -6,8 +6,8 @@
 // paths between nodes on the grid. Prefers straight lines over zigzags.
 // ============================================================================
 
-import type { GridCoord, AsciiNode } from './types.ts'
-import { gridKey, gridCoordEquals } from './types.ts'
+import type { AsciiNode, GridCoord } from './types.ts'
+import { gridCoordEquals, gridKey } from './types.ts'
 
 // ============================================================================
 // Priority queue (min-heap) for A* open set
@@ -118,11 +118,7 @@ function isFreeInGrid(grid: Map<string, AsciiNode>, c: GridCoord): boolean {
  * Find a path from `from` to `to` on the grid using A*.
  * Returns the path as an array of GridCoords, or null if no path exists.
  */
-export function getPath(
-  grid: Map<string, AsciiNode>,
-  from: GridCoord,
-  to: GridCoord,
-): GridCoord[] | null {
+export function getPath(grid: Map<string, AsciiNode>, from: GridCoord, to: GridCoord): GridCoord[] | null {
   const pq = new MinHeap()
   pq.push({ coord: from, priority: 0 })
 

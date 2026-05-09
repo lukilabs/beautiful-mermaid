@@ -19,32 +19,31 @@
 //   const svg = renderMermaidSVG('graph TD\n  A --> B')
 // ============================================================================
 
-export type { RenderOptions, MermaidGraph, PositionedGraph } from './types.ts'
-export type { DiagramColors, ThemeName } from './theme.ts'
-export { fromShikiTheme, THEMES, DEFAULTS } from './theme.ts'
-export { parseMermaid } from './parser.ts'
-export { renderMermaidASCII, renderMermaidAscii } from './ascii/index.ts'
 export type { AsciiRenderOptions } from './ascii/index.ts'
+export { renderMermaidASCII, renderMermaidAscii } from './ascii/index.ts'
+export { parseMermaid } from './parser.ts'
+export type { DiagramColors, ThemeName } from './theme.ts'
+export { DEFAULTS, fromShikiTheme, THEMES } from './theme.ts'
+export type { MermaidGraph, PositionedGraph, RenderOptions } from './types.ts'
 
 import { decodeXML } from 'entities'
-import { parseMermaid } from './parser.ts'
+import { layoutClassDiagramSync } from './class/layout.ts'
+import { parseClassDiagram } from './class/parser.ts'
+import { renderClassSvg } from './class/renderer.ts'
+import { layoutErDiagramSync } from './er/layout.ts'
+import { parseErDiagram } from './er/parser.ts'
+import { renderErSvg } from './er/renderer.ts'
 import { layoutGraphSync } from './layout.ts'
+import { parseMermaid } from './parser.ts'
 import { renderSvg } from './renderer.ts'
-import type { RenderOptions } from './types.ts'
+import { layoutSequenceDiagram } from './sequence/layout.ts'
+import { parseSequenceDiagram } from './sequence/parser.ts'
+import { renderSequenceSvg } from './sequence/renderer.ts'
 import type { DiagramColors } from './theme.ts'
 import { DEFAULTS } from './theme.ts'
-
-import { parseSequenceDiagram } from './sequence/parser.ts'
-import { layoutSequenceDiagram } from './sequence/layout.ts'
-import { renderSequenceSvg } from './sequence/renderer.ts'
-import { parseClassDiagram } from './class/parser.ts'
-import { layoutClassDiagramSync } from './class/layout.ts'
-import { renderClassSvg } from './class/renderer.ts'
-import { parseErDiagram } from './er/parser.ts'
-import { layoutErDiagramSync } from './er/layout.ts'
-import { renderErSvg } from './er/renderer.ts'
-import { parseXYChart } from './xychart/parser.ts'
+import type { RenderOptions } from './types.ts'
 import { layoutXYChart } from './xychart/layout.ts'
+import { parseXYChart } from './xychart/parser.ts'
 import { renderXYChartSvg } from './xychart/renderer.ts'
 
 /**
@@ -108,10 +107,7 @@ function buildColors(options: RenderOptions): DiagramColors {
  * })
  * ```
  */
-export function renderMermaidSVG(
-  text: string,
-  options: RenderOptions = {}
-): string {
+export function renderMermaidSVG(text: string, options: RenderOptions = {}): string {
   // Decode XML entities that may leak from markdown parsers (e.g. rehype-raw).
   // Without this, escapeXml() double-encodes them: &lt; → &amp;lt; → literal "&lt;" in SVG.
   text = decodeXML(text)
@@ -121,7 +117,10 @@ export function renderMermaidSVG(
   const transparent = options.transparent ?? false
   const diagramType = detectDiagramType(text)
 
-  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0 && !l.startsWith('%%'))
+  const lines = text
+    .split('\n')
+    .map(l => l.trim())
+    .filter(l => l.length > 0 && !l.startsWith('%%'))
 
   switch (diagramType) {
     case 'sequence': {
@@ -144,7 +143,6 @@ export function renderMermaidSVG(
       const positioned = layoutXYChart(chart, options)
       return renderXYChartSvg(positioned, colors, font, transparent, options.interactive ?? false)
     }
-    case 'flowchart':
     default: {
       const graph = parseMermaid(text)
       const positioned = layoutGraphSync(graph, options)
@@ -159,10 +157,7 @@ export function renderMermaidSVG(
  * Same result as renderMermaidSVG() but returns a Promise.
  * Useful in async contexts (server handlers, data loaders, etc.)
  */
-export async function renderMermaidSVGAsync(
-  text: string,
-  options: RenderOptions = {}
-): Promise<string> {
+export async function renderMermaidSVGAsync(text: string, options: RenderOptions = {}): Promise<string> {
   return renderMermaidSVG(text, options)
 }
 

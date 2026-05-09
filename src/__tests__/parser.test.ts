@@ -9,7 +9,7 @@
  *   state aliases, direction override
  * - Comments and error cases
  */
-import { describe, it, expect } from 'bun:test'
+import { describe, expect, it } from 'bun:test'
 import { parseMermaid } from '../parser.ts'
 
 // ============================================================================
@@ -27,7 +27,7 @@ describe('parseMermaid – graph header', () => {
     expect(g.direction).toBe('LR')
   })
 
-  it.each(['TD', 'TB', 'LR', 'BT', 'RL'] as const)('accepts direction %s', (dir) => {
+  it.each(['TD', 'TB', 'LR', 'BT', 'RL'] as const)('accepts direction %s', dir => {
     const g = parseMermaid(`graph ${dir}\n  A --> B`)
     expect(g.direction).toBe(dir)
   })
@@ -306,7 +306,7 @@ describe('parseMermaid – bidirectional arrows', () => {
     expect(g.edges[0]!.hasArrowEnd).toBe(true)
   })
 
-  it('parses dotted bidirectional: <-.->',  () => {
+  it('parses dotted bidirectional: <-.->', () => {
     const g = parseMermaid('graph TD\n  A <-.-> B')
     expect(g.edges[0]!.style).toBe('dotted')
     expect(g.edges[0]!.hasArrowStart).toBe(true)
@@ -619,8 +619,8 @@ describe('parseMermaid – classDef and class', () => {
       A --> B`)
     expect(g.classDefs.has('highlight')).toBe(true)
     const props = g.classDefs.get('highlight')!
-    expect(props['fill']).toBe('#f96')
-    expect(props['stroke']).toBe('#333')
+    expect(props.fill).toBe('#f96')
+    expect(props.stroke).toBe('#333')
   })
 
   it('parses class assignments to single node', () => {

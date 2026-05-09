@@ -1,5 +1,5 @@
-import type { ErDiagram, ErEntity, ErAttribute, ErRelationship, Cardinality } from './types.ts'
 import { normalizeBrTags } from '../multiline-utils.ts'
+import type { Cardinality, ErAttribute, ErDiagram, ErEntity, ErRelationship } from './types.ts'
 
 // ============================================================================
 // ER diagram parser
@@ -74,7 +74,6 @@ export function parseErDiagram(lines: string[]): ErDiagram {
       ensureEntity(entityMap, rel.entity1)
       ensureEntity(entityMap, rel.entity2)
       diagram.relationships.push(rel)
-      continue
     }
   }
 

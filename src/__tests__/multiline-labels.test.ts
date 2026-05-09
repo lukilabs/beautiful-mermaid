@@ -8,14 +8,14 @@
  * - Renderer: <tspan> generation for node and edge labels
  * - Integration: full SVG output with multi-line labels
  */
-import { describe, it, expect } from 'bun:test'
-import { parseMermaid } from '../parser.ts'
-import { parseSequenceDiagram } from '../sequence/parser.ts'
+import { describe, expect, it } from 'bun:test'
 import { parseClassDiagram } from '../class/parser.ts'
 import { parseErDiagram } from '../er/parser.ts'
-import { measureMultilineText, LINE_HEIGHT_RATIO, measureTextWidth } from '../text-metrics.ts'
 import { renderMermaid } from '../index.ts'
 import { normalizeBrTags, stripFormattingTags } from '../multiline-utils.ts'
+import { parseMermaid } from '../parser.ts'
+import { parseSequenceDiagram } from '../sequence/parser.ts'
+import { LINE_HEIGHT_RATIO, measureMultilineText, measureTextWidth } from '../text-metrics.ts'
 
 // ============================================================================
 // Parser: <br> tag normalization
@@ -150,7 +150,15 @@ describe('parseMermaid – <br> tag normalization', () => {
     })
 
     it('normalizes <br> in divider labels', () => {
-      const lines = ['sequenceDiagram', 'A->>B: Hello', 'alt First<br>case', 'A->>B: a', 'else Second<br>case', 'A->>B: b', 'end']
+      const lines = [
+        'sequenceDiagram',
+        'A->>B: Hello',
+        'alt First<br>case',
+        'A->>B: a',
+        'else Second<br>case',
+        'A->>B: b',
+        'end',
+      ]
       const diagram = parseSequenceDiagram(lines)
       expect(diagram.blocks[0]!.dividers[0]!.label).toBe('Second\ncase')
     })

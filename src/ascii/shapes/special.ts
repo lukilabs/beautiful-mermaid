@@ -5,14 +5,12 @@
 // Some shapes have unique internal structure (subroutine, cylinder) and keep
 // custom rendering. Others use the corner decorator pattern for simplicity.
 
-import type { Canvas, DrawingCoord, Direction } from '../types.ts'
-import { Up, Down, Left, Right } from '../types.ts'
 import { mkCanvas } from '../canvas.ts'
 import { splitLines } from '../multiline-utils.ts'
-import type { ShapeRenderer, ShapeDimensions, ShapeRenderOptions } from './types.ts'
-import { dirEquals } from '../edge-routing.ts'
-import { getBoxDimensions, renderBox, getBoxAttachmentPoint } from './rectangle.ts'
+import type { Canvas } from '../types.ts'
 import { getCorners } from './corners.ts'
+import { getBoxAttachmentPoint, getBoxDimensions, renderBox } from './rectangle.ts'
+import type { ShapeDimensions, ShapeRenderer, ShapeRenderOptions } from './types.ts'
 
 // ============================================================================
 // Subroutine — keeps custom double-border rendering
@@ -32,7 +30,7 @@ export const subroutineRenderer: ShapeRenderer = {
     const lineCount = lines.length
 
     const innerWidth = 2 * options.padding + maxLineWidth
-    const width = innerWidth + 4  // Double borders on each side
+    const width = innerWidth + 4 // Double borders on each side
     const innerHeight = lineCount + 2 * options.padding
     const height = innerHeight + 2
 
@@ -147,7 +145,7 @@ export const cylinderRenderer: ShapeRenderer = {
 
     const innerWidth = 2 * options.padding + maxLineWidth
     const width = innerWidth + 2
-    const innerHeight = lineCount + 2 * options.padding + 2  // Extra for curved top/bottom
+    const innerHeight = lineCount + 2 * options.padding + 2 // Extra for curved top/bottom
     const height = innerHeight + 2
 
     return {
@@ -193,9 +191,9 @@ export const cylinderRenderer: ShapeRenderer = {
     canvas[width - 1]![height - 2] = vChar
 
     // Bottom ellipse
-    canvas[0]![height - 1] = options.useAscii ? '\'' : '╰'
+    canvas[0]![height - 1] = options.useAscii ? "'" : '╰'
     for (let x = 1; x < width - 1; x++) canvas[x]![height - 1] = hChar
-    canvas[width - 1]![height - 1] = options.useAscii ? '\'' : '╯'
+    canvas[width - 1]![height - 1] = options.useAscii ? "'" : '╯'
 
     // Center the label
     const lines = splitLines(label)

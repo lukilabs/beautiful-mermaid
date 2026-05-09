@@ -17,16 +17,16 @@
 // ============================================================================
 
 import { parseMermaid } from '../parser.ts'
-import { convertToAsciiGraph } from './converter.ts'
-import { createMapping } from './grid.ts'
-import { drawGraph } from './draw.ts'
+import { DEFAULT_ASCII_THEME, detectColorMode, diagramColorsToAsciiTheme } from './ansi.ts'
 import { canvasToString, flipCanvasVertically, flipRoleCanvasVertically } from './canvas.ts'
-import { renderSequenceAscii } from './sequence.ts'
 import { renderClassAscii } from './class-diagram.ts'
+import { convertToAsciiGraph } from './converter.ts'
+import { drawGraph } from './draw.ts'
 import { renderErAscii } from './er-diagram.ts'
-import { renderXYChartAscii } from './xychart.ts'
-import { detectColorMode, DEFAULT_ASCII_THEME, diagramColorsToAsciiTheme } from './ansi.ts'
+import { createMapping } from './grid.ts'
+import { renderSequenceAscii } from './sequence.ts'
 import type { AsciiConfig, AsciiTheme, ColorMode } from './types.ts'
+import { renderXYChartAscii } from './xychart.ts'
 
 // Re-export types for external use
 export type { AsciiTheme, ColorMode }
@@ -98,10 +98,7 @@ function detectDiagramType(text: string): 'flowchart' | 'sequence' | 'class' | '
  * // +---+     +---+     +---+
  * ```
  */
-export function renderMermaidASCII(
-  text: string,
-  options: AsciiRenderOptions = {},
-): string {
+export function renderMermaidASCII(text: string, options: AsciiRenderOptions = {}): string {
   const config: AsciiConfig = {
     useAscii: options.useAscii ?? false,
     paddingX: options.paddingX ?? 5,
@@ -111,9 +108,8 @@ export function renderMermaidASCII(
   }
 
   // Resolve color mode ('auto' or unset → detect environment, otherwise use specified mode)
-  const colorMode: ColorMode = options.colorMode === 'auto' || options.colorMode === undefined
-    ? detectColorMode()
-    : options.colorMode
+  const colorMode: ColorMode =
+    options.colorMode === 'auto' || options.colorMode === undefined ? detectColorMode() : options.colorMode
 
   // Merge user theme with defaults
   const theme: AsciiTheme = { ...DEFAULT_ASCII_THEME, ...options.theme }
@@ -132,8 +128,6 @@ export function renderMermaidASCII(
 
     case 'er':
       return renderErAscii(text, config, colorMode, theme)
-
-    case 'flowchart':
     default: {
       // Flowchart + state diagram pipeline (original)
       const parsed = parseMermaid(text)

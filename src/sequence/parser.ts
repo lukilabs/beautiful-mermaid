@@ -1,5 +1,5 @@
-import type { SequenceDiagram, Actor, Message, Block, Note } from './types.ts'
 import { normalizeBrTags } from '../multiline-utils.ts'
+import type { Block, Message, SequenceDiagram } from './types.ts'
 
 // ============================================================================
 // Sequence diagram parser
@@ -39,7 +39,12 @@ export function parseSequenceDiagram(lines: string[]): SequenceDiagram {
   // Track actor IDs to auto-create actors referenced in messages
   const actorIds = new Set<string>()
   // Track block nesting with a stack
-  const blockStack: Array<{ type: Block['type']; label: string; startIndex: number; dividers: Block['dividers'] }> = []
+  const blockStack: Array<{
+    type: Block['type']
+    label: string
+    startIndex: number
+    dividers: Block['dividers']
+  }> = []
 
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i]!
@@ -130,9 +135,7 @@ export function parseSequenceDiagram(lines: string[]): SequenceDiagram {
     // --- Message ---
     // Patterns: A->>B, A-->>B, A-)B, A--)B, with optional +/- activation
     // Format: FROM ARROW TO: LABEL
-    const msgMatch = line.match(
-      /^(\S+?)\s*(--?>?>|--?[)x]|--?>>|--?>)\s*([+-]?)(\S+?)\s*:\s*(.+)$/
-    )
+    const msgMatch = line.match(/^(\S+?)\s*(--?>?>|--?[)x]|--?>>|--?>)\s*([+-]?)(\S+?)\s*:\s*(.+)$/)
     if (msgMatch) {
       const from = msgMatch[1]!
       const arrow = msgMatch[2]!
@@ -166,9 +169,7 @@ export function parseSequenceDiagram(lines: string[]): SequenceDiagram {
     }
 
     // --- Simplified message format: A->>B: Label (fallback with more relaxed regex) ---
-    const simpleMsgMatch = line.match(
-      /^(\S+?)\s*(->>|-->>|-\)|--\)|-x|--x|->|-->)\s*([+-]?)(\S+?)\s*:\s*(.+)$/
-    )
+    const simpleMsgMatch = line.match(/^(\S+?)\s*(->>|-->>|-\)|--\)|-x|--x|->|-->)\s*([+-]?)(\S+?)\s*:\s*(.+)$/)
     if (simpleMsgMatch) {
       const from = simpleMsgMatch[1]!
       const arrow = simpleMsgMatch[2]!
@@ -187,7 +188,6 @@ export function parseSequenceDiagram(lines: string[]): SequenceDiagram {
       if (activationMark === '-') msg.deactivate = true
 
       diagram.messages.push(msg)
-      continue
     }
 
     // --- activate / deactivate explicit commands ---

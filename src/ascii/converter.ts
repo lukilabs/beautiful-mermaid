@@ -7,11 +7,9 @@
 // ============================================================================
 
 import type { MermaidGraph, MermaidSubgraph } from '../types.ts'
-import type {
-  AsciiGraph, AsciiNode, AsciiEdge, AsciiSubgraph, AsciiConfig,
-} from './types.ts'
-import { EMPTY_STYLE } from './types.ts'
 import { mkCanvas, mkRoleCanvas } from './canvas.ts'
+import type { AsciiConfig, AsciiEdge, AsciiGraph, AsciiNode, AsciiSubgraph } from './types.ts'
+import { EMPTY_STYLE } from './types.ts'
 
 /**
  * Convert a parsed MermaidGraph into an AsciiGraph ready for grid layout.
@@ -124,7 +122,7 @@ function convertSubgraph(
   // Normalize subgraph direction: BT→TD, RL→LR (same as root graph normalization)
   let normalizedDirection: 'LR' | 'TD' | undefined
   if (mSg.direction) {
-    normalizedDirection = (mSg.direction === 'LR' || mSg.direction === 'RL') ? 'LR' : 'TD'
+    normalizedDirection = mSg.direction === 'LR' || mSg.direction === 'RL' ? 'LR' : 'TD'
   }
 
   const sg: AsciiSubgraph = {
@@ -132,7 +130,10 @@ function convertSubgraph(
     nodes: [],
     parent,
     children: [],
-    minX: 0, minY: 0, maxX: 0, maxY: 0,
+    minX: 0,
+    minY: 0,
+    maxX: 0,
+    maxY: 0,
     direction: normalizedDirection,
   }
 
@@ -178,7 +179,7 @@ function deduplicateSubgraphNodes(
   mermaidSubgraphs: MermaidSubgraph[],
   asciiSubgraphs: AsciiSubgraph[],
   nodeMap: Map<string, AsciiNode>,
-  parsed: MermaidGraph,
+  _parsed: MermaidGraph,
 ): void {
   // Build a map from MermaidSubgraph to its corresponding AsciiSubgraph.
   // The ordering matches since we convert them in the same order.
@@ -224,7 +225,10 @@ function deduplicateSubgraphNodes(
       // Find this node's ID in the nodeMap
       let nodeId: string | undefined
       for (const [id, n] of nodeMap) {
-        if (n === node) { nodeId = id; break }
+        if (n === node) {
+          nodeId = id
+          break
+        }
       }
       if (!nodeId) return false
 
@@ -248,11 +252,7 @@ function isAncestorOrSelf(candidate: AsciiSubgraph, target: AsciiSubgraph): bool
 }
 
 /** Build a mapping from MermaidSubgraph → AsciiSubgraph (matching by position). */
-function buildSgMap(
-  mSgs: MermaidSubgraph[],
-  aSgs: AsciiSubgraph[],
-  result: Map<MermaidSubgraph, AsciiSubgraph>,
-): void {
+function buildSgMap(mSgs: MermaidSubgraph[], aSgs: AsciiSubgraph[], result: Map<MermaidSubgraph, AsciiSubgraph>): void {
   // The asciiSubgraphs array is flat (all subgraphs including nested ones),
   // while mermaidSubgraphs is hierarchical. We need to flatten the mermaid tree
   // in the same order the converter processes them (pre-order DFS).

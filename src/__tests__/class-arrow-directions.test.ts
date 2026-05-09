@@ -7,11 +7,10 @@
  * - Composition/Aggregation: diamonds are omnidirectional
  */
 
-import { describe, test, expect } from 'bun:test'
+import { describe, expect, test } from 'bun:test'
 import { renderMermaidAscii } from '../ascii/index.ts'
 
 describe('Class Diagram Arrow Directions', () => {
-
   // ============================================================================
   // INHERITANCE (<|--)
   // ============================================================================

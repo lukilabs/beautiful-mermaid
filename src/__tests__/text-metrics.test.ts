@@ -1,7 +1,7 @@
 /**
  * Tests for text-metrics module — variable-width character measurement.
  */
-import { describe, it, expect } from 'bun:test'
+import { describe, expect, it } from 'bun:test'
 import { getCharWidth, measureTextWidth } from '../text-metrics'
 
 // ============================================================================

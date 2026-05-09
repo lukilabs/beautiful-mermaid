@@ -6,21 +6,38 @@
 // subgraphs, labels, and the top-level draw orchestrator.
 // ============================================================================
 
-import type {
-  Canvas, DrawingCoord, GridCoord, Direction,
-  AsciiGraph, AsciiNode, AsciiEdge, AsciiSubgraph, AsciiEdgeStyle, EdgeBundle,
-} from './types.ts'
-import {
-  Up, Down, Left, Right, UpperLeft, UpperRight, LowerLeft, LowerRight, Middle,
-  drawingCoordEquals,
-} from './types.ts'
-import { mkCanvas, copyCanvas, getCanvasSize, mergeCanvases, drawText, mkRoleCanvas, setRole, mergeRoleCanvases } from './canvas.ts'
-import type { RoleCanvas, CharRole } from './types.ts'
+import { copyCanvas, drawText, mergeCanvases, mkCanvas, setRole } from './canvas.ts'
 import { determineDirection, dirEquals } from './edge-routing.ts'
 import { gridToDrawingCoord, lineToDrawing } from './grid.ts'
 import { splitLines } from './multiline-utils.ts'
 import { getCorners } from './shapes/corners.ts'
 import { getShapeAttachmentPoint } from './shapes/index.ts'
+import type {
+  AsciiEdge,
+  AsciiEdgeStyle,
+  AsciiGraph,
+  AsciiNode,
+  AsciiSubgraph,
+  Canvas,
+  CharRole,
+  Direction,
+  DrawingCoord,
+  EdgeBundle,
+  GridCoord,
+  RoleCanvas,
+} from './types.ts'
+import {
+  Down,
+  drawingCoordEquals,
+  Left,
+  LowerLeft,
+  LowerRight,
+  Middle,
+  Right,
+  Up,
+  UpperLeft,
+  UpperRight,
+} from './types.ts'
 
 // ============================================================================
 // Node drawing — renders a node using shape-aware rendering
@@ -77,13 +94,11 @@ function drawBoxWithGridDimensions(node: AsciiNode, graph: AsciiGraph): Canvas {
 
   // State-end uses double border to differentiate from state-start
   const isDoubleBox = node.shape === 'state-end'
-  const hChar = useAscii ? (isDoubleBox ? '=' : '-') : (isDoubleBox ? '═' : '─')
-  const vChar = useAscii ? (isDoubleBox ? '‖' : '|') : (isDoubleBox ? '║' : '│')
+  const hChar = useAscii ? (isDoubleBox ? '=' : '-') : isDoubleBox ? '═' : '─'
+  const vChar = useAscii ? (isDoubleBox ? '‖' : '|') : isDoubleBox ? '║' : '│'
 
   // Double-box corners (for state-end)
-  const doubleCorners = useAscii
-    ? { tl: '#', tr: '#', bl: '#', br: '#' }
-    : { tl: '╔', tr: '╗', bl: '╚', br: '╝' }
+  const doubleCorners = useAscii ? { tl: '#', tr: '#', bl: '#', br: '#' } : { tl: '╔', tr: '╗', bl: '╚', br: '╝' }
   const effectiveCorners = isDoubleBox ? doubleCorners : corners
 
   // Draw box border with shape-specific corners
@@ -138,11 +153,7 @@ export function drawBox(node: AsciiNode, graph: AsciiGraph): Canvas {
  * @param padding - horizontal padding inside the box (default 1)
  * @returns A standalone Canvas containing the multi-section box
  */
-export function drawMultiBox(
-  sections: string[][],
-  useAscii: boolean,
-  padding: number = 1,
-): Canvas {
+export function drawMultiBox(sections: string[][], useAscii: boolean, padding: number = 1): Canvas {
   // Compute width: widest line across all sections + 2*padding + 2 border chars
   let maxTextWidth = 0
   for (const section of sections) {
@@ -377,10 +388,7 @@ export function drawLine(
  *
  * Supports bidirectional arrows via edge.hasArrowStart and edge.hasArrowEnd.
  */
-export function drawArrow(
-  graph: AsciiGraph,
-  edge: AsciiEdge,
-): [Canvas, Canvas, Canvas, Canvas, Canvas, Canvas] {
+export function drawArrow(graph: AsciiGraph, edge: AsciiEdge): [Canvas, Canvas, Canvas, Canvas, Canvas, Canvas] {
   if (edge.path.length === 0) {
     const empty = copyCanvas(graph.canvas)
     return [empty, empty, empty, empty, empty, empty]
@@ -393,11 +401,7 @@ export function drawArrow(
   // Draw end arrowhead only if hasArrowEnd is true (default behavior)
   let arrowHeadEndCanvas: Canvas
   if (edge.hasArrowEnd) {
-    arrowHeadEndCanvas = drawArrowHead(
-      graph,
-      linesDrawn[linesDrawn.length - 1]!,
-      lineDirs[lineDirs.length - 1]!,
-    )
+    arrowHeadEndCanvas = drawArrowHead(graph, linesDrawn[linesDrawn.length - 1]!, lineDirs[lineDirs.length - 1]!)
   } else {
     arrowHeadEndCanvas = copyCanvas(graph.canvas)
   }
@@ -485,12 +489,7 @@ function drawPath(
  * Only applies to Unicode mode (ASCII mode just uses the line characters).
  * Skips drawing for state pseudo-states which have their own visual borders.
  */
-function drawBoxStart(
-  graph: AsciiGraph,
-  path: GridCoord[],
-  firstLine: DrawingCoord[],
-  sourceShape: string,
-): Canvas {
+function drawBoxStart(graph: AsciiGraph, path: GridCoord[], firstLine: DrawingCoord[], sourceShape: string): Canvas {
   const canvas = copyCanvas(graph.canvas)
   if (graph.config.useAscii) return canvas
 
@@ -514,11 +513,7 @@ function drawBoxStart(
  * Draw the arrowhead at the end of an edge path.
  * Uses triangular Unicode symbols (▲▼◄►) or ASCII symbols (^v<>).
  */
-function drawArrowHead(
-  graph: AsciiGraph,
-  lastLine: DrawingCoord[],
-  fallbackDir: Direction,
-): Canvas {
+function drawArrowHead(graph: AsciiGraph, lastLine: DrawingCoord[], fallbackDir: Direction): Canvas {
   const canvas = copyCanvas(graph.canvas)
   if (lastLine.length === 0) return canvas
 
@@ -583,17 +578,25 @@ function drawCorners(graph: AsciiGraph, path: GridCoord[]): Canvas {
 
     let corner: string
     if (!graph.config.useAscii) {
-      if ((dirEquals(prevDir, Right) && dirEquals(nextDir, Down)) ||
-          (dirEquals(prevDir, Up) && dirEquals(nextDir, Left))) {
+      if (
+        (dirEquals(prevDir, Right) && dirEquals(nextDir, Down)) ||
+        (dirEquals(prevDir, Up) && dirEquals(nextDir, Left))
+      ) {
         corner = '┐'
-      } else if ((dirEquals(prevDir, Right) && dirEquals(nextDir, Up)) ||
-                 (dirEquals(prevDir, Down) && dirEquals(nextDir, Left))) {
+      } else if (
+        (dirEquals(prevDir, Right) && dirEquals(nextDir, Up)) ||
+        (dirEquals(prevDir, Down) && dirEquals(nextDir, Left))
+      ) {
         corner = '┘'
-      } else if ((dirEquals(prevDir, Left) && dirEquals(nextDir, Down)) ||
-                 (dirEquals(prevDir, Up) && dirEquals(nextDir, Right))) {
+      } else if (
+        (dirEquals(prevDir, Left) && dirEquals(nextDir, Down)) ||
+        (dirEquals(prevDir, Up) && dirEquals(nextDir, Right))
+      ) {
         corner = '┌'
-      } else if ((dirEquals(prevDir, Left) && dirEquals(nextDir, Up)) ||
-                 (dirEquals(prevDir, Down) && dirEquals(nextDir, Right))) {
+      } else if (
+        (dirEquals(prevDir, Left) && dirEquals(nextDir, Up)) ||
+        (dirEquals(prevDir, Down) && dirEquals(nextDir, Right))
+      ) {
         corner = '└'
       } else {
         corner = '+'
@@ -688,11 +691,7 @@ function drawTextOnLine(canvas: Canvas, line: DrawingCoord[], label: string, isU
  * drawn box (which may be wider/taller than the intrinsic shape dimensions
  * when sharing a column/row with a larger node).
  */
-function getNodeAttachmentPoint(
-  graph: AsciiGraph,
-  node: AsciiNode,
-  dir: Direction,
-): DrawingCoord {
+function getNodeAttachmentPoint(graph: AsciiGraph, node: AsciiNode, dir: Direction): DrawingCoord {
   const gc = node.gridCoord!
 
   // Calculate actual drawn dimensions from grid (matching drawBoxWithGridDimensions)
@@ -781,17 +780,25 @@ function drawBundledEdgeSegment(
 
     let corner: string
     if (!useAscii) {
-      if ((dirEquals(prevDir, Right) && dirEquals(nextDir, Down)) ||
-          (dirEquals(prevDir, Up) && dirEquals(nextDir, Left))) {
+      if (
+        (dirEquals(prevDir, Right) && dirEquals(nextDir, Down)) ||
+        (dirEquals(prevDir, Up) && dirEquals(nextDir, Left))
+      ) {
         corner = '┐'
-      } else if ((dirEquals(prevDir, Right) && dirEquals(nextDir, Up)) ||
-                 (dirEquals(prevDir, Down) && dirEquals(nextDir, Left))) {
+      } else if (
+        (dirEquals(prevDir, Right) && dirEquals(nextDir, Up)) ||
+        (dirEquals(prevDir, Down) && dirEquals(nextDir, Left))
+      ) {
         corner = '┘'
-      } else if ((dirEquals(prevDir, Left) && dirEquals(nextDir, Down)) ||
-                 (dirEquals(prevDir, Up) && dirEquals(nextDir, Right))) {
+      } else if (
+        (dirEquals(prevDir, Left) && dirEquals(nextDir, Down)) ||
+        (dirEquals(prevDir, Up) && dirEquals(nextDir, Right))
+      ) {
         corner = '┌'
-      } else if ((dirEquals(prevDir, Left) && dirEquals(nextDir, Up)) ||
-                 (dirEquals(prevDir, Down) && dirEquals(nextDir, Right))) {
+      } else if (
+        (dirEquals(prevDir, Left) && dirEquals(nextDir, Up)) ||
+        (dirEquals(prevDir, Down) && dirEquals(nextDir, Right))
+      ) {
         corner = '└'
       } else {
         corner = '+'
@@ -877,17 +884,25 @@ function drawBundleSharedPath(graph: AsciiGraph, bundle: EdgeBundle): [Canvas, C
 
     let corner: string
     if (!useAscii) {
-      if ((dirEquals(prevDir, Right) && dirEquals(nextDir, Down)) ||
-          (dirEquals(prevDir, Up) && dirEquals(nextDir, Left))) {
+      if (
+        (dirEquals(prevDir, Right) && dirEquals(nextDir, Down)) ||
+        (dirEquals(prevDir, Up) && dirEquals(nextDir, Left))
+      ) {
         corner = '┐'
-      } else if ((dirEquals(prevDir, Right) && dirEquals(nextDir, Up)) ||
-                 (dirEquals(prevDir, Down) && dirEquals(nextDir, Left))) {
+      } else if (
+        (dirEquals(prevDir, Right) && dirEquals(nextDir, Up)) ||
+        (dirEquals(prevDir, Down) && dirEquals(nextDir, Left))
+      ) {
         corner = '┘'
-      } else if ((dirEquals(prevDir, Left) && dirEquals(nextDir, Down)) ||
-                 (dirEquals(prevDir, Up) && dirEquals(nextDir, Right))) {
+      } else if (
+        (dirEquals(prevDir, Left) && dirEquals(nextDir, Down)) ||
+        (dirEquals(prevDir, Up) && dirEquals(nextDir, Right))
+      ) {
         corner = '┌'
-      } else if ((dirEquals(prevDir, Left) && dirEquals(nextDir, Up)) ||
-                 (dirEquals(prevDir, Down) && dirEquals(nextDir, Right))) {
+      } else if (
+        (dirEquals(prevDir, Left) && dirEquals(nextDir, Up)) ||
+        (dirEquals(prevDir, Down) && dirEquals(nextDir, Right))
+      ) {
         corner = '└'
       } else {
         corner = '+'
@@ -933,13 +948,13 @@ function drawBundleArrowhead(graph: AsciiGraph, bundle: EdgeBundle): Canvas {
     else if (dirEquals(dir, Down)) char = '▼'
     else if (dirEquals(dir, Left)) char = '◄'
     else if (dirEquals(dir, Right)) char = '►'
-    else char = '▼'  // default
+    else char = '▼' // default
   } else {
     if (dirEquals(dir, Up)) char = '^'
     else if (dirEquals(dir, Down)) char = 'v'
     else if (dirEquals(dir, Left)) char = '<'
     else if (dirEquals(dir, Right)) char = '>'
-    else char = 'v'  // default
+    else char = 'v' // default
   }
 
   canvas[dc.x]![dc.y] = char
@@ -975,13 +990,13 @@ function drawBundledEdgeArrowhead(graph: AsciiGraph, edge: AsciiEdge): Canvas {
     else if (dirEquals(dir, Down)) char = '▼'
     else if (dirEquals(dir, Left)) char = '◄'
     else if (dirEquals(dir, Right)) char = '►'
-    else char = '▼'  // default
+    else char = '▼' // default
   } else {
     if (dirEquals(dir, Up)) char = '^'
     else if (dirEquals(dir, Down)) char = 'v'
     else if (dirEquals(dir, Left)) char = '<'
     else if (dirEquals(dir, Right)) char = '>'
-    else char = 'v'  // default
+    else char = 'v' // default
   }
 
   canvas[dc.x]![dc.y] = char
@@ -1018,10 +1033,7 @@ function drawJunctionCharacter(graph: AsciiGraph, bundle: EdgeBundle): Canvas {
     // For fan-out: shared path goes FROM source TO junction (last index is junction)
     const junctionIdx = bundle.type === 'fan-in' ? 0 : bundle.sharedPath.length - 1
     const adjacentIdx = bundle.type === 'fan-in' ? 1 : bundle.sharedPath.length - 2
-    const sharedDir = determineDirection(
-      bundle.sharedPath[junctionIdx]!,
-      bundle.sharedPath[adjacentIdx]!
-    )
+    const sharedDir = determineDirection(bundle.sharedPath[junctionIdx]!, bundle.sharedPath[adjacentIdx]!)
     // This is the direction the shared path GOES from junction
     if (dirEquals(sharedDir, Down)) hasDown = true
     else if (dirEquals(sharedDir, Up)) hasUp = true
@@ -1034,20 +1046,14 @@ function drawJunctionCharacter(graph: AsciiGraph, bundle: EdgeBundle): Canvas {
     if (edge.pathToJunction && edge.pathToJunction.length >= 2) {
       // For fan-in: pathToJunction goes FROM source TO junction (last is junction)
       // For fan-out: pathToJunction goes FROM junction TO target (first is junction)
-      const junctionIdx = bundle.type === 'fan-in'
-        ? edge.pathToJunction.length - 1
-        : 0
-      const adjacentIdx = bundle.type === 'fan-in'
-        ? edge.pathToJunction.length - 2
-        : 1
+      const junctionIdx = bundle.type === 'fan-in' ? edge.pathToJunction.length - 1 : 0
+      const adjacentIdx = bundle.type === 'fan-in' ? edge.pathToJunction.length - 2 : 1
 
-      const arrivalDir = determineDirection(
-        edge.pathToJunction[adjacentIdx]!,
-        edge.pathToJunction[junctionIdx]!
-      )
+      const arrivalDir = determineDirection(edge.pathToJunction[adjacentIdx]!, edge.pathToJunction[junctionIdx]!)
       // This is the direction the edge ARRIVES at junction from
       // e.g., if arrivalDir is Right, the line comes FROM the left
-      if (dirEquals(arrivalDir, Down)) hasUp = true    // arrived going down = came from up
+      if (dirEquals(arrivalDir, Down))
+        hasUp = true // arrived going down = came from up
       else if (dirEquals(arrivalDir, Up)) hasDown = true
       else if (dirEquals(arrivalDir, Right)) hasLeft = true
       else if (dirEquals(arrivalDir, Left)) hasRight = true
@@ -1058,21 +1064,21 @@ function drawJunctionCharacter(graph: AsciiGraph, bundle: EdgeBundle): Canvas {
   let char: string
   if (!useAscii) {
     if (hasUp && hasDown && hasLeft && hasRight) {
-      char = '┼'  // cross - all 4 directions
+      char = '┼' // cross - all 4 directions
     } else if (hasDown && hasLeft && hasRight && !hasUp) {
-      char = '┬'  // T pointing down
+      char = '┬' // T pointing down
     } else if (hasUp && hasLeft && hasRight && !hasDown) {
-      char = '┴'  // T pointing up
+      char = '┴' // T pointing up
     } else if (hasUp && hasDown && hasRight && !hasLeft) {
-      char = '├'  // T pointing right
+      char = '├' // T pointing right
     } else if (hasUp && hasDown && hasLeft && !hasRight) {
-      char = '┤'  // T pointing left
+      char = '┤' // T pointing left
     } else if (hasLeft && hasRight) {
-      char = '─'  // horizontal only
+      char = '─' // horizontal only
     } else if (hasUp && hasDown) {
-      char = '│'  // vertical only
+      char = '│' // vertical only
     } else if (hasDown && hasRight) {
-      char = '┌'  // corner
+      char = '┌' // corner
     } else if (hasDown && hasLeft) {
       char = '┐'
     } else if (hasUp && hasRight) {
@@ -1080,7 +1086,7 @@ function drawJunctionCharacter(graph: AsciiGraph, bundle: EdgeBundle): Canvas {
     } else if (hasUp && hasLeft) {
       char = '┘'
     } else {
-      char = '┼'  // fallback
+      char = '┼' // fallback
     }
   } else {
     char = '+'
@@ -1128,7 +1134,7 @@ export function drawSubgraphBox(sg: AsciiSubgraph, graph: AsciiGraph): Canvas {
 }
 
 /** Draw a subgraph label centered in its header area. Supports multi-line labels. */
-export function drawSubgraphLabel(sg: AsciiSubgraph, graph: AsciiGraph): [Canvas, DrawingCoord] {
+export function drawSubgraphLabel(sg: AsciiSubgraph, _graph: AsciiGraph): [Canvas, DrawingCoord] {
   const width = sg.maxX - sg.minX
   const height = sg.maxY - sg.minY
   if (width <= 0 || height <= 0) return [mkCanvas(0, 0), { x: 0, y: 0 }]
@@ -1177,12 +1183,7 @@ function sortSubgraphsByDepth(subgraphs: AsciiSubgraph[]): AsciiSubgraph[] {
  * Fill roles for all non-space characters in a canvas region.
  * Used after drawing a layer to record what role those characters have.
  */
-function fillRolesFromCanvas(
-  roleCanvas: RoleCanvas,
-  canvas: Canvas,
-  offset: DrawingCoord,
-  role: CharRole,
-): void {
+function fillRolesFromCanvas(roleCanvas: RoleCanvas, canvas: Canvas, offset: DrawingCoord, role: CharRole): void {
   for (let x = 0; x < canvas.length; x++) {
     for (let y = 0; y < (canvas[0]?.length ?? 0); y++) {
       const char = canvas[x]?.[y]
@@ -1201,12 +1202,7 @@ function fillRolesFromCanvas(
 /**
  * Fill roles for multiple canvases with the same role.
  */
-function fillRolesFromCanvases(
-  roleCanvas: RoleCanvas,
-  canvases: Canvas[],
-  offset: DrawingCoord,
-  role: CharRole,
-): void {
+function fillRolesFromCanvases(roleCanvas: RoleCanvas, canvases: Canvas[], offset: DrawingCoord, role: CharRole): void {
   for (const canvas of canvases) {
     fillRolesFromCanvas(roleCanvas, canvas, offset, role)
   }
@@ -1216,11 +1212,7 @@ function fillRolesFromCanvases(
  * Special handling for node boxes: border chars get 'border' role, text gets 'text' role.
  * Detects text by checking if character is alphanumeric or common punctuation.
  */
-function fillRolesForNodeBox(
-  roleCanvas: RoleCanvas,
-  canvas: Canvas,
-  offset: DrawingCoord,
-): void {
+function fillRolesForNodeBox(roleCanvas: RoleCanvas, canvas: Canvas, offset: DrawingCoord): void {
   const isBorderChar = (c: string) => /^[┌┐└┘├┤┬┴┼│─╭╮╰╯+\-|.':]$/.test(c)
 
   for (let x = 0; x < canvas.length; x++) {

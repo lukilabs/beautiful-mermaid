@@ -1,9 +1,9 @@
-import type { PositionedGraph, PositionedNode, PositionedEdge, PositionedGroup, Point } from './types.ts'
-import type { DiagramColors } from './theme.ts'
-import { svgOpenTag, buildStyleBlock } from './theme.ts'
-import { FONT_SIZES, FONT_WEIGHTS, STROKE_WIDTHS, ARROW_HEAD, estimateTextWidth, TEXT_BASELINE_SHIFT } from './styles.ts'
+import { renderMultilineText, renderMultilineTextWithBackground } from './multiline-utils.ts'
+import { ARROW_HEAD, FONT_SIZES, FONT_WEIGHTS, STROKE_WIDTHS } from './styles.ts'
 import { measureMultilineText } from './text-metrics.ts'
-import { renderMultilineText, renderMultilineTextWithBackground, escapeXml } from './multiline-utils.ts'
+import type { DiagramColors } from './theme.ts'
+import { buildStyleBlock, svgOpenTag } from './theme.ts'
+import type { Point, PositionedEdge, PositionedGraph, PositionedGroup, PositionedNode } from './types.ts'
 
 // ============================================================================
 // SVG renderer — converts a PositionedGraph into an SVG string.
@@ -36,7 +36,7 @@ export function renderSvg(
   graph: PositionedGraph,
   colors: DiagramColors,
   font: string = 'Inter',
-  transparent: boolean = false
+  transparent: boolean = false,
 ): string {
   const parts: string[] = []
 
@@ -139,7 +139,7 @@ function arrowMarkerDefsForColor(color: string): string {
  *  Non-alphanumeric chars are hex-encoded so distinct inputs never collapse
  *  (e.g. "var(--line-1)" → "var28--line2d129", "var(--line1)" → "var28--line129"). */
 function markerSuffix(color: string): string {
-  return color.replace(/[^a-zA-Z0-9]/g, (ch) => ch.charCodeAt(0).toString(16))
+  return color.replace(/[^a-zA-Z0-9]/g, ch => ch.charCodeAt(0).toString(16))
 }
 
 // ============================================================================
@@ -153,31 +153,30 @@ function renderGroup(group: PositionedGroup, font: string): string {
   // Opening <g> with semantic attributes for subgraph identification
   // data-id: original Mermaid subgraph ID
   // data-label: display label (may differ from ID)
-  parts.push(
-    `<g class="subgraph" data-id="${escapeAttr(group.id)}" data-label="${escapeAttr(group.label)}">`
-  )
+  parts.push(`<g class="subgraph" data-id="${escapeAttr(group.id)}" data-label="${escapeAttr(group.label)}">`)
 
   // Outer rectangle
   parts.push(
     `  <rect x="${group.x}" y="${group.y}" width="${group.width}" height="${group.height}" ` +
-    `rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="${STROKE_WIDTHS.outerBox}" />`
+      `rx="0" ry="0" fill="var(--_group-fill)" stroke="var(--_node-stroke)" stroke-width="${STROKE_WIDTHS.outerBox}" />`,
   )
 
   // Header band
   parts.push(
     `  <rect x="${group.x}" y="${group.y}" width="${group.width}" height="${headerHeight}" ` +
-    `rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="${STROKE_WIDTHS.outerBox}" />`
+      `rx="0" ry="0" fill="var(--_group-hdr)" stroke="var(--_node-stroke)" stroke-width="${STROKE_WIDTHS.outerBox}" />`,
   )
 
   // Header label (supports multi-line via <br> tags)
   parts.push(
-    '  ' + renderMultilineText(
-      group.label,
-      group.x + 12,
-      group.y + headerHeight / 2,
-      FONT_SIZES.groupHeader,
-      `font-size="${FONT_SIZES.groupHeader}" font-weight="${FONT_WEIGHTS.groupHeader}" fill="var(--_text-sec)"`
-    )
+    '  ' +
+      renderMultilineText(
+        group.label,
+        group.x + 12,
+        group.y + headerHeight / 2,
+        FONT_SIZES.groupHeader,
+        `font-size="${FONT_SIZES.groupHeader}" font-weight="${FONT_WEIGHTS.groupHeader}" fill="var(--_text-sec)"`,
+      ),
   )
 
   // Render nested groups recursively (inside this group)
@@ -239,7 +238,7 @@ function pointsToPolylinePath(points: Point[]): string {
   return points.map(p => `${p.x},${p.y}`).join(' ')
 }
 
-function renderEdgeLabel(edge: PositionedEdge, font: string): string {
+function renderEdgeLabel(edge: PositionedEdge, _font: string): string {
   // Use layout-computed label position when available (layout-aware, avoids collisions).
   // Fall back to geometric midpoint of the edge polyline.
   const mid = edge.labelPosition ?? edgeMidpoint(edge.points)
@@ -261,7 +260,7 @@ function renderEdgeLabel(edge: PositionedEdge, font: string): string {
     // Use --_text-sec for better contrast (was --_text-muted)
     `text-anchor="middle" font-size="${FONT_SIZES.edgeLabel}" font-weight="${FONT_WEIGHTS.edgeLabel}" fill="var(--_text-sec)"`,
     // Increased stroke width from 0.5 to 1 for better label separation from edges
-    `rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1"`
+    `rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1"`,
   )
 
   // Semantic wrapper: links label to its edge via data-from/data-to
@@ -324,7 +323,7 @@ function renderNode(node: PositionedNode, font: string): string {
   // This enables reliable node identification without heuristics
   const parts: string[] = []
   parts.push(
-    `<g class="node" data-id="${escapeAttr(node.id)}" data-label="${escapeAttr(node.label)}" data-shape="${node.shape}">`
+    `<g class="node" data-id="${escapeAttr(node.id)}" data-label="${escapeAttr(node.label)}" data-shape="${node.shape}">`,
   )
   parts.push(`  ${shape.replace(/\n/g, '\n  ')}`)
   if (label) {
@@ -372,7 +371,6 @@ function renderNodeShape(node: PositionedNode): string {
       return renderStateStart(x, y, width, height)
     case 'state-end':
       return renderStateEnd(x, y, width, height)
-    case 'rectangle':
     default:
       return renderRect(x, y, width, height, fill, stroke, sw)
   }
@@ -387,7 +385,15 @@ function renderRect(x: number, y: number, w: number, h: number, fill: string, st
   )
 }
 
-function renderRoundedRect(x: number, y: number, w: number, h: number, fill: string, stroke: string, sw: string): string {
+function renderRoundedRect(
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  fill: string,
+  stroke: string,
+  sw: string,
+): string {
   return (
     `<rect x="${x}" y="${y}" width="${w}" height="${h}" ` +
     `rx="6" ry="6" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" />`
@@ -406,10 +412,7 @@ function renderCircle(x: number, y: number, w: number, h: number, fill: string, 
   const cx = x + w / 2
   const cy = y + h / 2
   const r = Math.min(w, h) / 2
-  return (
-    `<circle cx="${cx}" cy="${cy}" r="${r}" ` +
-    `fill="${fill}" stroke="${stroke}" stroke-width="${sw}" />`
-  )
+  return `<circle cx="${cx}" cy="${cy}" r="${r}" ` + `fill="${fill}" stroke="${stroke}" stroke-width="${sw}" />`
 }
 
 function renderDiamond(x: number, y: number, w: number, h: number, fill: string, stroke: string, sw: string): string {
@@ -418,21 +421,27 @@ function renderDiamond(x: number, y: number, w: number, h: number, fill: string,
   const hw = w / 2
   const hh = h / 2
   const points = [
-    `${cx},${cy - hh}`,   // top
-    `${cx + hw},${cy}`,   // right
-    `${cx},${cy + hh}`,   // bottom
-    `${cx - hw},${cy}`,   // left
+    `${cx},${cy - hh}`, // top
+    `${cx + hw},${cy}`, // right
+    `${cx},${cy + hh}`, // bottom
+    `${cx - hw},${cy}`, // left
   ].join(' ')
 
-  return (
-    `<polygon points="${points}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" />`
-  )
+  return `<polygon points="${points}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" />`
 }
 
 // --- Batch 1 shapes ---
 
 /** Subroutine: rectangle with double vertical borders on left and right */
-function renderSubroutine(x: number, y: number, w: number, h: number, fill: string, stroke: string, sw: string): string {
+function renderSubroutine(
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  fill: string,
+  stroke: string,
+  sw: string,
+): string {
   const inset = 8 // distance from edge to inner vertical line
   return (
     `<rect x="${x}" y="${y}" width="${w}" height="${h}" ` +
@@ -445,7 +454,15 @@ function renderSubroutine(x: number, y: number, w: number, h: number, fill: stri
 }
 
 /** Double circle: two concentric circles with a gap between them */
-function renderDoubleCircle(x: number, y: number, w: number, h: number, fill: string, stroke: string, sw: string): string {
+function renderDoubleCircle(
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  fill: string,
+  stroke: string,
+  sw: string,
+): string {
   const cx = x + w / 2
   const cy = y + h / 2
   const outerR = Math.min(w, h) / 2
@@ -462,12 +479,12 @@ function renderDoubleCircle(x: number, y: number, w: number, h: number, fill: st
 function renderHexagon(x: number, y: number, w: number, h: number, fill: string, stroke: string, sw: string): string {
   const inset = h / 4 // horizontal inset for the angled sides
   const points = [
-    `${x + inset},${y}`,           // top-left
-    `${x + w - inset},${y}`,       // top-right
-    `${x + w},${y + h / 2}`,       // mid-right
-    `${x + w - inset},${y + h}`,   // bottom-right
-    `${x + inset},${y + h}`,       // bottom-left
-    `${x},${y + h / 2}`,           // mid-left
+    `${x + inset},${y}`, // top-left
+    `${x + w - inset},${y}`, // top-right
+    `${x + w},${y + h / 2}`, // mid-right
+    `${x + w - inset},${y + h}`, // bottom-right
+    `${x + inset},${y + h}`, // bottom-left
+    `${x},${y + h / 2}`, // mid-left
   ].join(' ')
 
   return `<polygon points="${points}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" />`
@@ -499,14 +516,22 @@ function renderCylinder(x: number, y: number, w: number, h: number, fill: string
 }
 
 /** Asymmetric / flag: rectangle with a pointed left edge */
-function renderAsymmetric(x: number, y: number, w: number, h: number, fill: string, stroke: string, sw: string): string {
+function renderAsymmetric(
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  fill: string,
+  stroke: string,
+  sw: string,
+): string {
   const indent = 12 // how far the point indents
   const points = [
-    `${x + indent},${y}`,       // top-left (indented)
-    `${x + w},${y}`,            // top-right
-    `${x + w},${y + h}`,        // bottom-right
-    `${x + indent},${y + h}`,   // bottom-left (indented)
-    `${x},${y + h / 2}`,        // left point
+    `${x + indent},${y}`, // top-left (indented)
+    `${x + w},${y}`, // top-right
+    `${x + w},${y + h}`, // bottom-right
+    `${x + indent},${y + h}`, // bottom-left (indented)
+    `${x},${y + h / 2}`, // left point
   ].join(' ')
 
   return `<polygon points="${points}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" />`
@@ -516,23 +541,31 @@ function renderAsymmetric(x: number, y: number, w: number, h: number, fill: stri
 function renderTrapezoid(x: number, y: number, w: number, h: number, fill: string, stroke: string, sw: string): string {
   const inset = w * 0.15 // top edge is narrower by this amount on each side
   const points = [
-    `${x + inset},${y}`,         // top-left (indented)
-    `${x + w - inset},${y}`,     // top-right (indented)
-    `${x + w},${y + h}`,         // bottom-right (full width)
-    `${x},${y + h}`,             // bottom-left (full width)
+    `${x + inset},${y}`, // top-left (indented)
+    `${x + w - inset},${y}`, // top-right (indented)
+    `${x + w},${y + h}`, // bottom-right (full width)
+    `${x},${y + h}`, // bottom-left (full width)
   ].join(' ')
 
   return `<polygon points="${points}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" />`
 }
 
 /** Trapezoid-alt [\text/]: wider top, narrower bottom */
-function renderTrapezoidAlt(x: number, y: number, w: number, h: number, fill: string, stroke: string, sw: string): string {
+function renderTrapezoidAlt(
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  fill: string,
+  stroke: string,
+  sw: string,
+): string {
   const inset = w * 0.15 // bottom edge is narrower
   const points = [
-    `${x},${y}`,                     // top-left (full width)
-    `${x + w},${y}`,                 // top-right (full width)
-    `${x + w - inset},${y + h}`,     // bottom-right (indented)
-    `${x + inset},${y + h}`,         // bottom-left (indented)
+    `${x},${y}`, // top-left (full width)
+    `${x + w},${y}`, // top-right (full width)
+    `${x + w - inset},${y + h}`, // bottom-right (indented)
+    `${x + inset},${y + h}`, // bottom-left (indented)
   ].join(' ')
 
   return `<polygon points="${points}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" />`
@@ -565,7 +598,7 @@ function renderStateEnd(x: number, y: number, w: number, h: number): string {
 // Node label rendering
 // ============================================================================
 
-function renderNodeLabel(node: PositionedNode, font: string): string {
+function renderNodeLabel(node: PositionedNode, _font: string): string {
   // State pseudostates have no label
   if (node.shape === 'state-start' || node.shape === 'state-end') {
     if (!node.label) return ''
@@ -582,7 +615,7 @@ function renderNodeLabel(node: PositionedNode, font: string): string {
     cx,
     cy,
     FONT_SIZES.nodeLabel,
-    `text-anchor="middle" font-size="${FONT_SIZES.nodeLabel}" font-weight="${FONT_WEIGHTS.nodeLabel}" fill="${textColor}"`
+    `text-anchor="middle" font-size="${FONT_SIZES.nodeLabel}" font-weight="${FONT_WEIGHTS.nodeLabel}" fill="${textColor}"`,
   )
 }
 
@@ -595,9 +628,5 @@ function renderNodeLabel(node: PositionedNode, font: string): string {
  * Escapes quotes and ampersands to prevent attribute injection.
  */
 function escapeAttr(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
+  return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }

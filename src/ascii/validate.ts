@@ -32,7 +32,7 @@ export interface DiagonalPosition {
  * @returns true if diagonal characters are present, false otherwise
  */
 export function hasDiagonalLines(asciiOutput: string): boolean {
-  return DIAGONAL_CHARS.all.some((char) => asciiOutput.includes(char))
+  return DIAGONAL_CHARS.all.some(char => asciiOutput.includes(char))
 }
 
 /**
@@ -108,13 +108,11 @@ export function assertNoDiagonals(asciiOutput: string, context?: string): void {
 
   const positions = findDiagonalLines(asciiOutput)
   const contextStr = context ? ` in "${context}"` : ''
-  const positionStr = positions
-    .map((p) => `  Line ${p.line}, Col ${p.col}: '${p.char}'`)
-    .join('\n')
+  const positionStr = positions.map(p => `  Line ${p.line}, Col ${p.col}: '${p.char}'`).join('\n')
 
   throw new Error(
     `Diagonal lines detected${contextStr}. ` +
       `Edges must use orthogonal Manhattan routing (90° bends only).\n` +
-      `Found ${positions.length} diagonal character(s):\n${positionStr}`
+      `Found ${positions.length} diagonal character(s):\n${positionStr}`,
   )
 }

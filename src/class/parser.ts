@@ -1,5 +1,12 @@
-import type { ClassDiagram, ClassNode, ClassRelationship, ClassMember, RelationshipType, ClassNamespace } from './types.ts'
 import { normalizeBrTags } from '../multiline-utils.ts'
+import type {
+  ClassDiagram,
+  ClassMember,
+  ClassNamespace,
+  ClassNode,
+  ClassRelationship,
+  RelationshipType,
+} from './types.ts'
 
 // ============================================================================
 // Class diagram parser
@@ -154,7 +161,6 @@ export function parseClassDiagram(lines: string[]): ClassDiagram {
       ensureClass(classMap, rel.from)
       ensureClass(classMap, rel.to)
       diagram.relationships.push(rel)
-      continue
     }
   }
 
@@ -243,7 +249,7 @@ function parseRelationship(line: string): ClassRelationship | null {
   // Relationship regex — handles all arrow types with optional cardinality and labels
   // Pattern: FROM ["card"] ARROW ["card"] TO [: label]
   const match = line.match(
-    /^(\S+?)\s+(?:"([^"]*?)"\s+)?(<\|--|<\|\.\.|\*--|o--|-->|--\*|--o|--\|>|\.\.>|\.\.\|>|<--|<\.\.?|--)\s+(?:"([^"]*?)"\s+)?(\S+?)(?:\s*:\s*(.+))?$/
+    /^(\S+?)\s+(?:"([^"]*?)"\s+)?(<\|--|<\|\.\.|\*--|o--|-->|--\*|--o|--\|>|\.\.>|\.\.\|>|<--|<\.\.?|--)\s+(?:"([^"]*?)"\s+)?(\S+?)(?:\s*:\s*(.+))?$/,
   )
   if (!match) return null
 
@@ -260,7 +266,15 @@ function parseRelationship(line: string): ClassRelationship | null {
   const parsed = parseArrow(arrow)
   if (!parsed) return null
 
-  return { from, to, type: parsed.type, markerAt: parsed.markerAt, label, fromCardinality, toCardinality }
+  return {
+    from,
+    to,
+    type: parsed.type,
+    markerAt: parsed.markerAt,
+    label,
+    fromCardinality,
+    toCardinality,
+  }
 }
 
 /**
@@ -272,19 +286,33 @@ function parseArrow(arrow: string): { type: RelationshipType; markerAt: 'from' |
   // Trim whitespace that might be captured by the regex
   const a = arrow.trim()
   switch (a) {
-    case '<|--': return { type: 'inheritance',  markerAt: 'from' }
-    case '--|>': return { type: 'inheritance',  markerAt: 'to' }
-    case '<|..': return { type: 'realization',  markerAt: 'from' }
-    case '..|>': return { type: 'realization',  markerAt: 'to' }
-    case '*--':  return { type: 'composition',  markerAt: 'from' }
-    case '--*':  return { type: 'composition',  markerAt: 'to' }
-    case 'o--':  return { type: 'aggregation',  markerAt: 'from' }
-    case '--o':  return { type: 'aggregation',  markerAt: 'to' }
-    case '-->':  return { type: 'association',  markerAt: 'to' }
-    case '<--':  return { type: 'association',  markerAt: 'from' }
-    case '..>':  return { type: 'dependency',   markerAt: 'to' }
-    case '<..':  return { type: 'dependency',   markerAt: 'from' }
-    case '--':   return { type: 'association',  markerAt: 'to' }
-    default:     return null
+    case '<|--':
+      return { type: 'inheritance', markerAt: 'from' }
+    case '--|>':
+      return { type: 'inheritance', markerAt: 'to' }
+    case '<|..':
+      return { type: 'realization', markerAt: 'from' }
+    case '..|>':
+      return { type: 'realization', markerAt: 'to' }
+    case '*--':
+      return { type: 'composition', markerAt: 'from' }
+    case '--*':
+      return { type: 'composition', markerAt: 'to' }
+    case 'o--':
+      return { type: 'aggregation', markerAt: 'from' }
+    case '--o':
+      return { type: 'aggregation', markerAt: 'to' }
+    case '-->':
+      return { type: 'association', markerAt: 'to' }
+    case '<--':
+      return { type: 'association', markerAt: 'from' }
+    case '..>':
+      return { type: 'dependency', markerAt: 'to' }
+    case '<..':
+      return { type: 'dependency', markerAt: 'from' }
+    case '--':
+      return { type: 'association', markerAt: 'to' }
+    default:
+      return null
   }
 }
