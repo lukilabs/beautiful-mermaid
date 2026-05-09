@@ -745,3 +745,81 @@ describe('sequence layout – note positioning', () => {
     }
   })
 })
+
+// ============================================================================
+// Pre-message notes — verify fix for issue #53 (notes before first message
+// were silently dropped because afterIndex === -1 was never looked up)
+// ============================================================================
+
+describe('sequence layout – pre-message notes', () => {
+  it('single pre-message note is positioned above first message', () => {
+    const result = layout(`sequenceDiagram
+      participant A as Alice
+      participant B as Bob
+      Note over A: note 1
+      A->>B: Hello`)
+    expect(result.notes).toHaveLength(1)
+    expect(result.notes[0]!.text).toBe('note 1')
+    expect(result.notes[0]!.y).toBeLessThan(result.messages[0]!.y)
+  })
+
+  it('multiple pre-message notes stack above first message', () => {
+    const result = layout(`sequenceDiagram
+      participant A as Alice
+      participant B as Bob
+      Note over A: note 1
+      Note over B: note 2
+      Note over A,B: spanning note
+      A->>B: Hello`)
+    expect(result.notes).toHaveLength(3)
+    const n0 = result.notes[0]!
+    const n1 = result.notes[1]!
+    expect(n1.y).toBeGreaterThanOrEqual(n0.y + n0.height)
+    expect(n1.y + n1.height).toBeLessThanOrEqual(result.messages[0]!.y)
+    // spanning note is centered between actors
+    const spanning = result.notes.find(n => n.text === 'spanning note')!
+    const aActor = result.actors.find(a => a.id === 'A')!
+    const bActor = result.actors.find(a => a.id === 'B')!
+    const mid = (aActor.x + bActor.x) / 2
+    expect(Math.abs(spanning.x + spanning.width / 2 - mid)).toBeLessThan(20)
+  })
+
+  it('notes-only diagram (0 messages) renders notes', () => {
+    const result = layout(`sequenceDiagram
+      participant A
+      Note over A: lonely note`)
+    expect(result.notes).toHaveLength(1)
+    expect(result.notes[0]!.text).toBe('lonely note')
+    expect(result.messages).toHaveLength(0)
+  })
+
+  it('pre-message notes push first message down and increase diagram height', () => {
+    const withNotes = layout(`sequenceDiagram
+      participant A as Alice
+      participant B as Bob
+      Note over A: note 1
+      Note over B: note 2
+      A->>B: Hello`)
+
+    const withoutNotes = layout(`sequenceDiagram
+      participant A as Alice
+      participant B as Bob
+      A->>B: Hello`)
+
+    expect(withNotes.messages[0]!.y).toBeGreaterThan(withoutNotes.messages[0]!.y)
+    expect(withNotes.height).toBeGreaterThan(withoutNotes.height)
+  })
+
+  it('pre-message note right of actor is within diagram bounds', () => {
+    const result = layout(`sequenceDiagram
+      participant A as Alice
+      participant B as Bob
+      Note right of B: side note
+      A->>B: Hello`)
+    expect(result.notes).toHaveLength(1)
+    for (const note of result.notes) {
+      expect(note.x).toBeGreaterThanOrEqual(0)
+      expect(note.x + note.width).toBeLessThanOrEqual(result.width)
+    }
+  })
+})
