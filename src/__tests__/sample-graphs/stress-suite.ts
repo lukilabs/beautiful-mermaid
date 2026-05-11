@@ -1,6 +1,6 @@
 /**
  * Eight realistic medium-complexity flowcharts. Each maps 1:1 to a `describe`
- * block in `layout-stress.test.ts`.
+ * block in `layout-samples.test.ts`.
  */
 import type { SampleGraph } from './types.ts'
 

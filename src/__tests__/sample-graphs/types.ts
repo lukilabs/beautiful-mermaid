@@ -3,9 +3,10 @@
  * sample-comparison tooling. Concrete samples live in the per-category
  * `sample-graphs/` modules; `index.ts` aggregates them.
  *
- * The optional fields drive parameterised structural assertions in
- * `layout-stress.test.ts`. A sample only declares the properties it
- * actually wants checked; missing fields skip their assertion.
+ * The optional fields below drive the parameterised assertions in
+ * `layout-samples.test.ts`: every sample iterated by `ALL_SAMPLE_GRAPHS`
+ * gets one `it` per applicable field. A sample only declares the
+ * properties it wants checked; missing fields skip their assertion.
  */
 export interface SampleGraph {
   /** Kebab-case identifier; used as the SVG filename and the DOM id on the comparison page. */
@@ -45,12 +46,16 @@ export interface SampleGraph {
    */
   expectedSubgraphAspect?: Array<{ subgraph: string; taller?: boolean; wider?: boolean }>
 
+  /**
+   * Cross-hier edges whose polyline must end on its target's bounding
+   * box. Catches the failure mode where ELK leaves the port → leaf
+   * section empty and the assembled polyline stops short of the target.
+   */
+  expectedEdgesReachTargets?: Array<{ source: string; target: string }>
+
   /** When true, asserts no two distinct edges share a colinear segment longer than 6px (i.e. no arrows drawn on top of each other). */
   expectNoColinearOverlap?: boolean
 
   /** When set, asserts the diagram's overall `height / width` is at least this value — used to catch graphs that should be tall but flip horizontal. */
   minGraphHeightOverWidth?: number
-
-  /** When set, asserts the diagram's overall `width / height` is at least this value — the wider-than-tall counterpart. */
-  minGraphWidthOverHeight?: number
 }

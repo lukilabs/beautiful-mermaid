@@ -1,7 +1,9 @@
 /**
- * Renders comparison samples through the official mermaid-cli (mmdc) with
- * its default renderer. Provides the third "reference" column that
- * compare-build-page.ts inlines when invoked with `--with-mmc`.
+ * Renders comparison samples through the official mermaid-cli (mmdc)
+ * using its default dagre renderer — the layout most mermaid consumers
+ * (GitHub, npm-published mermaid, etc.) actually produce. Drives the
+ * third "reference" column that compare-build-page.ts inlines when
+ * invoked with `--with-mmc`.
  *
  * mmdc must be on PATH or available via npx. `init()` exits the process
  * with an install hint if neither resolves. Each `render()` call shells

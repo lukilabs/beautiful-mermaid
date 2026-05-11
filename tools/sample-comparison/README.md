@@ -22,16 +22,16 @@ bun run tools/sample-comparison/compare-build-page.ts
 
 Open the resulting `index.html` in a browser. Each row shows the same
 sample rendered by both versions side-by-side, with a delta-percentage
-badge indicating how much the dimensions differ.
+badge indicating how much the rendered SVG width and height differ.
 
 ## Backends
 
 `compare-render.ts` selects which renderer to use via `--backend`:
 
-| Backend | Default | Renders through                      |
-|---------|---------|--------------------------------------|
-| `bm`    | yes     | beautiful-mermaid (the code on disk) |
-| `mmc`   |         | mermaid-cli (`mmdc`) with ELK enabled |
+| Backend | Default | Renders through                                       |
+|---------|---------|-------------------------------------------------------|
+| `bm`    | yes     | beautiful-mermaid (the code on disk; ELK-based)       |
+| `mmc`   |         | mermaid-cli (`mmdc`) with its default dagre renderer  |
 
 ```sh
 # Capture mermaid-cli reference renders for the third column
@@ -44,15 +44,15 @@ exits with an install hint if neither resolves.
 ## The `--with-mmc` flag
 
 By default `compare-build-page.ts` produces a two-panel page (before /
-after). Pass `--with-mmc` to add a third "mermaid + ELK (reference)"
-column populated from `<compareDir>/mmc/`:
+after). Pass `--with-mmc` to add a third "mermaid (reference)" column
+populated from `<compareDir>/mmc/` (rendered with mmdc's default dagre
+layout):
 
 ```sh
 bun run tools/sample-comparison/compare-build-page.ts --with-mmc
 ```
 
-Without the flag, the third column and the mermaid.js script tag are
-both omitted — the page stays small and offline-friendly.
+Without the flag, only the before/after columns are emitted.
 
 ## Output location
 

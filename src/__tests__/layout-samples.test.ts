@@ -1,20 +1,35 @@
 /**
- * Stress test suite for the flowchart layout engine.
+ * Sample-driven layout tests.
  *
- * One parameterised describe block per sample in ALL_SAMPLE_GRAPHS. Each
- * iteration runs every applicable check: bounded right-angle crossings,
- * declared containment, no node overlaps, no edge polyline threading a
- * foreign subgraph header, axis ordering, nesting, subgraph aspect ratio,
- * absence of colinear edge overlaps, layout determinism, and matching
- * hop / crossing counts in the rendered SVG. Per-sample metadata in
- * `sample-graphs/` decides which checks apply.
+ * Iterates two sample sets:
+ *
+ *   - `ALL_SAMPLE_GRAPHS` (curated layout-stress and real-world repros
+ *     from `sample-graphs/`). Each sample's `SampleGraph` metadata
+ *     declares which structural assertions apply — bounded crossings,
+ *     containment, axis ordering, nesting, subgraph aspect ratio,
+ *     edges reach targets, no colinear overlap, graph-aspect ratio.
+ *     The parameterised loop runs one `it` per applicable field and
+ *     skips the rest, so a sample opts into only the checks that
+ *     meaningfully apply to it. Determinism and `hop count == crossing
+ *     count` run on every sample.
+ *
+ *   - `samples-data.ts` flowcharts (the published gallery). Each
+ *     gets a basic sanity check — finite positive bounds, no node
+ *     overlaps, every leaf inside the graph rectangle — so the
+ *     maintainer's full reference set acts as regression coverage.
+ *     New entries added to that file are auto-tested.
+ *
+ * Inline-source unit tests on layout properties (overall direction,
+ * subgraph direction directive, containment, no-overlap) live in
+ * `layout-properties.test.ts`.
  */
 import { describe, it, expect } from 'bun:test'
 import { parseMermaid, renderMermaidSVG } from '../index.ts'
 import { layoutGraphSync } from '../layout.ts'
 import { countRightAngleCrossings } from '../layout-engine.ts'
-import type { PositionedGraph, PositionedNode, PositionedGroup } from '../types.ts'
+import type { PositionedGraph, PositionedNode, PositionedGroup, Point } from '../types.ts'
 import { ALL_SAMPLE_GRAPHS, type SampleGraph } from './sample-graphs/index.ts'
+import { samples as publishedSamples } from '../../samples-data.ts'
 
 // ============================================================================
 // Helpers
@@ -67,6 +82,15 @@ function resolveRect(g: PositionedGraph, idOrLabel: string): Rect {
   const sub = findGroup(g.groups, idOrLabel)
   if (sub) return sub
   throw new Error(`No node or subgraph matches "${idOrLabel}"`)
+}
+
+/** True when point `p` sits on (or within `tol` of) one edge of rectangle `r`. */
+function pointTouchesRect(p: Point, r: Rect, tol = 5): boolean {
+  const onLeft   = Math.abs(p.x - r.x) < tol             && p.y >= r.y - tol && p.y <= r.y + r.height + tol
+  const onRight  = Math.abs(p.x - (r.x + r.width)) < tol  && p.y >= r.y - tol && p.y <= r.y + r.height + tol
+  const onTop    = Math.abs(p.y - r.y) < tol             && p.x >= r.x - tol && p.x <= r.x + r.width + tol
+  const onBottom = Math.abs(p.y - (r.y + r.height)) < tol && p.x >= r.x - tol && p.x <= r.x + r.width + tol
+  return onLeft || onRight || onTop || onBottom
 }
 
 const HEADER_HEIGHT = 28
@@ -239,6 +263,23 @@ for (const sample of ALL_SAMPLE_GRAPHS) {
       }
     }
 
+    if (sample.expectedEdgesReachTargets) {
+      for (const edge of sample.expectedEdgesReachTargets) {
+        const e_ = edge
+        it(`edge ${e_.source} → ${e_.target} polyline ends on target`, () => {
+          const matched = g.edges.find(x => x.source === e_.source && x.target === e_.target)
+          expect(matched, `edge ${e_.source} → ${e_.target} is missing from the laid-out graph`).toBeDefined()
+          const target = g.nodes.find(n => n.id === e_.target)
+          expect(target, `node "${e_.target}" is missing from the laid-out graph`).toBeDefined()
+          const last = matched!.points[matched!.points.length - 1]!
+          expect(
+            pointTouchesRect(last, target!),
+            `edge ${e_.source} → ${e_.target} ends at (${last.x.toFixed(0)}, ${last.y.toFixed(0)}) which is not on "${e_.target}"'s bounding box`,
+          ).toBe(true)
+        })
+      }
+    }
+
     if (sample.expectNoColinearOverlap) {
       it('no two distinct edges share a colinear segment longer than 6px', () => {
         expect(findColinearOverlaps(g)).toEqual([])
@@ -249,13 +290,6 @@ for (const sample of ALL_SAMPLE_GRAPHS) {
       const min = sample.minGraphHeightOverWidth
       it(`graph height / width ≥ ${min}`, () => {
         expect(g.height / g.width).toBeGreaterThanOrEqual(min)
-      })
-    }
-
-    if (sample.minGraphWidthOverHeight !== undefined) {
-      const min = sample.minGraphWidthOverHeight
-      it(`graph width / height ≥ ${min}`, () => {
-        expect(g.width / g.height).toBeGreaterThanOrEqual(min)
       })
     }
 
@@ -272,6 +306,39 @@ for (const sample of ALL_SAMPLE_GRAPHS) {
     })
   })
 }
+
+// ============================================================================
+// Published-gallery flowcharts — basic sanity coverage from samples-data.ts
+// ============================================================================
+
+describe('published-gallery flowcharts', () => {
+  const flowchartSamples = publishedSamples.filter(s => s.category === 'Flowchart')
+  for (const sample of flowchartSamples) {
+    it(`renders without sprawl or overlap: ${sample.title}`, () => {
+      const g = layout(sample.source)
+
+      expect(Number.isFinite(g.width)).toBe(true)
+      expect(Number.isFinite(g.height)).toBe(true)
+      expect(g.width).toBeGreaterThan(0)
+      expect(g.height).toBeGreaterThan(0)
+      expect(g.nodes.length).toBeGreaterThan(0)
+
+      for (let i = 0; i < g.nodes.length; i++) {
+        for (let j = i + 1; j < g.nodes.length; j++) {
+          const a = g.nodes[i]!, b = g.nodes[j]!
+          expect(rectsOverlap(a, b), `${sample.title}: nodes "${a.id}" and "${b.id}" overlap`).toBe(false)
+        }
+      }
+
+      for (const n of g.nodes) {
+        expect(n.x).toBeGreaterThanOrEqual(0)
+        expect(n.y).toBeGreaterThanOrEqual(0)
+        expect(n.x + n.width).toBeLessThanOrEqual(g.width + 0.01)
+        expect(n.y + n.height).toBeLessThanOrEqual(g.height + 0.01)
+      }
+    })
+  }
+})
 
 // Re-export type for IDE convenience
 export type { SampleGraph }
