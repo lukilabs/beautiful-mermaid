@@ -8,9 +8,9 @@ import type { SampleGraph } from './types.ts'
 
 export const REAL_SAMPLES: SampleGraph[] = [
   {
-    slug: 'pr-98-nested-tb-cross-hier',
-    title: 'PR #98: nested TB subgraphs with many cross-hierarchy edges',
-    description: 'Motivating reproduction for lukilabs/beautiful-mermaid#98. Three sibling root subgraphs (one with a nested subgraph), `direction TB` on outer and inner, many cross-hierarchy edges crossing 1-3 boundaries. Pre-fix renders this roughly square because broken hierarchy handling spreads cross-hier routing horizontally; the post-fix layout keeps it tall and narrow. Labels are anonymised.',
+    slug: 'pr-98-nested-tb-cross-subgraph',
+    title: 'PR #98: nested TB subgraphs with many cross-subgraph edges',
+    description: 'Motivating reproduction for lukilabs/beautiful-mermaid#98. Three sibling root subgraphs (one with a nested subgraph), `direction TB` on outer and inner, many cross-subgraph edges crossing 1-3 boundaries. Pre-fix renders this roughly square because broken hierarchy handling spreads cross-subgraph routing horizontally; the post-fix layout keeps it tall and narrow. Labels are anonymised.',
     expectedAxisOrder: [
       { axis: 'y', items: ['v', 'd', 't'] },
     ],

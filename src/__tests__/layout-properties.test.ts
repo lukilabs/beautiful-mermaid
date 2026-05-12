@@ -3,7 +3,7 @@
  *
  * Every test builds its own small inline mermaid source and asserts a
  * single property — overall graph direction, subgraph direction
- * directive respect, containment, sibling non-overlap, cross-hier edge
+ * directive respect, containment, sibling non-overlap, cross-subgraph edge
  * direction preservation. No test reads from the shared sample-graphs
  * fixtures: the inputs are minimal, fully self-contained, and changes
  * to the curated samples don't affect this file.
@@ -121,7 +121,7 @@ describe('layoutGraph – overall graph direction', () => {
 // ============================================================================
 // Property: a subgraph's `direction` directive reaches ELK
 //
-// When no cross-hierarchy edge crosses a subgraph's boundary, the directive
+// When no cross-subgraph edge crosses a subgraph's boundary, the directive
 // must take effect on the subgraph's interior. The pre-fix code violated
 // this contract quietly: the parser produced `direction: 'LR'` on the AST
 // and the value flowed all the way to ELK as `elk.direction: 'RIGHT'`, but
@@ -179,16 +179,16 @@ describe('layoutGraph – subgraph direction directive', () => {
 })
 
 // ============================================================================
-// Property: nested subgraphs with cross-hierarchy edges respect direction
+// Property: nested subgraphs with cross-subgraph edges respect direction
 //
-// When external edges enter a subgraph through cross-hierarchy ports, the
+// When external edges enter a subgraph through cross-subgraph ports, the
 // subgraph's own direction directive must still control its interior
 // layout. The pre-fix code mis-set `hierarchyHandling` and gave the
 // subgraph's ports no `port.side` constraint, so ELK ignored the directive
 // the moment a single external edge touched the subgraph's boundary.
 // ============================================================================
 
-describe('layoutGraph – nested subgraph with cross-hierarchy edges', () => {
+describe('layoutGraph – nested subgraph with cross-subgraph edges', () => {
   it('inner TB subgraph keeps a vertical chain stacked when external edges enter it', () => {
     const g = layout(`graph TB
       subgraph outer
@@ -236,7 +236,7 @@ describe('layoutGraph – nested subgraph with cross-hierarchy edges', () => {
     expectNoNodeOverlaps(g)
   })
 
-  it('an LR pipeline inside a TD parent keeps its horizontal layout when cross-hier edges enter and exit', () => {
+  it('an LR pipeline inside a TD parent keeps its horizontal layout when cross-subgraph edges enter and exit', () => {
     const g = layout(`graph TD
       subgraph pipeline [Processing Pipeline]
         direction LR

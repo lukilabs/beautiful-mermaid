@@ -11,7 +11,7 @@ export const DIRECTION_PERMUTATION_SAMPLES: SampleGraph[] = [
   {
     slug: 'perm-lr-with-tb-nested',
     title: 'Permutation: LR root with TB-direction nested subgraph',
-    description: 'Outer flow is left-to-right; an inner subgraph declares `direction TB` and so its content stacks vertically, with cross-hierarchy edges entering from the left and leaving on the right of the outer flow.',
+    description: 'Outer flow is left-to-right; an inner subgraph declares `direction TB` and so its content stacks vertically, with cross-subgraph edges entering from the left and leaving on the right of the outer flow.',
     expectedAxisOrder: [
       { axis: 'y', items: ['a', 'b', 'c'] },
     ],
@@ -120,7 +120,7 @@ export const DIRECTION_PERMUTATION_SAMPLES: SampleGraph[] = [
   {
     slug: 'perm-4-level-same-direction',
     title: 'Permutation: four-level nesting, all subgraphs matching the root direction',
-    description: 'Each subgraph declares the same direction as the root, so none need SEPARATE_CHILDREN — they all flatten via INCLUDE_CHILDREN. A cross-hierarchy edge from the root reaches the deepest leaf naturally without ports.',
+    description: 'Each subgraph declares the same direction as the root, so none need SEPARATE_CHILDREN — they all flatten via INCLUDE_CHILDREN. A cross-subgraph edge from the root reaches the deepest leaf naturally without ports.',
     expectedAxisOrder: [
       { axis: 'y', items: ['a', 'b', 'c'] },
     ],
@@ -148,7 +148,7 @@ export const DIRECTION_PERMUTATION_SAMPLES: SampleGraph[] = [
   {
     slug: 'perm-alt-lr-tb',
     title: 'Permutation: alternating-direction nesting (LR/LR/TB/LR/TB), only innermost has leaves',
-    description: 'Direction swaps at every level except the root match. Intermediate subgraphs hold no leaf nodes — they are pure structure. With no cross-hierarchy edges to route through the multiple SEPARATE_CHILDREN boundaries, the layout still nests cleanly and the innermost direction is preserved.',
+    description: 'Direction swaps at every level except the root match. Intermediate subgraphs hold no leaf nodes — they are pure structure. With no cross-subgraph edges to route through the multiple SEPARATE_CHILDREN boundaries, the layout still nests cleanly and the innermost direction is preserved.',
     expectedAxisOrder: [
       { axis: 'y', items: ['a', 'b', 'c'] },
     ],
@@ -196,9 +196,9 @@ export const DIRECTION_PERMUTATION_SAMPLES: SampleGraph[] = [
       end`,
   },
   {
-    slug: 'perm-many-cross-hier',
-    title: 'Permutation: multiple cross-hierarchy edges into a non-matching direction subgraph',
-    description: 'An LR-direction subgraph with two incoming and two outgoing cross-hierarchy edges. With FIXED_ORDER port constraints, all incoming ports pin to the WEST side and all outgoing ports pin to the EAST side.',
+    slug: 'perm-many-cross-subgraph',
+    title: 'Permutation: multiple cross-subgraph edges into a non-matching direction subgraph',
+    description: 'An LR-direction subgraph with two incoming and two outgoing cross-subgraph edges. With FIXED_ORDER port constraints, all incoming ports pin to the WEST side and all outgoing ports pin to the EAST side.',
     expectedAxisOrder: [
       { axis: 'x', items: ['a', 'b', 'c'] },
     ],

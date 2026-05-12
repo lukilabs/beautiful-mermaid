@@ -64,7 +64,7 @@ export function renderSvg(
 
   // 2. Edges (paths — rendered behind nodes)
   // Each edge is a <path> with semantic data-* attributes. When RENDER_HOPS
-  // is on, right-angle crossings between unrelated edges render an arched
+  // is on, perpendicular crossings between unrelated edges render an arched
   // "hop" on the horizontal segment so the crossing reads as a bridge
   // rather than a junction. Toggle by flipping RENDER_HOPS at the top of
   // this file.
@@ -242,7 +242,7 @@ function renderEdge(edge: PositionedEdge, crossings?: SegmentCrossing[]): string
 }
 
 /**
- * Toggle for the hop-over arcs at right-angle edge crossings. When `true`,
+ * Toggle for the hop-over arcs at perpendicular edge crossings. When `true`,
  * each crossing where a horizontal edge segment passes over an unrelated
  * vertical edge segment is drawn as a small Bezier arch ("hop"), so the
  * crossing reads as a bridge rather than a junction. Set to `false` to
@@ -259,7 +259,7 @@ const HOP_RADIUS = 5
  * a clear bridge rather than a slight blip. */
 const HOP_HEIGHT = 10
 /** Tolerance used when classifying segments and detecting crossings. */
-const CROSSING_EPSILON = 0.5
+const COORDINATE_EQUALITY_TOLERANCE = 0.5
 
 interface SegmentCrossing {
   segIndex: number
@@ -309,7 +309,7 @@ function buildEdgePathD(points: Point[], crossings?: SegmentCrossing[]): string 
 }
 
 /**
- * Find every right-angle crossing where one edge's horizontal segment
+ * Find every perpendicular crossing where one edge's horizontal segment
  * passes over another edge's vertical segment. Each crossing attaches to
  * the horizontal segment so that — when emitted — the horizontal arches
  * over the vertical. ENDPOINT_PAD filters out crossings within HOP_RADIUS+1
@@ -336,10 +336,10 @@ function buildCrossingMap(edges: PositionedEdge[]): Map<PositionedEdge, SegmentC
       const p2 = pts[si + 1]!
       const dx = p2.x - p1.x
       const dy = p2.y - p1.y
-      if (Math.abs(dy) < CROSSING_EPSILON && Math.abs(dx) > CROSSING_EPSILON) {
+      if (Math.abs(dy) < COORDINATE_EQUALITY_TOLERANCE && Math.abs(dx) > COORDINATE_EQUALITY_TOLERANCE) {
         segs.push({ edge: e, segIndex: si, axis: 'H', pos: (p1.y + p2.y) / 2,
           rangeMin: Math.min(p1.x, p2.x), rangeMax: Math.max(p1.x, p2.x) })
-      } else if (Math.abs(dx) < CROSSING_EPSILON && Math.abs(dy) > CROSSING_EPSILON) {
+      } else if (Math.abs(dx) < COORDINATE_EQUALITY_TOLERANCE && Math.abs(dy) > COORDINATE_EQUALITY_TOLERANCE) {
         segs.push({ edge: e, segIndex: si, axis: 'V', pos: (p1.x + p2.x) / 2,
           rangeMin: Math.min(p1.y, p2.y), rangeMax: Math.max(p1.y, p2.y) })
       }

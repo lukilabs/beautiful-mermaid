@@ -1,6 +1,6 @@
 /**
  * Subgraphs nested 3+ levels deep with leaf nodes at every level and
- * cross-hierarchy edges that cross varying numbers of subgraph boundaries
+ * cross-subgraph edges that cross varying numbers of subgraph boundaries
  * (1, 2, 3, n). Stresses port-chain decomposition at depth and the
  * edge-synthesis path that completes a polyline when ELK leaves the
  * port-to-leaf section empty (the case where a leaf is buried inside an
@@ -12,7 +12,7 @@ export const MULTI_LEVEL_WORKFLOW_SAMPLES: SampleGraph[] = [
   {
     slug: 'multi-3-level-every-level',
     title: 'Multi-level workflow: 3-level nesting, nodes at every level, edges cross 1/2/3 boundaries',
-    description: 'A 3-level nest with leaf nodes at every level. Cross-hierarchy edges from a root-level node reach (a) a level-1 node, (b) a level-2 node, and (c) a level-3 node — three different cross-hierarchy depths in the same diagram. Edge synthesis must complete each polyline to its target regardless of how many subgraph boundaries it crosses.',
+    description: 'A 3-level nest with leaf nodes at every level. Cross-hierarchy edges from a root-level node reach (a) a level-1 node, (b) a level-2 node, and (c) a level-3 node — three different cross-subgraph depths in the same diagram. Edge synthesis must complete each polyline to its target regardless of how many subgraph boundaries it crosses.',
     expectedNesting: [
       ['Outer', 'Middle', 'Inner', 'deep_a'],
       ['Inner', 'deep_b'],
@@ -44,8 +44,8 @@ export const MULTI_LEVEL_WORKFLOW_SAMPLES: SampleGraph[] = [
       in_a --> mid_a`,
   },
   {
-    slug: 'multi-cousin-cross-hier',
-    title: 'Multi-level workflow: cousin nodes — cross-hier edges between siblings sharing a parent',
+    slug: 'multi-cousin-cross-subgraph',
+    title: 'Multi-level workflow: cousin nodes — cross-subgraph edges between siblings sharing a parent',
     description: 'Two child subgraphs nested inside a shared parent, each with their own interior chain. Cross-hierarchy edges connect a node in the left child to a node in the right child — exiting one subgraph, traversing the parent\'s interior, and entering the other.',
     expectedNesting: [
       ['Parent', 'Left', 'l1'],

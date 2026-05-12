@@ -8,7 +8,7 @@ export const STRESS_SUITE_SAMPLES: SampleGraph[] = [
   {
     slug: 'stress-microservices-stack',
     title: 'Stress: microservices stack — three layers, fan-out from a single API node',
-    description: 'Web/Mobile/Desktop fan into a single API node, which fans out to four service nodes, each terminating at its own DB. Tests cross-hier port indexing under double fan-out/fan-in.',
+    description: 'Web/Mobile/Desktop fan into a single API node, which fans out to four service nodes, each terminating at its own DB. Tests cross-subgraph port indexing under double fan-out/fan-in.',
     containment: {
       Web: 'Client Layer', Mobile: 'Client Layer', Desktop: 'Client Layer', API: 'Client Layer',
       Auth: 'Service Layer', Users: 'Service Layer', Orders: 'Service Layer', Payments: 'Service Layer',
@@ -76,7 +76,7 @@ export const STRESS_SUITE_SAMPLES: SampleGraph[] = [
   {
     slug: 'stress-bidirectional-request-response',
     title: 'Stress: bidirectional request/response between Client and Server',
-    description: 'Mirrored cross-hier edge pairs (Client→Server then Server→Client) at multiple layers — should resolve into clean parallel channels with no colinear overlap.',
+    description: 'Mirrored cross-subgraph edge pairs (Client→Server then Server→Client) at multiple layers — should resolve into clean parallel channels with no colinear overlap.',
     containment: {
       UI: 'Client', Cache: 'Client', Network: 'Client',
       Endpoint: 'Server', Handler: 'Server', DB: 'Server',
@@ -146,7 +146,7 @@ export const STRESS_SUITE_SAMPLES: SampleGraph[] = [
   {
     slug: 'stress-mixed-direction-sandwich',
     title: 'Stress: deep mixed-direction sandwich (LR/TB/LR/TB) with fan-out from src',
-    description: 'Four levels of alternating direction directives plus three fan-out edges from a root node into nodes at three different nesting depths. Exercises direction inheritance and cross-hier port chains under maximum nesting.',
+    description: 'Four levels of alternating direction directives plus three fan-out edges from a root node into nodes at three different nesting depths. Exercises direction inheritance and cross-subgraph port chains under maximum nesting.',
     maxCrossings: 2,
     expectedAxisOrder: [
       { axis: 'y', items: ['d', 'e', 'f'] },
@@ -220,7 +220,7 @@ export const STRESS_SUITE_SAMPLES: SampleGraph[] = [
   {
     slug: 'stress-error-path-cluster',
     title: 'Stress: error-path cluster with retry back-edge and Monitoring fan-in',
-    description: 'Happy path, error path, and a Monitoring sink subgraph; RetryStep→Login wraps the full graph height. Tests back-edge wraparound plus cross-hier fan-in into a third subgraph.',
+    description: 'Happy path, error path, and a Monitoring sink subgraph; RetryStep→Login wraps the full graph height. Tests back-edge wraparound plus cross-subgraph fan-in into a third subgraph.',
     maxCrossings: 2,
     containment: {
       Login: 'Happy Path', Verify: 'Happy Path', Authorize: 'Happy Path', Success: 'Happy Path',

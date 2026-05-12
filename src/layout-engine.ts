@@ -4,18 +4,18 @@
  * ELK does both layout and routing. Per-subgraph `direction` directives
  * are honoured by setting `SEPARATE_CHILDREN` on every subgraph whose
  * direction differs from its effective parent (or that contains a leaf
- * endpoint of a cross-hierarchy edge — without `SEPARATE_CHILDREN` the
+ * endpoint of a cross-subgraph edge — without `SEPARATE_CHILDREN` the
  * leaf would migrate out of its declared subgraph). Cross-hierarchy
  * edges are decomposed into a chain of sub-edges, one per subgraph
  * boundary they cross, with explicit ports on each subgraph's boundary
  * on the side dictated by that subgraph's direction. ELK lays out each
  * subgraph independently with its own direction and routes every edge
- * — including the cross-hierarchy ones — in a single pass.
+ * — including the cross-subgraph ones — in a single pass.
  *
  * Pipeline:
  *   mermaidToElk:    build ELK input with port chains and sub-edges
  *   elkLayoutSync:   ELK lays out the subgraph tree end-to-end
- *   elkToPositioned: extract nodes + groups; assemble each cross-hier edge
+ *   elkToPositioned: extract nodes + groups; assemble each cross-subgraph edge
  *                    polyline by concatenating its sub-edge sections
  *   clipEdgeToShape: shape-aware endpoint clipping for non-rectangles
  */
@@ -215,7 +215,7 @@ function lowestCommonAncestor(
 /**
  * Effective direction at a subgraph: own direction directive if any, otherwise
  * the nearest ancestor's, otherwise the root direction. Determines which side
- * a port for an outgoing/incoming cross-hier edge sits on.
+ * a port for an outgoing/incoming cross-subgraph edge sits on.
  */
 function effectiveDirection(
   subgraphId: string,
@@ -236,17 +236,17 @@ function effectiveDirection(
  * Subgraphs that need SEPARATE_CHILDREN. Two reasons:
  *
  * 1. Direction mismatch: own directive differs from effective parent direction.
- * 2. Contains a direct leaf child that's an endpoint of a cross-hier edge —
+ * 2. Contains a direct leaf child that's an endpoint of a cross-subgraph edge —
  *    without SEPARATE_CHILDREN, INCLUDE_CHILDREN inheritance lets ELK migrate
  *    that leaf out of its declared subgraph when the layered layout prefers
- *    a layer near a cross-hier neighbour. SEPARATE_CHILDREN locks it inside.
+ *    a layer near a cross-subgraph neighbour. SEPARATE_CHILDREN locks it inside.
  */
 function computeSubgraphsNeedingSeparate(
   subgraphMap: Map<string, MermaidSubgraph>,
   subgraphParent: Map<string, string | undefined>,
   rootDirection: Direction,
   nodeToSubgraph: Map<string, string>,
-  crossHierEdges: ReadonlyArray<{ edge: MermaidEdge }>
+  crossSubgraphEdges: ReadonlyArray<{ edge: MermaidEdge }>
 ): Set<string> {
   const result = new Set<string>()
   for (const [id, sg] of subgraphMap) {
@@ -262,11 +262,11 @@ function computeSubgraphsNeedingSeparate(
       result.add(id)
     }
   }
-  for (const ce of crossHierEdges) {
-    const srcSg = nodeToSubgraph.get(ce.edge.source)
-    if (srcSg) result.add(srcSg)
-    const tgtSg = nodeToSubgraph.get(ce.edge.target)
-    if (tgtSg) result.add(tgtSg)
+  for (const ce of crossSubgraphEdges) {
+    const sourceSubgraphId = nodeToSubgraph.get(ce.edge.source)
+    if (sourceSubgraphId) result.add(sourceSubgraphId)
+    const targetSubgraphId = nodeToSubgraph.get(ce.edge.target)
+    if (targetSubgraphId) result.add(targetSubgraphId)
   }
   return result
 }
@@ -274,7 +274,7 @@ function computeSubgraphsNeedingSeparate(
 // ============================================================================
 // Cross-hierarchy edge decomposition
 //
-// Each cross-hier edge becomes a chain of sub-edges, one per subgraph
+// Each cross-subgraph edge becomes a chain of sub-edges, one per subgraph
 // boundary it crosses, plus one final sub-edge at the LCA level where the
 // source-side and target-side become siblings (or where one endpoint is at
 // LCA level itself).
@@ -292,7 +292,7 @@ function computeSubgraphsNeedingSeparate(
 // natively, with channels reserved.
 // ============================================================================
 
-interface CrossHierPort {
+interface CrossSubgraphPort {
   /** Stable, unique ELK port id. */
   portId: string
   /** Subgraph that owns this port. */
@@ -301,12 +301,12 @@ interface CrossHierPort {
   side: Side
   /** 'out' = outgoing (source side), 'in' = incoming (target side). */
   direction: 'in' | 'out'
-  /** Index of the underlying cross-hier edge in graph.edges. Numeric tiebreaker that orders ports sharing a side and outsideDepth in declaration order. */
+  /** Index of the underlying cross-subgraph edge in graph.edges. Numeric tiebreaker that orders ports sharing a side and outsideDepth in declaration order. */
   edgeIndex: number
   /**
    * Number of subgraph levels between this port's subgraph and the source
    * (for `direction: 'in'`) or the target (for `direction: 'out'`) of the
-   * underlying cross-hier edge. Used as a tiebreaker when several ports
+   * underlying cross-subgraph edge. Used as a tiebreaker when several ports
    * share a side: the closer endpoint goes first along the side, which
    * matches the natural geographic order in most diagrams (closer leaves
    * are typically laid out closer to their target subgraph).
@@ -314,26 +314,26 @@ interface CrossHierPort {
   outsideDepth: number
 }
 
-interface CrossHierDecomposition {
+interface PreprocessedEdge {
   /** Index of this edge in graph.edges. */
   index: number
   edge: MermaidEdge
   /** Source-side subgraph chain, innermost first (excluding LCA). Empty if source is direct child of LCA. */
-  srcChain: CrossHierPort[]
+  sourceChain: CrossSubgraphPort[]
   /** Target-side subgraph chain, innermost first (excluding LCA). Empty if target is direct child of LCA. */
-  tgtChain: CrossHierPort[]
+  targetChain: CrossSubgraphPort[]
   /** LCA subgraph id, or undefined for root LCA. */
   lca: string | undefined
   /**
    * True when the LCA-level segment was reversed in the ELK input to break
    * a cycle in that LCA's flow DAG (e.g. two siblings with bidirectional
-   * cross-hier edges). The polyline for this segment is reversed back during
+   * cross-subgraph edges). The polyline for this segment is reversed back during
    * assembly so the user-visible direction is preserved.
    */
   lcaReversed: boolean
 }
 
-function decomposeCrossHierEdge(
+function preprocessEdge(
   index: number,
   edge: MermaidEdge,
   sourceSg: string | undefined,
@@ -341,11 +341,11 @@ function decomposeCrossHierEdge(
   subgraphParent: Map<string, string | undefined>,
   subgraphMap: Map<string, MermaidSubgraph>,
   rootDirection: Direction
-): CrossHierDecomposition {
+): PreprocessedEdge {
   const lca = lowestCommonAncestor(sourceSg, targetSg, subgraphParent)
 
-  function buildChain(startSg: string | undefined, dir: 'in' | 'out'): CrossHierPort[] {
-    const chain: CrossHierPort[] = []
+  function buildChain(startSg: string | undefined, dir: 'in' | 'out'): CrossSubgraphPort[] {
+    const chain: CrossSubgraphPort[] = []
     let cur = startSg
     while (cur !== undefined && cur !== lca) {
       const subgraphDir = effectiveDirection(cur, subgraphMap, subgraphParent, rootDirection)
@@ -374,8 +374,8 @@ function decomposeCrossHierEdge(
   return {
     index,
     edge,
-    srcChain: buildChain(sourceSg, 'out'),
-    tgtChain: buildChain(targetSg, 'in'),
+    sourceChain: buildChain(sourceSg, 'out'),
+    targetChain: buildChain(targetSg, 'in'),
     lca,
     lcaReversed: false,
   }
@@ -389,7 +389,7 @@ function decomposeCrossHierEdge(
 //   - hierarchyHandling: SEPARATE_CHILDREN
 //   - portConstraints: FIXED_ORDER (the explicit port.index on each port
 //     decides the per-side order; the explicit port.side decides the side)
-//   - ports[] populated from cross-hier decomposition
+//   - ports[] populated from cross-subgraph decomposition
 //
 // Sub-edges are placed in the edges array of the subgraph where their
 // source and target are direct children (or where they are direct ports
@@ -409,10 +409,10 @@ interface ElkGraphNode extends ElkNode {
 
 interface MermaidToElkResult {
   elkGraph: ElkGraphNode
-  /** The decomposed cross-hier edges, in graph.edges order. Used during extraction to assemble polylines. */
-  decompositions: CrossHierDecomposition[]
-  /** Raw cross-hier ports per subgraph (used by the second-pass index refinement). */
-  rawPortsBySubgraph: Map<string, CrossHierPort[]>
+  /** The decomposed cross-subgraph edges, in graph.edges order. Used during extraction to assemble polylines. */
+  preprocessedEdges: PreprocessedEdge[]
+  /** Raw cross-subgraph ports per subgraph (used by the second-pass index refinement). */
+  portsBySubgraph: Map<string, CrossSubgraphPort[]>
 }
 
 function buildElkLabel(text: string): NonNullable<ElkExtendedEdge['labels']>[0] {
@@ -465,7 +465,7 @@ function mermaidToElk(
   // Classify edges. internalEdgesBySubgraph[null] = root-level real edges.
   const internalEdgesBySubgraph = new Map<string | null, Array<{ index: number; edge: MermaidEdge }>>()
   internalEdgesBySubgraph.set(null, [])
-  const crossHierRaw: Array<{ index: number; edge: MermaidEdge; sourceSg: string | undefined; targetSg: string | undefined }> = []
+  const crossSubgraphRaw: Array<{ index: number; edge: MermaidEdge; sourceSg: string | undefined; targetSg: string | undefined }> = []
   for (let i = 0; i < graph.edges.length; i++) {
     const edge = graph.edges[i]!
     const sourceSg = nodeToSubgraph.get(edge.source)
@@ -476,17 +476,17 @@ function mermaidToElk(
       if (!arr) { arr = []; internalEdgesBySubgraph.set(key, arr) }
       arr.push({ index: i, edge })
     } else {
-      crossHierRaw.push({ index: i, edge, sourceSg, targetSg })
+      crossSubgraphRaw.push({ index: i, edge, sourceSg, targetSg })
     }
   }
 
-  // Decompose cross-hier edges into port chains.
-  const decompositions: CrossHierDecomposition[] = crossHierRaw.map(ce =>
-    decomposeCrossHierEdge(ce.index, ce.edge, ce.sourceSg, ce.targetSg, subgraphParent, subgraphMap, graph.direction)
+  // Decompose cross-subgraph edges into port chains.
+  const preprocessedEdges: PreprocessedEdge[] = crossSubgraphRaw.map(ce =>
+    preprocessEdge(ce.index, ce.edge, ce.sourceSg, ce.targetSg, subgraphParent, subgraphMap, graph.direction)
   )
 
-  // Detect LCA-level cycles. When two cross-hier edges between the same pair
-  // of LCA-children flow in opposite directions (the cousin-cross-hier case),
+  // Detect LCA-level cycles. When two cross-subgraph edges between the same pair
+  // of LCA-children flow in opposite directions (the cousin-cross-subgraph case),
   // their LCA sub-edges form a 2-cycle that ELK has to break. With model
   // ordering on, ELK arbitrarily picks which to reverse — sometimes the one
   // that reverses sibling declaration order. To control this, we walk the
@@ -529,23 +529,23 @@ function mermaidToElk(
       const a = getAdj(lcaKey)
       for (const { edge } of edges) addAdj(a, edge.source, edge.target)
     }
-    // Walk decompositions in source order. For each LCA sub-edge, check if it
+    // Walk preprocessedEdges in source order. For each LCA sub-edge, check if it
     // would close a cycle; if yes, mark reversed. Record either the forward
     // or reversed direction in the DAG so subsequent edges see the result.
-    for (const decomp of decompositions) {
-      const srcAnc = decomp.srcChain.length > 0
-        ? decomp.srcChain[decomp.srcChain.length - 1]!.subgraphId
-        : decomp.edge.source
-      const tgtAnc = decomp.tgtChain.length > 0
-        ? decomp.tgtChain[decomp.tgtChain.length - 1]!.subgraphId
-        : decomp.edge.target
-      if (srcAnc === tgtAnc) continue
-      const adj = getAdj(decomp.lca ?? null)
-      if (hasPath(adj, tgtAnc, srcAnc)) {
-        decomp.lcaReversed = true
-        addAdj(adj, tgtAnc, srcAnc)
+    for (const preprocessed of preprocessedEdges) {
+      const sourceAncestor = preprocessed.sourceChain.length > 0
+        ? preprocessed.sourceChain[preprocessed.sourceChain.length - 1]!.subgraphId
+        : preprocessed.edge.source
+      const targetAncestor = preprocessed.targetChain.length > 0
+        ? preprocessed.targetChain[preprocessed.targetChain.length - 1]!.subgraphId
+        : preprocessed.edge.target
+      if (sourceAncestor === targetAncestor) continue
+      const adj = getAdj(preprocessed.lca ?? null)
+      if (hasPath(adj, targetAncestor, sourceAncestor)) {
+        preprocessed.lcaReversed = true
+        addAdj(adj, targetAncestor, sourceAncestor)
       } else {
-        addAdj(adj, srcAnc, tgtAnc)
+        addAdj(adj, sourceAncestor, targetAncestor)
       }
     }
   }
@@ -555,16 +555,16 @@ function mermaidToElk(
   // the FIXED_ORDER port constraints on; without SEPARATE the boundary
   // would be soft and the port positions would not stick.
   const subgraphsNeedingSeparate = computeSubgraphsNeedingSeparate(
-    subgraphMap, subgraphParent, graph.direction, nodeToSubgraph, crossHierRaw
+    subgraphMap, subgraphParent, graph.direction, nodeToSubgraph, crossSubgraphRaw
   )
-  // Any subgraph that owns at least one cross-hier port also needs SEPARATE.
-  for (const decomp of decompositions) {
-    for (const p of decomp.srcChain) subgraphsNeedingSeparate.add(p.subgraphId)
-    for (const p of decomp.tgtChain) subgraphsNeedingSeparate.add(p.subgraphId)
+  // Any subgraph that owns at least one cross-subgraph port also needs SEPARATE.
+  for (const preprocessed of preprocessedEdges) {
+    for (const p of preprocessed.sourceChain) subgraphsNeedingSeparate.add(p.subgraphId)
+    for (const p of preprocessed.targetChain) subgraphsNeedingSeparate.add(p.subgraphId)
   }
 
   // Per-subgraph: ports owned + sub-edges to lay out at this level.
-  const rawPortsBySubgraph = new Map<string, CrossHierPort[]>()
+  const portsBySubgraph = new Map<string, CrossSubgraphPort[]>()
   // sub-edges owned by a subgraph (or root if subgraphId === null)
   const subEdgesBySubgraph = new Map<string | null, ElkExtendedEdge[]>()
   function addSubEdge(subgraphId: string | null, edge: ElkExtendedEdge): void {
@@ -572,36 +572,36 @@ function mermaidToElk(
     if (!arr) { arr = []; subEdgesBySubgraph.set(subgraphId, arr) }
     arr.push(edge)
   }
-  function addRawPort(p: CrossHierPort): void {
-    let arr = rawPortsBySubgraph.get(p.subgraphId)
-    if (!arr) { arr = []; rawPortsBySubgraph.set(p.subgraphId, arr) }
+  function recordPort(p: CrossSubgraphPort): void {
+    let arr = portsBySubgraph.get(p.subgraphId)
+    if (!arr) { arr = []; portsBySubgraph.set(p.subgraphId, arr) }
     arr.push(p)
   }
 
   // Emit ports + sub-edges per decomposition.
-  for (const decomp of decompositions) {
+  for (const preprocessed of preprocessedEdges) {
     // Collect ports for sorting/indexing later.
-    for (const p of decomp.srcChain) addRawPort(p)
-    for (const p of decomp.tgtChain) addRawPort(p)
+    for (const p of preprocessed.sourceChain) recordPort(p)
+    for (const p of preprocessed.targetChain) recordPort(p)
 
     // Sub-edges. Each is `e${index}_seg${k}` so the extractor can group them
     // back together by parsing the id prefix.
     let segCounter = 0
-    function nextSegId(): string { return `e${decomp.index}_seg${segCounter++}` }
+    function nextSegId(): string { return `e${preprocessed.index}_seg${segCounter++}` }
 
     // Source side, innermost first.
-    if (decomp.srcChain.length > 0) {
+    if (preprocessed.sourceChain.length > 0) {
       // Innermost: from source leaf to first subgraph's port
-      const firstPort = decomp.srcChain[0]!
+      const firstPort = preprocessed.sourceChain[0]!
       addSubEdge(firstPort.subgraphId, {
         id: nextSegId(),
-        sources: [decomp.edge.source],
+        sources: [preprocessed.edge.source],
         targets: [firstPort.portId],
       })
       // Each subsequent subgraph: from inner port to outer port (lives at outer's level)
-      for (let i = 1; i < decomp.srcChain.length; i++) {
-        const inner = decomp.srcChain[i - 1]!
-        const outer = decomp.srcChain[i]!
+      for (let i = 1; i < preprocessed.sourceChain.length; i++) {
+        const inner = preprocessed.sourceChain[i - 1]!
+        const outer = preprocessed.sourceChain[i]!
         addSubEdge(outer.subgraphId, {
           id: nextSegId(),
           sources: [inner.portId],
@@ -611,17 +611,17 @@ function mermaidToElk(
     }
 
     // Target side, innermost first.
-    if (decomp.tgtChain.length > 0) {
+    if (preprocessed.targetChain.length > 0) {
       // Innermost: from first subgraph's port to target leaf
-      const firstPort = decomp.tgtChain[0]!
+      const firstPort = preprocessed.targetChain[0]!
       addSubEdge(firstPort.subgraphId, {
         id: nextSegId(),
         sources: [firstPort.portId],
-        targets: [decomp.edge.target],
+        targets: [preprocessed.edge.target],
       })
-      for (let i = 1; i < decomp.tgtChain.length; i++) {
-        const inner = decomp.tgtChain[i - 1]!
-        const outer = decomp.tgtChain[i]!
+      for (let i = 1; i < preprocessed.targetChain.length; i++) {
+        const inner = preprocessed.targetChain[i - 1]!
+        const outer = preprocessed.targetChain[i]!
         addSubEdge(outer.subgraphId, {
           id: nextSegId(),
           sources: [outer.portId],
@@ -630,22 +630,22 @@ function mermaidToElk(
       }
     }
 
-    // LCA-level segment: from outermost source-port (or source leaf if srcChain empty)
-    // to outermost target-port (or target leaf if tgtChain empty).
-    const lcaSrc = decomp.srcChain.length > 0
-      ? decomp.srcChain[decomp.srcChain.length - 1]!.portId
-      : decomp.edge.source
-    const lcaTgt = decomp.tgtChain.length > 0
-      ? decomp.tgtChain[decomp.tgtChain.length - 1]!.portId
-      : decomp.edge.target
-    const lcaEdge: ElkExtendedEdge = decomp.lcaReversed
+    // LCA-level segment: from outermost source-port (or source leaf if sourceChain empty)
+    // to outermost target-port (or target leaf if targetChain empty).
+    const lcaSrc = preprocessed.sourceChain.length > 0
+      ? preprocessed.sourceChain[preprocessed.sourceChain.length - 1]!.portId
+      : preprocessed.edge.source
+    const lcaTgt = preprocessed.targetChain.length > 0
+      ? preprocessed.targetChain[preprocessed.targetChain.length - 1]!.portId
+      : preprocessed.edge.target
+    const lcaEdge: ElkExtendedEdge = preprocessed.lcaReversed
       ? { id: nextSegId(), sources: [lcaTgt], targets: [lcaSrc] }
       : { id: nextSegId(), sources: [lcaSrc], targets: [lcaTgt] }
-    if (decomp.edge.label) lcaEdge.labels = [buildElkLabel(decomp.edge.label)]
-    addSubEdge(decomp.lca ?? null, lcaEdge)
+    if (preprocessed.edge.label) lcaEdge.labels = [buildElkLabel(preprocessed.edge.label)]
+    addSubEdge(preprocessed.lca ?? null, lcaEdge)
   }
 
-  // Convert raw ports (CrossHierPort) to ELK ports with explicit indices.
+  // Convert raw ports (CrossSubgraphPort) to ELK ports with explicit indices.
   // `port.index` is per side, restarting at 0 on each side. ELK numbers
   // ports along each perimeter in the natural sense — NORTH/SOUTH
   // left-to-right, EAST/WEST top-to-bottom. With `portIndexOverride`
@@ -654,11 +654,11 @@ function mermaidToElk(
   // each side — the closer source/target endpoint comes first, which is
   // the best blind heuristic when both sub-edges in a SEPARATE subgraph
   // end at the same internal node.
-  const portsBySubgraph = new Map<string, ElkPort[]>()
-  for (const [subgraphId, raws] of rawPortsBySubgraph) {
+  const elkPortsBySubgraph = new Map<string, ElkPort[]>()
+  for (const [subgraphId, portsForSubgraph] of portsBySubgraph) {
     // Group by side and sort each side independently.
-    const bySide = new Map<Side, CrossHierPort[]>()
-    for (const p of raws) {
+    const bySide = new Map<Side, CrossSubgraphPort[]>()
+    for (const p of portsForSubgraph) {
       let arr = bySide.get(p.side)
       if (!arr) { arr = []; bySide.set(p.side, arr) }
       arr.push(p)
@@ -685,7 +685,7 @@ function mermaidToElk(
         })
       })
     }
-    portsBySubgraph.set(subgraphId, elkPorts)
+    elkPortsBySubgraph.set(subgraphId, elkPorts)
   }
 
   // Sub-edge order matters for SEPARATE subgraph port placement: ELK fans
@@ -697,7 +697,7 @@ function mermaidToElk(
   // first, the next-indexed port comes second, etc. Sub-edges with no port
   // on this subgraph (LCA-level segments) are placed last.
   const portIndexOf = new Map<string, number>()
-  for (const elkPorts of portsBySubgraph.values()) {
+  for (const elkPorts of elkPortsBySubgraph.values()) {
     for (const p of elkPorts) {
       const idxStr = p.layoutOptions?.['org.eclipse.elk.port.index']
       if (idxStr !== undefined) portIndexOf.set(p.id, parseInt(idxStr, 10))
@@ -706,7 +706,7 @@ function mermaidToElk(
   for (const [subgraphId, edges] of subEdgesBySubgraph) {
     if (subgraphId === null) continue // root has no boundary ports
     const subgraphPortIds = new Set<string>()
-    for (const p of portsBySubgraph.get(subgraphId) ?? []) subgraphPortIds.add(p.id)
+    for (const p of elkPortsBySubgraph.get(subgraphId) ?? []) subgraphPortIds.add(p.id)
     function sortKey(edge: ElkExtendedEdge): number {
       // Find a port on this subgraph that this edge connects to.
       for (const s of edge.sources) if (subgraphPortIds.has(s)) return portIndexOf.get(s) ?? 1e9
@@ -761,19 +761,19 @@ function mermaidToElk(
 
   // Subgraphs (recursive).
   for (const sg of graph.subgraphs) {
-    elkGraph.children!.push(buildSubgraphNode(sg, graph, opts, internalEdgesBySubgraph, subEdgesBySubgraph, portsBySubgraph, subgraphsNeedingSeparate, subgraphMap, subgraphParent, graph.direction))
+    elkGraph.children!.push(buildSubgraphNode(sg, graph, opts, internalEdgesBySubgraph, subEdgesBySubgraph, elkPortsBySubgraph, subgraphsNeedingSeparate, subgraphMap, subgraphParent, graph.direction))
   }
 
   // Root-level real internal edges.
   for (const { index, edge } of internalEdgesBySubgraph.get(null) ?? []) {
     elkGraph.edges!.push(buildInternalElkEdge(index, edge))
   }
-  // Root-level cross-hier sub-edges (LCA = root).
+  // Root-level cross-subgraph sub-edges (LCA = root).
   for (const e of subEdgesBySubgraph.get(null) ?? []) {
     elkGraph.edges!.push(e)
   }
 
-  return { elkGraph, decompositions, rawPortsBySubgraph }
+  return { elkGraph, preprocessedEdges, portsBySubgraph }
 }
 
 function buildSubgraphNode(
@@ -782,7 +782,7 @@ function buildSubgraphNode(
   opts: Required<Pick<RenderOptions, 'font' | 'padding' | 'nodeSpacing' | 'layerSpacing'>>,
   internalEdgesBySubgraph: Map<string | null, Array<{ index: number; edge: MermaidEdge }>>,
   subEdgesBySubgraph: Map<string | null, ElkExtendedEdge[]>,
-  portsBySubgraph: Map<string, ElkPort[]>,
+  elkPortsBySubgraph: Map<string, ElkPort[]>,
   subgraphsNeedingSeparate: Set<string>,
   subgraphMap: Map<string, MermaidSubgraph>,
   subgraphParent: Map<string, string | undefined>,
@@ -803,7 +803,7 @@ function buildSubgraphNode(
     'elk.layered.cycleBreaking.strategy': 'GREEDY_MODEL_ORDER',
   }
 
-  const ownPorts = portsBySubgraph.get(sg.id) ?? []
+  const ownPorts = elkPortsBySubgraph.get(sg.id) ?? []
   const needsSeparate = subgraphsNeedingSeparate.has(sg.id) || ownPorts.length > 0
 
   if (needsSeparate) {
@@ -858,7 +858,7 @@ function buildSubgraphNode(
 
   // Direct sub-subgraphs.
   for (const child of sg.children) {
-    elkNode.children!.push(buildSubgraphNode(child, graph, opts, internalEdgesBySubgraph, subEdgesBySubgraph, portsBySubgraph, subgraphsNeedingSeparate, subgraphMap, subgraphParent, rootDirection))
+    elkNode.children!.push(buildSubgraphNode(child, graph, opts, internalEdgesBySubgraph, subEdgesBySubgraph, elkPortsBySubgraph, subgraphsNeedingSeparate, subgraphMap, subgraphParent, rootDirection))
   }
 
   // Real internal edges at this subgraph's level.
@@ -906,10 +906,10 @@ function buildSubgraphNode(
 // Walk the ELK output once. For each ELK edge encountered:
 //   - If id matches `e${index}` exactly, it's a real internal edge: take
 //     its single section as the polyline.
-//   - If id matches `e${index}_seg${k}`, it's a cross-hier sub-edge:
+//   - If id matches `e${index}_seg${k}`, it's a cross-subgraph sub-edge:
 //     accumulate its section into an aggregate keyed by index.
 //
-// After walking, each cross-hier edge has N sub-sections. They concatenate
+// After walking, each cross-subgraph edge has N sub-sections. They concatenate
 // into one continuous polyline because port positions match by construction
 // (the same port id is the target of one sub-edge and the source of the
 // next, so ELK places them at the same global coordinate).
@@ -925,7 +925,7 @@ interface ExtractionResult {
 function elkToPositioned(
   elkResult: ElkNode,
   graph: MermaidGraph,
-  decompositions: CrossHierDecomposition[]
+  preprocessedEdges: PreprocessedEdge[]
 ): ExtractionResult {
   const nodes: PositionedNode[] = []
   const groups: PositionedGroup[] = []
@@ -974,7 +974,7 @@ function elkToPositioned(
   }
   walk(elkResult, 0, 0, groups)
 
-  // Edge polyline accumulation. Internal edges have a direct entry; cross-hier
+  // Edge polyline accumulation. Internal edges have a direct entry; cross-subgraph
   // edges accumulate per-segment sections then concatenate.
   interface AccumulatedSeg {
     segIdx: number
@@ -982,7 +982,7 @@ function elkToPositioned(
     labelPosition?: Point
   }
   const internalPolylines = new Map<number, { points: Point[]; labelPosition?: Point }>()
-  const crossHierSegs = new Map<number, AccumulatedSeg[]>()
+  const crossSubgraphSegs = new Map<number, AccumulatedSeg[]>()
 
   function collectEdges(elkNode: ElkNode, offsetX: number, offsetY: number): void {
     if (elkNode.edges) {
@@ -1022,8 +1022,8 @@ function elkToPositioned(
         } else {
           // Cross-hier sub-edge segment.
           const segIdx = parseInt(m[2]!, 10)
-          let arr = crossHierSegs.get(index)
-          if (!arr) { arr = []; crossHierSegs.set(index, arr) }
+          let arr = crossSubgraphSegs.get(index)
+          if (!arr) { arr = []; crossSubgraphSegs.set(index, arr) }
           arr.push({ segIdx, points, labelPosition: labelPos })
         }
       }
@@ -1037,18 +1037,18 @@ function elkToPositioned(
   collectEdges(elkResult, 0, 0)
 
   // Build the edges array in graph.edges order.
-  const decompByIndex = new Map<number, CrossHierDecomposition>()
-  for (const d of decompositions) decompByIndex.set(d.index, d)
+  const preprocessedByEdgeIndex = new Map<number, PreprocessedEdge>()
+  for (const d of preprocessedEdges) preprocessedByEdgeIndex.set(d.index, d)
   const edges: PositionedEdge[] = []
 
   for (let i = 0; i < graph.edges.length; i++) {
     const original = graph.edges[i]!
-    const decomp = decompByIndex.get(i)
+    const preprocessed = preprocessedByEdgeIndex.get(i)
 
     let points: Point[] = []
     let labelPos: Point | undefined
 
-    if (decomp === undefined) {
+    if (preprocessed === undefined) {
       // Real internal edge.
       const e = internalPolylines.get(i)
       if (!e) continue
@@ -1056,8 +1056,8 @@ function elkToPositioned(
       labelPos = e.labelPosition ?? (original.label ? calculatePathMidpoint(points) : undefined)
     } else {
       // Cross-hier edge: assemble in chain order.
-      const segs = crossHierSegs.get(i) ?? []
-      points = assembleCrossHierPolyline(decomp, segs)
+      const segs = crossSubgraphSegs.get(i) ?? []
+      points = assembleCrossSubgraphPolyline(preprocessed, segs)
       // Label was attached to the LCA-level segment.
       for (const s of segs) {
         if (s.labelPosition) { labelPos = s.labelPosition; break }
@@ -1086,29 +1086,29 @@ function elkToPositioned(
 }
 
 /**
- * Assemble a cross-hier edge's polyline from its sub-segments, in the order
+ * Assemble a cross-subgraph edge's polyline from its sub-segments, in the order
  *   source-leaf → ...source-chain ports outermost-last... → LCA-segment →
  *   ...target-chain ports outermost-first... → target-leaf.
  *
  * Sub-segments are tagged in mermaidToElk by `segIdx` in this order:
- *   srcChain[0..n-1] (source-leaf → port → port → ...)
- *   tgtChain[0..m-1] (port → ... → port → target-leaf)
+ *   sourceChain[0..n-1] (source-leaf → port → port → ...)
+ *   targetChain[0..m-1] (port → ... → port → target-leaf)
  *   LCA-segment
  *
  * To assemble we sort by:
- *   1. all srcChain segments in ascending segIdx (innermost to outermost)
+ *   1. all sourceChain segments in ascending segIdx (innermost to outermost)
  *   2. then the LCA segment
- *   3. then all tgtChain segments REVERSED (outermost to innermost)
+ *   3. then all targetChain segments REVERSED (outermost to innermost)
  *
  * Because endpoints of consecutive segments share a port (which ELK places
  * at the same global coordinate), the concatenation is continuous. We drop
  * the duplicated endpoint at each join.
  */
-function assembleCrossHierPolyline(decomp: CrossHierDecomposition, segs: ReadonlyArray<{ segIdx: number; points: Point[] }>): Point[] {
+function assembleCrossSubgraphPolyline(preprocessed: PreprocessedEdge, segs: ReadonlyArray<{ segIdx: number; points: Point[] }>): Point[] {
   if (segs.length === 0) return []
 
-  const srcLen = decomp.srcChain.length
-  const tgtLen = decomp.tgtChain.length
+  const srcLen = preprocessed.sourceChain.length
+  const tgtLen = preprocessed.targetChain.length
   // Sort segments into the per-chain buckets by their segIdx slot.
   const srcSegs: Array<Point[] | undefined> = new Array(srcLen)
   const tgtSegs: Array<Point[] | undefined> = new Array(tgtLen)
@@ -1124,7 +1124,7 @@ function assembleCrossHierPolyline(decomp: CrossHierDecomposition, segs: Readonl
       // ELK gave us points in reverse order (from what is logically the
       // target back to the source); flip them so concatenation joins on
       // the correct port at each end.
-      lcaSeg = decomp.lcaReversed ? [...s.points].reverse() : s.points
+      lcaSeg = preprocessed.lcaReversed ? [...s.points].reverse() : s.points
     }
   }
 
@@ -1166,7 +1166,7 @@ function assembleCrossHierPolyline(decomp: CrossHierDecomposition, segs: Readonl
 // Polyline simplification
 // ============================================================================
 
-const COORD_EPSILON = 0.5
+const COORDINATE_EQUALITY_TOLERANCE = 0.5
 
 function simplifyColinear(points: Point[]): Point[] {
   if (points.length <= 2) return points
@@ -1175,7 +1175,7 @@ function simplifyColinear(points: Point[]): Point[] {
   for (let i = 1; i < points.length; i++) {
     const prev = compact[compact.length - 1]!
     const cur = points[i]!
-    if (Math.abs(prev.x - cur.x) < COORD_EPSILON && Math.abs(prev.y - cur.y) < COORD_EPSILON) continue
+    if (Math.abs(prev.x - cur.x) < COORDINATE_EQUALITY_TOLERANCE && Math.abs(prev.y - cur.y) < COORDINATE_EQUALITY_TOLERANCE) continue
     compact.push(cur)
   }
   if (compact.length <= 2) return compact
@@ -1184,8 +1184,8 @@ function simplifyColinear(points: Point[]): Point[] {
     const prev = out[out.length - 1]!
     const cur = compact[i]!
     const next = compact[i + 1]!
-    const sameX = Math.abs(prev.x - cur.x) < COORD_EPSILON && Math.abs(cur.x - next.x) < COORD_EPSILON
-    const sameY = Math.abs(prev.y - cur.y) < COORD_EPSILON && Math.abs(cur.y - next.y) < COORD_EPSILON
+    const sameX = Math.abs(prev.x - cur.x) < COORDINATE_EQUALITY_TOLERANCE && Math.abs(cur.x - next.x) < COORDINATE_EQUALITY_TOLERANCE
+    const sameY = Math.abs(prev.y - cur.y) < COORDINATE_EQUALITY_TOLERANCE && Math.abs(cur.y - next.y) < COORDINATE_EQUALITY_TOLERANCE
     if (sameX || sameY) continue
     out.push(cur)
   }
@@ -1245,20 +1245,20 @@ function calculatePathMidpoint(points: Point[]): Point {
 // ============================================================================
 // Iterative port-index recomputation
 //
-// Each ELK pass leaves every cross-hier port, leaf, and sub-edge endpoint
+// Each ELK pass leaves every cross-subgraph port, leaf, and sub-edge endpoint
 // with a known position. Reading those back lets us recompute port indices
 // on each subgraph boundary by the position of each port's outside
-// neighbour — the next step outward along the cross-hier chain. Sorting
+// neighbour — the next step outward along the cross-subgraph chain. Sorting
 // by perpendicular coordinate (x for NORTH/SOUTH, y for EAST/WEST) places
 // each port directly across from its outward neighbour, the order that
-// minimises crossings between cross-hier sub-edges entering the same
+// minimises crossings between cross-subgraph sub-edges entering the same
 // subgraph side. Used by `layoutGraphSync`'s iterative barycenter pass.
 // ============================================================================
 
 function computePortIndicesFromLayout(
   elkResult: ElkNode,
-  rawPortsBySubgraph: Map<string, CrossHierPort[]>,
-  decompositions: CrossHierDecomposition[]
+  portsBySubgraph: Map<string, CrossSubgraphPort[]>,
+  preprocessedEdges: PreprocessedEdge[]
 ): Map<string, number> {
   // 1. Walk ELK output and collect global positions for every port and
   //    every node center. Ports live as `node.ports[]` per ELK schema.
@@ -1287,24 +1287,24 @@ function computePortIndicesFromLayout(
   }
   walk(elkResult, 0, 0)
 
-  // 2. For each cross-hier port, compute the BARYCENTER of the edge's two
+  // 2. For each cross-subgraph port, compute the BARYCENTER of the edge's two
   //    endpoints (source leaf and target leaf). This is the standard port-
   //    ordering heuristic for crossing minimisation in port-constrained
   //    layered layouts (KLay Layered uses the same approach internally).
   //    Sorting ports by their edge's barycentre puts each port near where
   //    the edge "wants to be" geographically, which propagates consistently
-  //    across subgraphs at every nesting level — when two cross-hier edges
+  //    across subgraphs at every nesting level — when two cross-subgraph edges
   //    share a source (e.g. both `spec→stepA` and `spec→merged`), the
   //    target position breaks the tie and orders ports identically on
   //    every subgraph the edges traverse.
   const barycenter = new Map<string, Point>()
-  for (const decomp of decompositions) {
-    const sourcePos = nodeCenters.get(decomp.edge.source)
-    const targetPos = nodeCenters.get(decomp.edge.target)
+  for (const preprocessed of preprocessedEdges) {
+    const sourcePos = nodeCenters.get(preprocessed.edge.source)
+    const targetPos = nodeCenters.get(preprocessed.edge.target)
     if (!sourcePos || !targetPos) continue
     const bary = { x: (sourcePos.x + targetPos.x) / 2, y: (sourcePos.y + targetPos.y) / 2 }
-    for (const port of decomp.srcChain) barycenter.set(port.portId, bary)
-    for (const port of decomp.tgtChain) barycenter.set(port.portId, bary)
+    for (const port of preprocessed.sourceChain) barycenter.set(port.portId, bary)
+    for (const port of preprocessed.targetChain) barycenter.set(port.portId, bary)
   }
 
   // 3. Per subgraph, group ports by side and sort each side independently
@@ -1312,9 +1312,9 @@ function computePortIndicesFromLayout(
   //    y for EAST/WEST). Indices restart at 0 per side and increase in the
   //    natural perpendicular direction.
   const newIndices = new Map<string, number>()
-  for (const raws of rawPortsBySubgraph.values()) {
-    const bySide = new Map<Side, CrossHierPort[]>()
-    for (const p of raws) {
+  for (const portsForSubgraph of portsBySubgraph.values()) {
+    const bySide = new Map<Side, CrossSubgraphPort[]>()
+    for (const p of portsForSubgraph) {
       let arr = bySide.get(p.side)
       if (!arr) { arr = []; bySide.set(p.side, arr) }
       arr.push(p)
@@ -1344,17 +1344,17 @@ function sameIndices(a: Map<string, number>, b: Map<string, number>): boolean {
 }
 
 /** True iff at least one subgraph has 2+ ports on the same side — the only case where indices can affect crossings. */
-function hasReorderableSide(rawPortsBySubgraph: Map<string, CrossHierPort[]>): boolean {
-  for (const raws of rawPortsBySubgraph.values()) {
+function hasReorderableSide(portsBySubgraph: Map<string, CrossSubgraphPort[]>): boolean {
+  for (const portsForSubgraph of portsBySubgraph.values()) {
     const counts = new Map<Side, number>()
-    for (const p of raws) counts.set(p.side, (counts.get(p.side) ?? 0) + 1)
+    for (const p of portsForSubgraph) counts.set(p.side, (counts.get(p.side) ?? 0) + 1)
     for (const c of counts.values()) if (c > 1) return true
   }
   return false
 }
 
 /**
- * Count right-angle crossings between distinct edges. A crossing is a
+ * Count perpendicular crossings between distinct edges. A crossing is a
  * horizontal segment of one edge passing over a vertical segment of
  * another with the intersection strictly inside both segments
  * (`HOP_RADIUS + 1` padding from each endpoint, matching the renderer so
@@ -1364,10 +1364,10 @@ function hasReorderableSide(rawPortsBySubgraph: Map<string, CrossHierPort[]>): b
  * Exported for the stress test suite. Internal API; do not depend on
  * this from outside `src/`.
  */
-export function countRightAngleCrossings(edges: ReadonlyArray<PositionedEdge>): number {
+export function countPerpendicularCrossings(edges: ReadonlyArray<PositionedEdge>): number {
   interface Seg { edgeIdx: number; axis: 'H' | 'V'; pos: number; rangeMin: number; rangeMax: number }
   const segs: Seg[] = []
-  const EPS = 0.5
+  const COORDINATE_EQUALITY_TOLERANCE = 0.5
   for (let ei = 0; ei < edges.length; ei++) {
     const pts = edges[ei]!.points
     for (let si = 0; si + 1 < pts.length; si++) {
@@ -1375,9 +1375,9 @@ export function countRightAngleCrossings(edges: ReadonlyArray<PositionedEdge>): 
       const p2 = pts[si + 1]!
       const dx = p2.x - p1.x
       const dy = p2.y - p1.y
-      if (Math.abs(dy) < EPS && Math.abs(dx) > EPS) {
+      if (Math.abs(dy) < COORDINATE_EQUALITY_TOLERANCE && Math.abs(dx) > COORDINATE_EQUALITY_TOLERANCE) {
         segs.push({ edgeIdx: ei, axis: 'H', pos: (p1.y + p2.y) / 2, rangeMin: Math.min(p1.x, p2.x), rangeMax: Math.max(p1.x, p2.x) })
-      } else if (Math.abs(dx) < EPS && Math.abs(dy) > EPS) {
+      } else if (Math.abs(dx) < COORDINATE_EQUALITY_TOLERANCE && Math.abs(dy) > COORDINATE_EQUALITY_TOLERANCE) {
         segs.push({ edgeIdx: ei, axis: 'V', pos: (p1.x + p2.x) / 2, rangeMin: Math.min(p1.y, p2.y), rangeMax: Math.max(p1.y, p2.y) })
       }
     }
@@ -1410,34 +1410,34 @@ export function layoutGraphSync(
   // Pass 1: default port indices.
   const pass1 = mermaidToElk(graph, opts)
   const r1 = elkLayoutSync(pass1.elkGraph)
-  const ext1 = elkToPositioned(r1, graph, pass1.decompositions)
+  const ext1 = elkToPositioned(r1, graph, pass1.preprocessedEdges)
   let extracted = ext1
   let elkResult = r1
 
   // Iterative barycenter port-ordering pass. Skipped unless (a) some
   // subgraph has multiple ports on the same side (otherwise port indices
-  // can't affect anything) AND (b) pass 1 has right-angle crossings to
+  // can't affect anything) AND (b) pass 1 has perpendicular crossings to
   // reduce. Each iteration reads the previous layout's leaf positions,
   // recomputes each port's barycentre, re-sorts ports per subgraph side,
   // and re-runs ELK with the new indices. The new layout is accepted only
   // if it strictly reduces crossings; iteration stops on convergence or
   // after MAX_PASSES iterations. Standard crossing-minimisation layer
   // sweep adapted for subgraph-port layered layouts.
-  if (hasReorderableSide(pass1.rawPortsBySubgraph)) {
+  if (hasReorderableSide(pass1.portsBySubgraph)) {
     let bestExt = ext1
     let bestResult = r1
-    let bestCrossings = countRightAngleCrossings(ext1.edges)
+    let bestCrossings = countPerpendicularCrossings(ext1.edges)
     let prevIndices: Map<string, number> | undefined
     const MAX_PASSES = 4
     for (let i = 0; bestCrossings > 0 && i < MAX_PASSES; i++) {
-      const newIndices = computePortIndicesFromLayout(bestResult, pass1.rawPortsBySubgraph, pass1.decompositions)
+      const newIndices = computePortIndicesFromLayout(bestResult, pass1.portsBySubgraph, pass1.preprocessedEdges)
       // Stop when the heuristic produces the same indices as last iteration.
       if (prevIndices && sameIndices(newIndices, prevIndices)) break
       prevIndices = newIndices
       const candidate = mermaidToElk(graph, opts, newIndices)
       const candidateResult = elkLayoutSync(candidate.elkGraph)
-      const candidateExt = elkToPositioned(candidateResult, graph, candidate.decompositions)
-      const candidateCrossings = countRightAngleCrossings(candidateExt.edges)
+      const candidateExt = elkToPositioned(candidateResult, graph, candidate.preprocessedEdges)
+      const candidateCrossings = countPerpendicularCrossings(candidateExt.edges)
       if (candidateCrossings < bestCrossings) {
         bestExt = candidateExt
         bestResult = candidateResult

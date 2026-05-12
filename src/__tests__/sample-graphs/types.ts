@@ -18,7 +18,7 @@ export interface SampleGraph {
   /** Mermaid source; tests parse and lay this out and assert on the result. */
   source: string
 
-  /** Maximum acceptable right-angle crossings between distinct edges. Defaults to 0. */
+  /** Maximum acceptable perpendicular crossings between distinct edges. Defaults to 0. */
   maxCrossings?: number
 
   /** Map of leaf id → expected subgraph id or label. */

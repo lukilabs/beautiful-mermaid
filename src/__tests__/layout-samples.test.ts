@@ -26,7 +26,7 @@
 import { describe, it, expect } from 'bun:test'
 import { parseMermaid, renderMermaidSVG } from '../index.ts'
 import { layoutGraphSync } from '../layout.ts'
-import { countRightAngleCrossings } from '../layout-engine.ts'
+import { countPerpendicularCrossings } from '../layout-engine.ts'
 import type { PositionedGraph, PositionedNode, PositionedGroup, Point } from '../types.ts'
 import { ALL_SAMPLE_GRAPHS, type SampleGraph } from './sample-graphs/index.ts'
 import { samples as publishedSamples } from '../../samples-data.ts'
@@ -143,7 +143,7 @@ function findHeaderThreads(g: PositionedGraph): Array<{ edge: string; subgraph: 
 /** Returns segment pairs from distinct edges that share a colinear interval longer than `minLen` — a proxy for "drawing arrows on top of each other". */
 function findColinearOverlaps(g: PositionedGraph, minLen = 6): Array<{ a: string; b: string; axis: 'H' | 'V' }> {
   interface Seg { eId: string; axis: 'H' | 'V'; pos: number; lo: number; hi: number }
-  const EPS = 0.5
+  const COORDINATE_EQUALITY_TOLERANCE = 0.5
   const segs: Seg[] = []
   for (const e of g.edges) {
     const pts = e.points
@@ -151,9 +151,9 @@ function findColinearOverlaps(g: PositionedGraph, minLen = 6): Array<{ a: string
     for (let i = 0; i + 1 < pts.length; i++) {
       const p1 = pts[i]!, p2 = pts[i + 1]!
       const dx = p2.x - p1.x, dy = p2.y - p1.y
-      if (Math.abs(dy) < EPS && Math.abs(dx) > EPS) {
+      if (Math.abs(dy) < COORDINATE_EQUALITY_TOLERANCE && Math.abs(dx) > COORDINATE_EQUALITY_TOLERANCE) {
         segs.push({ eId: id, axis: 'H', pos: (p1.y + p2.y) / 2, lo: Math.min(p1.x, p2.x), hi: Math.max(p1.x, p2.x) })
-      } else if (Math.abs(dx) < EPS && Math.abs(dy) > EPS) {
+      } else if (Math.abs(dx) < COORDINATE_EQUALITY_TOLERANCE && Math.abs(dy) > COORDINATE_EQUALITY_TOLERANCE) {
         segs.push({ eId: id, axis: 'V', pos: (p1.x + p2.x) / 2, lo: Math.min(p1.y, p2.y), hi: Math.max(p1.y, p2.y) })
       }
     }
@@ -164,7 +164,7 @@ function findColinearOverlaps(g: PositionedGraph, minLen = 6): Array<{ a: string
       const s1 = segs[i]!, s2 = segs[j]!
       if (s1.eId === s2.eId) continue
       if (s1.axis !== s2.axis) continue
-      if (Math.abs(s1.pos - s2.pos) > EPS) continue
+      if (Math.abs(s1.pos - s2.pos) > COORDINATE_EQUALITY_TOLERANCE) continue
       const overlap = Math.min(s1.hi, s2.hi) - Math.max(s1.lo, s2.lo)
       if (overlap > minLen) {
         overlaps.push({ a: s1.eId, b: s2.eId, axis: s1.axis })
@@ -183,8 +183,8 @@ for (const sample of ALL_SAMPLE_GRAPHS) {
     const g = layout(sample.source)
     const maxCrossings = sample.maxCrossings ?? 0
 
-    it(`right-angle crossings ≤ ${maxCrossings}`, () => {
-      expect(countRightAngleCrossings(g.edges)).toBeLessThanOrEqual(maxCrossings)
+    it(`perpendicular crossings ≤ ${maxCrossings}`, () => {
+      expect(countPerpendicularCrossings(g.edges)).toBeLessThanOrEqual(maxCrossings)
     })
 
     it('no two leaves overlap', () => {
@@ -299,7 +299,7 @@ for (const sample of ALL_SAMPLE_GRAPHS) {
     })
 
     it('rendered hop count equals computed crossing count', () => {
-      const crossings = countRightAngleCrossings(g.edges)
+      const crossings = countPerpendicularCrossings(g.edges)
       const svg = renderMermaidSVG(sample.source, { bg: '#fff', fg: '#000' })
       const hops = (svg.match(/Q\d+\.\d+/g) ?? []).length
       expect(hops, `hops (${hops}) ≠ crossings (${crossings})`).toBe(crossings)
