@@ -27,6 +27,7 @@ import { describe, it, expect } from 'bun:test'
 import { parseMermaid, renderMermaidSVG } from '../index.ts'
 import { layoutGraphSync } from '../layout.ts'
 import { countPerpendicularCrossings } from '../layout-engine.ts'
+import { COORDINATE_EQUALITY_TOLERANCE } from '../render-geometry.ts'
 import type { PositionedGraph, PositionedNode, PositionedGroup, Point } from '../types.ts'
 import { ALL_SAMPLE_GRAPHS, type SampleGraph } from './sample-graphs/index.ts'
 import { samples as publishedSamples } from '../../samples-data.ts'
@@ -143,7 +144,6 @@ function findHeaderThreads(g: PositionedGraph): Array<{ edge: string; subgraph: 
 /** Returns segment pairs from distinct edges that share a colinear interval longer than `minLen` — a proxy for "drawing arrows on top of each other". */
 function findColinearOverlaps(g: PositionedGraph, minLen = 6): Array<{ a: string; b: string; axis: 'H' | 'V' }> {
   interface Seg { eId: string; axis: 'H' | 'V'; pos: number; lo: number; hi: number }
-  const COORDINATE_EQUALITY_TOLERANCE = 0.5
   const segs: Seg[] = []
   for (const e of g.edges) {
     const pts = e.points

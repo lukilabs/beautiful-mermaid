@@ -4,6 +4,7 @@ import { svgOpenTag, buildStyleBlock } from './theme.ts'
 import { FONT_SIZES, FONT_WEIGHTS, STROKE_WIDTHS, ARROW_HEAD, estimateTextWidth, TEXT_BASELINE_SHIFT } from './styles.ts'
 import { measureMultilineText } from './text-metrics.ts'
 import { renderMultilineText, renderMultilineTextWithBackground, escapeXml } from './multiline-utils.ts'
+import { HOP_RADIUS, HOP_HEIGHT, COORDINATE_EQUALITY_TOLERANCE } from './render-geometry.ts'
 
 // ============================================================================
 // SVG renderer — converts a PositionedGraph into an SVG string.
@@ -251,15 +252,6 @@ function renderEdge(edge: PositionedEdge, crossings?: SegmentCrossing[]): string
  * noise rather than clarity.
  */
 const RENDER_HOPS = true
-
-/** Half-width of the arc drawn at a hop-over crossing. */
-const HOP_RADIUS = 5
-/** Maximum bump height of the hop-over arc above the segment. The arc's
- * apex is HOP_HEIGHT pixels above the segment line so a crossing reads as
- * a clear bridge rather than a slight blip. */
-const HOP_HEIGHT = 10
-/** Tolerance used when classifying segments and detecting crossings. */
-const COORDINATE_EQUALITY_TOLERANCE = 0.5
 
 interface SegmentCrossing {
   segIndex: number

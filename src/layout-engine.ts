@@ -37,6 +37,7 @@ import { FONT_SIZES, FONT_WEIGHTS, NODE_PADDING, ARROW_HEAD } from './styles.ts'
 import { measureMultilineText } from './text-metrics.ts'
 import { elkLayoutSync } from './elk-instance.ts'
 import { clipEdgeToShape } from './shape-clipping.ts'
+import { COORDINATE_EQUALITY_TOLERANCE, HOP_ENDPOINT_PAD } from './render-geometry.ts'
 
 // ============================================================================
 // Defaults & direction helpers
@@ -1367,7 +1368,6 @@ function hasReorderableSide(portsBySubgraph: Map<string, CrossSubgraphPort[]>): 
 export function countPerpendicularCrossings(edges: ReadonlyArray<PositionedEdge>): number {
   interface Seg { edgeIdx: number; axis: 'H' | 'V'; pos: number; rangeMin: number; rangeMax: number }
   const segs: Seg[] = []
-  const COORDINATE_EQUALITY_TOLERANCE = 0.5
   for (let ei = 0; ei < edges.length; ei++) {
     const pts = edges[ei]!.points
     for (let si = 0; si + 1 < pts.length; si++) {
@@ -1382,15 +1382,14 @@ export function countPerpendicularCrossings(edges: ReadonlyArray<PositionedEdge>
       }
     }
   }
-  const PAD = 6 // matches renderer's HOP_RADIUS+1
   let count = 0
   for (const h of segs) {
     if (h.axis !== 'H') continue
     for (const v of segs) {
       if (v.axis !== 'V') continue
       if (h.edgeIdx === v.edgeIdx) continue
-      if (v.pos < h.rangeMin + PAD || v.pos > h.rangeMax - PAD) continue
-      if (h.pos < v.rangeMin + PAD || h.pos > v.rangeMax - PAD) continue
+      if (v.pos < h.rangeMin + HOP_ENDPOINT_PAD || v.pos > h.rangeMax - HOP_ENDPOINT_PAD) continue
+      if (h.pos < v.rangeMin + HOP_ENDPOINT_PAD || h.pos > v.rangeMax - HOP_ENDPOINT_PAD) continue
       count++
     }
   }
