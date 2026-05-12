@@ -314,3 +314,95 @@ describe('layoutGraph – non-overlap property', () => {
     expect(rectsOverlap(ext, gb)).toBe(false)
   })
 })
+
+// ============================================================================
+// Property: SEPARATE_CHILDREN reason 2 — leaf-migration prevention
+//
+// When a subgraph has no direction directive but directly contains a leaf
+// that is an endpoint of a cross-subgraph edge, reason 2 forces
+// SEPARATE_CHILDREN. Without that, INCLUDE_CHILDREN inheritance lets ELK
+// migrate the leaf out of its declared subgraph rectangle so it can be
+// placed in a more convenient layer of the parent's layered flow.
+// ============================================================================
+
+function endpointReachesTarget(graph: PositionedGraph, source: string, target: string): boolean {
+  const t = graph.nodes.find(n => n.id === target)
+  if (!t) return false
+  const edge = graph.edges.find(e => e.source === source && e.target === target)
+  if (!edge || edge.points.length === 0) return false
+  const tail = edge.points[edge.points.length - 1]!
+  return tail.x >= t.x && tail.x <= t.x + t.width
+      && tail.y >= t.y && tail.y <= t.y + t.height
+}
+
+function sameLayout(a: PositionedGraph, b: PositionedGraph): boolean {
+  if (a.nodes.length !== b.nodes.length) return false
+  for (let i = 0; i < a.nodes.length; i++) {
+    const na = a.nodes[i]!
+    const nb = b.nodes.find(n => n.id === na.id)
+    if (!nb) return false
+    if (Math.abs(na.x - nb.x) > 0.5 || Math.abs(na.y - nb.y) > 0.5) return false
+  }
+  return true
+}
+
+describe('layoutGraph – SEPARATE_CHILDREN reason 2 (leaf-migration prevention)', () => {
+  const source = `graph TB
+    Outside
+    subgraph wrapper [Wrapper]
+      Inside
+    end
+    Outside --> Inside`
+
+  it('leaf endpoint stays inside its undirected subgraph when a cross-subgraph edge targets it', () => {
+    const g = layout(source)
+    const wrapper = group(g, 'Wrapper')
+    expect(rectContains(wrapper, node(g, 'Inside'))).toBe(true)
+  })
+
+  it('the cross-subgraph edge polyline actually reaches the inside leaf', () => {
+    const g = layout(source)
+    expect(endpointReachesTarget(g, 'Outside', 'Inside')).toBe(true)
+  })
+
+  it('the layout is deterministic — re-running on the same source produces the same coordinates', () => {
+    expect(sameLayout(layout(source), layout(source))).toBe(true)
+  })
+})
+
+// ============================================================================
+// Property: SEPARATE_CHILDREN reason 3 — port-passthrough subgraphs
+//
+// A cross-subgraph edge passes through an intermediate subgraph that has no
+// direction directive of its own and contains no leaf endpoint of the
+// edge — its only stake is owning the boundary port the chain hops through.
+// Reason 3 marks the passthrough subgraph SEPARATE so its FIXED_ORDER port
+// constraints stick. Without it, the port loses its declared side and the
+// assembled polyline can't reach the inner leaf.
+// ============================================================================
+
+describe('layoutGraph – SEPARATE_CHILDREN reason 3 (port-passthrough)', () => {
+  const source = `graph TB
+    Outside
+    subgraph outer [Outer]
+      subgraph inner [Inner]
+        DeepLeaf
+      end
+    end
+    Outside --> DeepLeaf`
+
+  it('the deep leaf stays inside its innermost subgraph through the passthrough', () => {
+    const g = layout(source)
+    const inner = group(g, 'Inner')
+    expect(rectContains(inner, node(g, 'DeepLeaf'))).toBe(true)
+  })
+
+  it('the cross-subgraph edge polyline reaches the deep leaf after crossing the passthrough subgraph', () => {
+    const g = layout(source)
+    expect(endpointReachesTarget(g, 'Outside', 'DeepLeaf')).toBe(true)
+  })
+
+  it('the layout is deterministic — re-running on the same source produces the same coordinates', () => {
+    expect(sameLayout(layout(source), layout(source))).toBe(true)
+  })
+})
