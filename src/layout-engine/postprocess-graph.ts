@@ -8,6 +8,14 @@ import { ARROW_HEAD } from '../styles.ts'
 import { clipEdgeToShape } from '../shape-clipping.ts'
 import type { ExtractionResult } from './elk-layout.ts'
 
+/**
+ * Pull each edge's endpoint back to where its polyline meets the shape
+ * outline. ELK routes to the node's bounding rectangle; for diamonds,
+ * circles, and the other non-rectangular shapes that boundary differs
+ * from the visible outline, so without clipping the edge visibly pokes
+ * past the shape before meeting the arrowhead. Delegates the per-shape
+ * geometry to `shape-clipping.ts`.
+ */
 function clipEndpoints(extraction: ExtractionResult): void {
   for (const edge of extraction.edges) {
     const s = extraction.nodeMap.get(edge.source)
@@ -17,6 +25,15 @@ function clipEndpoints(extraction: ExtractionResult): void {
   }
 }
 
+/**
+ * Grow the ELK-reported canvas size to wrap content that may have ended
+ * up outside it. Arrow heads sit beyond their nominal endpoint, edge
+ * labels have bounding boxes that can extend past the root's reported
+ * size, and ELK occasionally produces negative coordinates. We walk
+ * every polyline vertex and every label position; the canvas grows to
+ * fit, including `padding` margin on each side and `arrowMargin` to
+ * accommodate the arrowhead.
+ */
 function computeCanvasBounds(
   extraction: ExtractionResult,
   elkWidth: number,

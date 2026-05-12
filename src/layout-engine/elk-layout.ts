@@ -69,7 +69,12 @@ export interface ElkLayoutResult {
 }
 
 // ============================================================================
-// ELK input construction
+// Phase: ELK input construction (stage 5)
+//
+// Input:  PreprocessedGraph (port chains, internal edges by LCA, SEPARATE set)
+// Output: ElkGraphNode tree with subgraphs as nested children, sub-edges
+//         attached at their LCA's level, and FIXED_ORDER ports on every
+//         SEPARATE_CHILDREN subgraph.
 // ============================================================================
 
 function buildElkLabel(text: string): NonNullable<ElkExtendedEdge['labels']>[0] {
@@ -100,6 +105,17 @@ export interface BuiltElkInput {
   portsBySubgraph: Map<string, CrossSubgraphPort[]>
 }
 
+/**
+ * Convert the preprocessed mermaid graph into the ELK input tree. Emits
+ * one boundary port per port chain entry, one ELK sub-edge per
+ * port-to-port hop plus an LCA-level segment, and one ELK node per
+ * leaf and subgraph. SEPARATE subgraphs get FIXED_ORDER port constraints;
+ * the per-side port indices come from the outsideDepth heuristic by
+ * default, or `portIndexOverride` (from the iterative barycentre pass)
+ * when supplied. Returns both the ELK tree and the cross-subgraph port
+ * map; the iterative pass reads the port map back when computing new
+ * indices.
+ */
 export function buildElkInput(
   preprocessed: PreprocessedGraph,
   opts: EngineOptions,
@@ -366,7 +382,14 @@ function buildSubgraphNode(
 }
 
 // ============================================================================
-// Position extraction
+// Phase: position extraction (stage 7)
+//
+// Input:  ELK output tree (parent-relative x/y on every node, sections[]
+//         on every edge) + the PreprocessedEdge list from stage 2.
+// Output: ExtractionResult — flat node/group/edge arrays with absolute
+//         coordinates, and one polyline per user-visible edge (cross-
+//         subgraph chains reassembled, LCA segments reversed back if
+//         stage 3 flipped them).
 // ============================================================================
 
 function extractPositions(
@@ -521,6 +544,20 @@ function extractPositions(
   return { nodes, groups, edges, nodeMap }
 }
 
+/**
+ * Re-concatenate a cross-subgraph edge's sub-edge polylines into the
+ * single polyline the renderer expects. The chain order is:
+ *
+ *   source-leaf → sourceChain[0..n-1] → LCA segment →
+ *                 targetChain[m-1..0] → target-leaf
+ *
+ * Segments were tagged in buildElkInput by `segIdx`: 0..n-1 for the
+ * source chain (innermost to outermost), n..n+m-1 for the target chain,
+ * and the LCA segment last. Endpoints between adjacent segments are
+ * identical port positions, so the joining vertex is dropped on each
+ * boundary. The LCA segment was reversed in the ELK input when stage 3
+ * marked `lcaReversed` to break a 2-cycle; reverse its points back here.
+ */
 function assembleCrossSubgraphPolyline(preprocessed: PreprocessedEdge, segs: ReadonlyArray<{ segIdx: number; points: Point[] }>): Point[] {
   if (segs.length === 0) return []
 
@@ -569,6 +606,16 @@ function assembleCrossSubgraphPolyline(preprocessed: PreprocessedEdge, segs: Rea
   return simplifyColinear(out)
 }
 
+/**
+ * ELK can emit polylines with zero-length steps (two consecutive points
+ * at the same coordinate) and colinear interior vertices (three
+ * consecutive points on the same axis), particularly where sub-edges
+ * join through a boundary port. The downstream hop detector treats every
+ * vertex as a segment boundary, so these degenerate vertices produce
+ * spurious "segments" of length zero that confuse crossing classification
+ * — pass 1 drops zero-length steps, pass 2 drops colinear interior
+ * vertices.
+ */
 function simplifyColinear(points: Point[]): Point[] {
   if (points.length <= 2) return points
   const compact: Point[] = [points[0]!]
@@ -618,9 +665,25 @@ function calculatePathMidpoint(points: Point[]): Point {
 }
 
 // ============================================================================
-// Iterative port-index recomputation
+// Phase: iterative crossing minimisation (stage 8)
+//
+// Input:  the previous pass's ELK result + the cross-subgraph port map.
+// Output: a per-portId index map. Sorting ports on each subgraph side by
+//         these indices and re-running stages 5–7 reduces perpendicular
+//         crossings on dense fan-in/fan-out samples. Loop until
+//         convergence or 4 passes.
 // ============================================================================
 
+/**
+ * Recompute per-side port indices from the previous ELK output. A port's
+ * **barycentre** is the midpoint of the source-leaf and target-leaf
+ * positions of the cross-subgraph edge that owns the port — a single
+ * point representing where the edge "wants to be" geographically.
+ * Sorting each subgraph's per-side ports by barycentre puts each port
+ * directly across from its outward neighbour, which is the standard
+ * crossing-minimisation move adapted for port-constrained layered
+ * layouts.
+ */
 function computePortIndicesFromLayout(
   elkResult: ElkNode,
   portsBySubgraph: Map<string, CrossSubgraphPort[]>,
@@ -741,8 +804,20 @@ export function countPerpendicularCrossings(edges: ReadonlyArray<PositionedEdge>
 
 // ============================================================================
 // Main routine: build → run → extract → iterate
+//
+// Composes stages 5–8. The iterative pass is gated on `hasReorderableSide`
+// (cheap: returns false unless some subgraph has 2+ ports sharing a side)
+// AND the pass-1 layout having any perpendicular crossings to reduce.
+// Each iteration is only accepted if crossings strictly drop; we stop on
+// convergence (same indices as previous iteration) or MAX_PASSES = 4.
 // ============================================================================
 
+/**
+ * Build ELK input, run ELK, extract positions; iterate barycentre-sorting
+ * port indices if multi-port crossings remain. The returned width/height
+ * come from ELK's root layout extent — postprocess expands them to wrap
+ * arrow heads and label boxes that may sit outside.
+ */
 export function elkLayout(
   preprocessed: PreprocessedGraph,
   opts: EngineOptions

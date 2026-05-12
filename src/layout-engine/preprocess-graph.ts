@@ -2,6 +2,24 @@
  * Mermaid-side preparation: classify edges, decompose cross-subgraph edges
  * into port chains, break LCA-level cycles, decide which subgraphs need
  * `SEPARATE_CHILDREN`.
+ *
+ * Terminology used throughout this file:
+ *
+ * - **User-declared edge**: an entry in `graph.edges` — one of the edges
+ *   the user wrote in mermaid source.
+ * - **Internal edge**: a user-declared edge whose endpoints sit in the
+ *   same subgraph (or both at root). Passes straight to ELK.
+ * - **Cross-subgraph edge**: a user-declared edge whose endpoints sit in
+ *   different subgraphs. Decomposed into a chain of sub-edges.
+ * - **Sub-edge**: an ELK-level edge synthesised during decomposition —
+ *   either a port-to-port hop along the chain or the LCA-level segment
+ *   joining the chains. Source and target are direct siblings, so ELK
+ *   can route it.
+ * - **Boundary port**: a synthetic port placed on a subgraph's perimeter
+ *   where a cross-subgraph edge enters or leaves the subgraph.
+ * - **LCA** (lowest common ancestor): the deepest subgraph that contains
+ *   both endpoints of a cross-subgraph edge; the "meeting level" where
+ *   the source-side and target-side chains join.
  */
 
 import type {
@@ -78,6 +96,16 @@ export interface PreprocessedGraph {
   subgraphIds: Set<string>
 }
 
+/**
+ * Walk from source-side and target-side subgraphs up to their LCA,
+ * emitting one boundary port per subgraph crossed. Source-side ports sit
+ * on the outgoing side of each subgraph's effective direction;
+ * target-side ports sit on the incoming side. Each port's
+ * `outsideDepth` records how many subgraph levels separate it from its
+ * leaf endpoint — used as a tiebreaker when several ports share a side,
+ * so the closer endpoint goes first along the side (the best blind
+ * heuristic before the iterative barycentre pass).
+ */
 function preprocessEdge(
   index: number,
   edge: MermaidEdge,
@@ -121,6 +149,17 @@ function preprocessEdge(
   }
 }
 
+/**
+ * Split user-declared edges into internal vs. cross-subgraph. A
+ * "user-declared edge" is an entry in `graph.edges`. An "internal" edge
+ * has both endpoints in the same subgraph (or both at root); a
+ * "cross-subgraph" edge has endpoints in different subgraphs and needs
+ * port-chain decomposition before ELK can route it.
+ *
+ * Output: `internalEdgesBySubgraph` keyed by the owning subgraph (`null`
+ * for root) and `crossSubgraphRaw` with the source/target subgraph ids
+ * stashed for stage 2's chain walk.
+ */
 function classifyEdges(
   graph: MermaidGraph,
   nodeToSubgraph: Map<string, string>
@@ -155,6 +194,18 @@ function decomposeCrossSubgraphEdges(
   )
 }
 
+/**
+ * Sibling subgraphs with opposing cross-subgraph edges form a 2-cycle in
+ * the layered DAG at their LCA. ELK arbitrarily breaks it, silently
+ * inverting declaration order. To control which edge is reversed, walk
+ * preprocessedEdges in source-declaration order: seed the per-LCA
+ * flow-DAG with internal edges, then for each LCA-level sub-edge check
+ * whether adding it forward would close a cycle; if it would, mark
+ * `lcaReversed = true` and record the reverse direction instead. The
+ * polyline assembly reverses the segment back so the user-visible
+ * direction is preserved. Without this step, rendered direction at
+ * cycle pairs would flip non-deterministically across ELK versions.
+ */
 function markLcaCyclesReversed(
   preprocessedEdges: PreprocessedEdge[],
   internalEdgesBySubgraph: Map<string | null, Array<{ index: number; edge: MermaidEdge }>>
@@ -265,6 +316,13 @@ export function computeSubgraphsNeedingSeparate(
   return result
 }
 
+/**
+ * Run stages 1–4 of the pipeline on a `MermaidGraph`. The returned
+ * `PreprocessedGraph` carries everything stage 5 (build ELK input)
+ * needs: index maps, the internal-edges-by-LCA map, the list of
+ * decomposed cross-subgraph edges, and the SEPARATE_CHILDREN set. No
+ * ELK input is built here.
+ */
 export function preprocess(graph: MermaidGraph): PreprocessedGraph {
   const subgraphNodeIds = new Set<string>()
   const subgraphIds = new Set<string>()
