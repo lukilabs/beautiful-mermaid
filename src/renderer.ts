@@ -37,7 +37,8 @@ export function renderSvg(
   graph: PositionedGraph,
   colors: DiagramColors,
   font: string = 'Inter',
-  transparent: boolean = false
+  transparent: boolean = false,
+  renderHops: boolean = true
 ): string {
   const parts: string[] = []
 
@@ -64,12 +65,11 @@ export function renderSvg(
   }
 
   // 2. Edges (paths — rendered behind nodes)
-  // Each edge is a <path> with semantic data-* attributes. When RENDER_HOPS
+  // Each edge is a <path> with semantic data-* attributes. When renderHops
   // is on, perpendicular crossings between unrelated edges render an arched
   // "hop" on the horizontal segment so the crossing reads as a bridge
-  // rather than a junction. Toggle by flipping RENDER_HOPS at the top of
-  // this file.
-  const crossingMap = RENDER_HOPS
+  // rather than a junction.
+  const crossingMap = renderHops
     ? buildCrossingMap(graph.edges)
     : new Map<PositionedEdge, SegmentCrossing[]>()
   for (const edge of graph.edges) {
@@ -241,17 +241,6 @@ function renderEdge(edge: PositionedEdge, crossings?: SegmentCrossing[]): string
     `stroke-width="${strokeWidth}"${dashArray}${markers} />`
   )
 }
-
-/**
- * Toggle for the hop-over arcs at perpendicular edge crossings. When `true`,
- * each crossing where a horizontal edge segment passes over an unrelated
- * vertical edge segment is drawn as a small Bezier arch ("hop"), so the
- * crossing reads as a bridge rather than a junction. Set to `false` to
- * skip the crossing-detection pass entirely and emit straight L commands
- * everywhere — useful when the layout is dense enough that hops add visual
- * noise rather than clarity.
- */
-const RENDER_HOPS = true
 
 interface SegmentCrossing {
   segIndex: number

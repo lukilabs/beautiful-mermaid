@@ -148,7 +148,7 @@ export function renderMermaidSVG(
     default: {
       const graph = parseMermaid(text)
       const positioned = layoutGraphSync(graph, options)
-      return renderSvg(positioned, colors, font, transparent)
+      return renderSvg(positioned, colors, font, transparent, options.renderHops ?? true)
     }
   }
 }
