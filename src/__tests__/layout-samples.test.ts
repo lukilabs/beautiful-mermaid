@@ -26,7 +26,7 @@
 import { describe, it, expect } from 'bun:test'
 import { parseMermaid, renderMermaidSVG } from '../index.ts'
 import { layoutGraphSync } from '../layout.ts'
-import { countPerpendicularCrossings } from '../layout-engine.ts'
+import { countPerpendicularCrossings } from '../layout-engine/index.ts'
 import { COORDINATE_EQUALITY_TOLERANCE } from '../render-geometry.ts'
 import type { PositionedGraph, PositionedNode, PositionedGroup, Point } from '../types.ts'
 import { ALL_SAMPLE_GRAPHS, type SampleGraph } from './sample-graphs/index.ts'
