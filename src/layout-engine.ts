@@ -42,6 +42,7 @@ import { clipEdgeToShape } from './shape-clipping.ts'
 // Defaults & direction helpers
 // ============================================================================
 
+/** Default render options (layout-only) */
 const DEFAULTS = {
   font: 'Inter',
   padding: 40,
@@ -52,6 +53,7 @@ const DEFAULTS = {
 
 type ElkDirection = 'RIGHT' | 'LEFT' | 'UP' | 'DOWN'
 
+/** Convert Mermaid direction to ELK direction */
 function directionToElk(dir: Direction): ElkDirection {
   switch (dir) {
     case 'LR': return 'RIGHT'
@@ -93,7 +95,7 @@ function incomingSide(dir: Direction): Side {
 // Node sizing
 // ============================================================================
 
-function estimateNodeSize(_id: string, label: string, shape: string): { width: number; height: number } {
+function estimateNodeSize(id: string, label: string, shape: string): { width: number; height: number } {
   const metrics = measureMultilineText(label, FONT_SIZES.nodeLabel, FONT_WEIGHTS.nodeLabel)
 
   let width = metrics.width + NODE_PADDING.horizontal * 2
