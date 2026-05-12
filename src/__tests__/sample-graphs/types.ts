@@ -47,7 +47,7 @@ export interface SampleGraph {
   expectedSubgraphAspect?: Array<{ subgraph: string; taller?: boolean; wider?: boolean }>
 
   /**
-   * Cross-hier edges whose polyline must end on its target's bounding
+   * Cross-subgraph edges whose polyline must end on its target's bounding
    * box. Catches the failure mode where ELK leaves the port → leaf
    * section empty and the assembled polyline stops short of the target.
    */

@@ -12,7 +12,7 @@ export const MULTI_LEVEL_WORKFLOW_SAMPLES: SampleGraph[] = [
   {
     slug: 'multi-3-level-every-level',
     title: 'Multi-level workflow: 3-level nesting, nodes at every level, edges cross 1/2/3 boundaries',
-    description: 'A 3-level nest with leaf nodes at every level. Cross-hierarchy edges from a root-level node reach (a) a level-1 node, (b) a level-2 node, and (c) a level-3 node — three different cross-subgraph depths in the same diagram. Edge synthesis must complete each polyline to its target regardless of how many subgraph boundaries it crosses.',
+    description: 'A 3-level nest with leaf nodes at every level. Cross-subgraph edges from a root-level node reach (a) a level-1 node, (b) a level-2 node, and (c) a level-3 node — three different cross-subgraph depths in the same diagram. Edge synthesis must complete each polyline to its target regardless of how many subgraph boundaries it crosses.',
     expectedNesting: [
       ['Outer', 'Middle', 'Inner', 'deep_a'],
       ['Inner', 'deep_b'],
@@ -46,7 +46,7 @@ export const MULTI_LEVEL_WORKFLOW_SAMPLES: SampleGraph[] = [
   {
     slug: 'multi-cousin-cross-subgraph',
     title: 'Multi-level workflow: cousin nodes — cross-subgraph edges between siblings sharing a parent',
-    description: 'Two child subgraphs nested inside a shared parent, each with their own interior chain. Cross-hierarchy edges connect a node in the left child to a node in the right child — exiting one subgraph, traversing the parent\'s interior, and entering the other.',
+    description: 'Two child subgraphs nested inside a shared parent, each with their own interior chain. Cross-subgraph edges connect a node in the left child to a node in the right child — exiting one subgraph, traversing the parent\'s interior, and entering the other.',
     expectedNesting: [
       ['Parent', 'Left', 'l1'],
       ['Left', 'l2'],
@@ -73,7 +73,7 @@ export const MULTI_LEVEL_WORKFLOW_SAMPLES: SampleGraph[] = [
   {
     slug: 'multi-4-level-varied-depths',
     title: 'Multi-level workflow: 4-level deep with edges spanning every depth combination',
-    description: 'A 4-level nest. Cross-hierarchy edges connect a root-level node to leaves at level 1, level 4, and back; plus a level-1 → level-3 edge. Each edge\'s synthesized internal segment must terminate on its target.',
+    description: 'A 4-level nest. Cross-subgraph edges connect a root-level node to leaves at level 1, level 4, and back; plus a level-1 → level-3 edge. Each edge\'s synthesized internal segment must terminate on its target.',
     expectedNesting: [
       ['Level 1', 'Level 2', 'Level 3', 'Level 4', 'l4_node'],
     ],
@@ -105,7 +105,7 @@ export const MULTI_LEVEL_WORKFLOW_SAMPLES: SampleGraph[] = [
   {
     slug: 'multi-mixed-direction',
     title: 'Multi-level workflow: direction switches at every level + nodes at varying levels',
-    description: 'TB → LR → TB direction switches at every level, with leaf nodes at every level. Cross-hierarchy edges at varying depths interact with the SEPARATE_CHILDREN handling and FIXED_ORDER port placement on the alternating subgraphs.',
+    description: 'TB → LR → TB direction switches at every level, with leaf nodes at every level. Cross-subgraph edges at varying depths interact with the SEPARATE_CHILDREN handling and FIXED_ORDER port placement on the alternating subgraphs.',
     expectedAxisOrder: [
       { axis: 'y', items: ['l3_a', 'l3_b'] },
     ],
