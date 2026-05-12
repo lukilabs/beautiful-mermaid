@@ -1,7 +1,7 @@
 /**
  * Sample-driven layout tests.
  *
- * Iterates two sample sets:
+ * Iterates a single sample set built at import time from two sources:
  *
  *   - `ALL_SAMPLE_GRAPHS` (curated layout-stress and real-world repros
  *     from `sample-graphs/`). Each sample's `SampleGraph` metadata
@@ -10,14 +10,20 @@
  *     edges reach targets, no colinear overlap, graph-aspect ratio.
  *     The parameterised loop runs one `it` per applicable field and
  *     skips the rest, so a sample opts into only the checks that
- *     meaningfully apply to it. Determinism and `hop count == crossing
- *     count` run on every sample.
+ *     meaningfully apply to it.
  *
- *   - `samples-data.ts` flowcharts (the published gallery). Each
- *     gets a basic sanity check — finite positive bounds, no node
- *     overlaps, every leaf inside the graph rectangle — so the
- *     maintainer's full reference set acts as regression coverage.
- *     New entries added to that file are auto-tested.
+ *   - `samples-data.ts` flowcharts (the published gallery), wrapped as
+ *     `SampleGraph` entries at import time. Gallery samples opt into
+ *     none of the metadata fields, so they fall through to the
+ *     universal per-sample assertions only — no crossing budget, no
+ *     containment expectations, etc. New entries added to
+ *     `samples-data.ts` are auto-tested.
+ *
+ * The universal assertions (no opt-in needed) run on every sample:
+ * perpendicular crossings ≤ maxCrossings, no leaf overlaps, no edge
+ * threads a foreign subgraph header, every leaf sits inside the graph
+ * rectangle, layout is deterministic, rendered hop count equals
+ * computed crossing count.
  *
  * Inline-source unit tests on layout properties (overall direction,
  * subgraph direction directive, containment, no-overlap) live in
@@ -31,6 +37,21 @@ import { COORDINATE_EQUALITY_TOLERANCE } from '../render-geometry.ts'
 import type { PositionedGraph, PositionedNode, PositionedGroup, Point } from '../types.ts'
 import { ALL_SAMPLE_GRAPHS, type SampleGraph } from './sample-graphs/index.ts'
 import { samples as publishedSamples } from '../../samples-data.ts'
+
+function slugify(title: string): string {
+  return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+}
+
+const GALLERY_FLOWCHARTS: SampleGraph[] = publishedSamples
+  .filter(s => s.category === 'Flowchart')
+  .map(s => ({
+    slug: `gallery-${slugify(s.title)}`,
+    title: s.title,
+    description: s.description,
+    source: s.source,
+  }))
+
+const ALL_SAMPLES: ReadonlyArray<SampleGraph> = [...ALL_SAMPLE_GRAPHS, ...GALLERY_FLOWCHARTS]
 
 // ============================================================================
 // Helpers
@@ -178,13 +199,27 @@ function findColinearOverlaps(g: PositionedGraph, minLen = 6): Array<{ a: string
 // Per-sample assertions, parameterised over every sample
 // ============================================================================
 
-for (const sample of ALL_SAMPLE_GRAPHS) {
+for (const sample of ALL_SAMPLES) {
   describe(`sample: ${sample.slug}`, () => {
     const g = layout(sample.source)
     const maxCrossings = sample.maxCrossings ?? 0
 
     it(`perpendicular crossings ≤ ${maxCrossings}`, () => {
       expect(countPerpendicularCrossings(g.edges)).toBeLessThanOrEqual(maxCrossings)
+    })
+
+    it('every leaf sits inside the graph rectangle', () => {
+      expect(Number.isFinite(g.width)).toBe(true)
+      expect(Number.isFinite(g.height)).toBe(true)
+      expect(g.width).toBeGreaterThan(0)
+      expect(g.height).toBeGreaterThan(0)
+      expect(g.nodes.length).toBeGreaterThan(0)
+      for (const n of g.nodes) {
+        expect(n.x).toBeGreaterThanOrEqual(0)
+        expect(n.y).toBeGreaterThanOrEqual(0)
+        expect(n.x + n.width).toBeLessThanOrEqual(g.width + 0.01)
+        expect(n.y + n.height).toBeLessThanOrEqual(g.height + 0.01)
+      }
     })
 
     it('no two leaves overlap', () => {
@@ -306,39 +341,6 @@ for (const sample of ALL_SAMPLE_GRAPHS) {
     })
   })
 }
-
-// ============================================================================
-// Published-gallery flowcharts — basic sanity coverage from samples-data.ts
-// ============================================================================
-
-describe('published-gallery flowcharts', () => {
-  const flowchartSamples = publishedSamples.filter(s => s.category === 'Flowchart')
-  for (const sample of flowchartSamples) {
-    it(`renders without sprawl or overlap: ${sample.title}`, () => {
-      const g = layout(sample.source)
-
-      expect(Number.isFinite(g.width)).toBe(true)
-      expect(Number.isFinite(g.height)).toBe(true)
-      expect(g.width).toBeGreaterThan(0)
-      expect(g.height).toBeGreaterThan(0)
-      expect(g.nodes.length).toBeGreaterThan(0)
-
-      for (let i = 0; i < g.nodes.length; i++) {
-        for (let j = i + 1; j < g.nodes.length; j++) {
-          const a = g.nodes[i]!, b = g.nodes[j]!
-          expect(rectsOverlap(a, b), `${sample.title}: nodes "${a.id}" and "${b.id}" overlap`).toBe(false)
-        }
-      }
-
-      for (const n of g.nodes) {
-        expect(n.x).toBeGreaterThanOrEqual(0)
-        expect(n.y).toBeGreaterThanOrEqual(0)
-        expect(n.x + n.width).toBeLessThanOrEqual(g.width + 0.01)
-        expect(n.y + n.height).toBeLessThanOrEqual(g.height + 0.01)
-      }
-    })
-  }
-})
 
 // Re-export type for IDE convenience
 export type { SampleGraph }
