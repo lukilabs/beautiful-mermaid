@@ -60,6 +60,7 @@ function computeCanvasBounds(
   return { width, height }
 }
 
+/** Clip edge endpoints to non-rectangular shapes, then expand the ELK-reported canvas to wrap any arrowheads, labels, or negative coordinates that ended up outside it. Returns the final `PositionedGraph` the renderer consumes. */
 export function postprocess(
   extraction: ExtractionResult,
   elkWidth: number,

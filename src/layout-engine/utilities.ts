@@ -65,6 +65,7 @@ export function effectiveDirection(
   return rootDirection
 }
 
+/** Walk every leaf id reachable from `sg` into `nodeIds`, and every nested subgraph id into `subgraphIds`. */
 export function collectSubgraphNodeIds(sg: MermaidSubgraph, nodeIds: Set<string>, subgraphIds: Set<string>): void {
   for (const id of sg.nodeIds) nodeIds.add(id)
   for (const child of sg.children) {
@@ -73,11 +74,13 @@ export function collectSubgraphNodeIds(sg: MermaidSubgraph, nodeIds: Set<string>
   }
 }
 
+/** Walk `sg` and every descendant subgraph, accumulating ids into `out`. Used to distinguish subgraph nodes from leaf nodes during ELK output extraction. */
 export function collectAllSubgraphIds(sg: MermaidSubgraph, out: Set<string>): void {
   out.add(sg.id)
   for (const child of sg.children) collectAllSubgraphIds(child, out)
 }
 
+/** Locate the `MermaidSubgraph` at any depth whose id matches; `undefined` if not present. */
 export function findSubgraph(subgraphs: MermaidSubgraph[], id: string): MermaidSubgraph | undefined {
   for (const sg of subgraphs) {
     if (sg.id === id) return sg
@@ -87,6 +90,7 @@ export function findSubgraph(subgraphs: MermaidSubgraph[], id: string): MermaidS
   return undefined
 }
 
+/** Map every subgraph id to its parent subgraph id (or `undefined` when the subgraph sits at root). */
 export function buildSubgraphParentMap(subgraphs: MermaidSubgraph[]): Map<string, string | undefined> {
   const map = new Map<string, string | undefined>()
   function traverse(sg: MermaidSubgraph, parentId: string | undefined): void {
@@ -97,6 +101,7 @@ export function buildSubgraphParentMap(subgraphs: MermaidSubgraph[]): Map<string
   return map
 }
 
+/** Map every subgraph id to its `MermaidSubgraph` for O(1) lookup by id. */
 export function buildSubgraphMap(subgraphs: MermaidSubgraph[]): Map<string, MermaidSubgraph> {
   const map = new Map<string, MermaidSubgraph>()
   function index(sg: MermaidSubgraph): void {
@@ -107,6 +112,7 @@ export function buildSubgraphMap(subgraphs: MermaidSubgraph[]): Map<string, Merm
   return map
 }
 
+/** Map every leaf node id to the id of the subgraph that directly contains it. Leaves at root are absent from the map. */
 export function buildNodeToSubgraphMap(subgraphs: MermaidSubgraph[]): Map<string, string> {
   const map = new Map<string, string>()
   function traverse(sg: MermaidSubgraph): void {
@@ -117,6 +123,7 @@ export function buildNodeToSubgraphMap(subgraphs: MermaidSubgraph[]): Map<string
   return map
 }
 
+/** Lowest common ancestor of two subgraph ids in the `parentMap` tree; `undefined` when either id is `undefined` or when the LCA is the root. */
 export function lowestCommonAncestor(
   a: string | undefined,
   b: string | undefined,
@@ -134,6 +141,7 @@ export function lowestCommonAncestor(
   return undefined
 }
 
+/** Estimate the rendered width/height of a leaf node from its label text and shape. Used to populate ELK's per-leaf `width`/`height` before layout. */
 export function estimateNodeSize(id: string, label: string, shape: string): { width: number; height: number } {
   const metrics = measureMultilineText(label, FONT_SIZES.nodeLabel, FONT_WEIGHTS.nodeLabel)
 
@@ -178,6 +186,7 @@ export function estimateNodeSize(id: string, label: string, shape: string): { wi
   return { width, height }
 }
 
+/** Merge classDef + per-node style overrides into the final CSS-style record for a leaf, or `undefined` when no style applies. */
 export function resolveNodeStyle(nodeId: string, graph: MermaidGraph): Record<string, string> | undefined {
   let result: Record<string, string> | undefined
   const className = graph.classAssignments.get(nodeId)
@@ -190,6 +199,7 @@ export function resolveNodeStyle(nodeId: string, graph: MermaidGraph): Record<st
   return result
 }
 
+/** Merge default linkStyle + per-edge linkStyle into the final CSS-style record for an edge, or `undefined` when no style applies. */
 export function resolveEdgeStyle(edgeIndex: number, graph: MermaidGraph): Record<string, string> | undefined {
   let result: Record<string, string> | undefined
   const defaultStyle = graph.linkStyles.get('default')

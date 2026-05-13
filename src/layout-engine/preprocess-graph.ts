@@ -182,6 +182,7 @@ function classifyEdges(
   return { internalEdgesBySubgraph, crossSubgraphRaw }
 }
 
+/** Decompose every cross-subgraph edge in `crossSubgraphRaw` into a `PreprocessedEdge` carrying its source-side and target-side port chains. */
 function decomposeCrossSubgraphEdges(
   crossSubgraphRaw: ReadonlyArray<{ index: number; edge: MermaidEdge; sourceSg: string | undefined; targetSg: string | undefined }>,
   subgraphParent: Map<string, string | undefined>,
@@ -254,6 +255,7 @@ function markLcaCyclesReversed(
   }
 }
 
+/** SEPARATE reason 1: subgraphs whose own `direction` directive differs from the effective parent direction. Per-subgraph direction is honoured only under SEPARATE. */
 function subgraphsWithDirectionMismatch(
   subgraphMap: Map<string, MermaidSubgraph>,
   subgraphParent: Map<string, string | undefined>,
@@ -276,6 +278,7 @@ function subgraphsWithDirectionMismatch(
   return result
 }
 
+/** SEPARATE reason 2: subgraphs that directly contain a leaf endpoint of a cross-subgraph edge. Under INCLUDE_CHILDREN, ELK migrates leaves across subgraph boundaries when neighbouring layers pull them; SEPARATE locks the leaf inside. */
 function subgraphsContainingCrossSubgraphLeafEndpoint(
   nodeToSubgraph: Map<string, string>,
   preprocessedEdges: ReadonlyArray<PreprocessedEdge>
@@ -290,6 +293,7 @@ function subgraphsContainingCrossSubgraphLeafEndpoint(
   return result
 }
 
+/** SEPARATE reason 3: subgraphs that own at least one boundary port — covers passthrough subgraphs that neither have a direction directive nor a leaf endpoint of the edge. FIXED_ORDER port indices only stick when the boundary is a real layout boundary. */
 function subgraphsOwningCrossSubgraphPort(
   preprocessedEdges: ReadonlyArray<PreprocessedEdge>
 ): Set<string> {
@@ -301,6 +305,7 @@ function subgraphsOwningCrossSubgraphPort(
   return result
 }
 
+/** Union of the three SEPARATE_CHILDREN reasons — any subgraph in the result is marked SEPARATE in the ELK input. */
 function computeSubgraphsNeedingSeparate(
   subgraphMap: Map<string, MermaidSubgraph>,
   subgraphParent: Map<string, string | undefined>,

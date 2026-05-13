@@ -77,6 +77,7 @@ interface ElkLayoutResult {
 //         SEPARATE_CHILDREN subgraph.
 // ============================================================================
 
+/** Convert an edge-label string into an ELK label record with measured width/height so ELK reserves channel space around it. */
 function buildElkLabel(text: string): NonNullable<ElkExtendedEdge['labels']>[0] {
   const metrics = measureMultilineText(text, FONT_SIZES.edgeLabel, FONT_WEIGHTS.edgeLabel)
   return {
@@ -90,6 +91,7 @@ function buildElkLabel(text: string): NonNullable<ElkExtendedEdge['labels']>[0] 
   }
 }
 
+/** Wrap a user-declared internal edge as a single ELK edge with id `e${index}` — the prefix lets `extractPositions` recover the original edge index from the ELK output. */
 function buildInternalElkEdge(index: number, edge: MermaidEdge): ElkExtendedEdge {
   const elkEdge: ElkExtendedEdge = {
     id: `e${index}`,
@@ -288,6 +290,16 @@ export function buildElkInput(
   return { elkGraph, portsBySubgraph }
 }
 
+/**
+ * Build the ELK node for a single subgraph (recursing into its children).
+ * Sets `hierarchyHandling: SEPARATE_CHILDREN` and `portConstraints:
+ * FIXED_ORDER` when the subgraph appears in `subgraphsNeedingSeparate`,
+ * propagating the effective direction so SEPARATE subgraphs lay out in
+ * their own declared direction. Adds synthetic `__bm_chain_*` edges
+ * between consecutive isolated leaves of any direction-bearing subgraph
+ * (ELK has no edges to layer disconnected leaves by; the chain forces
+ * declaration order).
+ */
 function buildSubgraphNode(
   sg: MermaidSubgraph,
   graph: MermaidGraph,
@@ -392,6 +404,15 @@ function buildSubgraphNode(
 //         stage 3 flipped them).
 // ============================================================================
 
+/**
+ * Walk the ELK output tree once, summing parent offsets to compute absolute
+ * coordinates for every leaf and subgraph, and gathering polyline points
+ * for every edge. Internal edges with id `e${i}` become a single polyline;
+ * cross-subgraph sub-edges with id `e${i}_seg${k}` accumulate by `i` and
+ * reassemble through `assembleCrossSubgraphPolyline`. The resulting
+ * `ExtractionResult` carries flat node/group/edge arrays plus a
+ * `nodeMap` the clipping phase indexes by id.
+ */
 function extractPositions(
   elkResult: ElkNode,
   graph: MermaidGraph,
@@ -745,12 +766,14 @@ function computePortIndicesFromLayout(
   return newIndices
 }
 
+/** True when two port-index maps assign the same index to the same port id everywhere — convergence check that stops the iterative pass once the heuristic stabilises. */
 function sameIndices(a: Map<string, number>, b: Map<string, number>): boolean {
   if (a.size !== b.size) return false
   for (const [k, v] of a) if (b.get(k) !== v) return false
   return true
 }
 
+/** True when at least one subgraph has two or more ports sharing a side — the only configuration where re-ordering port indices can affect crossings, so this guards the iterative pass against doing useless work. */
 function hasReorderableSide(portsBySubgraph: Map<string, CrossSubgraphPort[]>): boolean {
   for (const portsForSubgraph of portsBySubgraph.values()) {
     const counts = new Map<Side, number>()

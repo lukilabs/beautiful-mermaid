@@ -151,6 +151,7 @@ const DEFAULTS: EngineOptions = {
   thoroughness: 30,
 }
 
+/** Merge user-supplied `RenderOptions` over `DEFAULTS` and pin internal-only fields (currently `thoroughness`) to their defaults — the engine downstream only ever sees a fully-resolved `EngineOptions`. */
 function resolveOptions(options: RenderOptions): EngineOptions {
   return {
     font: options.font ?? DEFAULTS.font,
@@ -161,6 +162,7 @@ function resolveOptions(options: RenderOptions): EngineOptions {
   }
 }
 
+/** Lay out a parsed `MermaidGraph` into a `PositionedGraph` the renderer consumes — composes preprocess → elkLayout → postprocess. Synchronous; ELK runs through its bundled worker fallback. */
 export function layoutGraphSync(
   graph: MermaidGraph,
   options: RenderOptions = {}

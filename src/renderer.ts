@@ -154,6 +154,7 @@ function markerSuffix(color: string): string {
 // Group rendering (subgraph backgrounds)
 // ============================================================================
 
+/** Render a subgraph as a labelled background rectangle (header band + body) wrapped in a semantic `<g class="subgraph">`. */
 function renderGroup(group: PositionedGroup, font: string): string {
   const headerHeight = FONT_SIZES.groupHeader + 16
   const parts: string[] = []
@@ -202,6 +203,7 @@ function renderGroup(group: PositionedGroup, font: string): string {
 // Edge rendering
 // ============================================================================
 
+/** Render a single edge as an SVG `<path>` with semantic data-* attributes for downstream inspection. When `crossings` are supplied, hop arcs are inserted at each crossing point so the edge reads as a bridge rather than a junction. */
 function renderEdge(edge: PositionedEdge, crossings?: SegmentCrossing[]): string {
   if (edge.points.length < 2) return ''
 
@@ -349,6 +351,7 @@ function buildCrossingMap(edges: PositionedEdge[]): Map<PositionedEdge, SegmentC
   return result
 }
 
+/** Render an edge label group at the edge's layout-supplied midpoint, falling back to the geometric midpoint of the polyline when layout did not assign a position. */
 function renderEdgeLabel(edge: PositionedEdge, font: string): string {
   // Use layout-computed label position when available (layout-aware, avoids collisions).
   // Fall back to geometric midpoint of the edge polyline.
@@ -410,6 +413,7 @@ function edgeMidpoint(points: Point[]): Point {
   return points[points.length - 1]!
 }
 
+/** Euclidean distance between two points. */
 function dist(a: Point, b: Point): number {
   return Math.sqrt((b.x - a.x) ** 2 + (b.y - a.y) ** 2)
 }
@@ -445,6 +449,7 @@ function renderNode(node: PositionedNode, font: string): string {
   return parts.join('\n')
 }
 
+/** Dispatch to the correct shape renderer based on `node.shape`, returning the SVG element string for the node's outline. */
 function renderNodeShape(node: PositionedNode): string {
   const { x, y, width, height, shape, inlineStyle } = node
 
@@ -490,6 +495,7 @@ function renderNodeShape(node: PositionedNode): string {
 
 // --- Basic shapes ---
 
+/** Render a rectangular node outline as an SVG `<rect>` with sharp corners. */
 function renderRect(x: number, y: number, w: number, h: number, fill: string, stroke: string, sw: string): string {
   return (
     `<rect x="${x}" y="${y}" width="${w}" height="${h}" ` +
@@ -497,6 +503,7 @@ function renderRect(x: number, y: number, w: number, h: number, fill: string, st
   )
 }
 
+/** Render a rounded-rectangle node outline as an SVG `<rect>` with a fixed corner radius. */
 function renderRoundedRect(x: number, y: number, w: number, h: number, fill: string, stroke: string, sw: string): string {
   return (
     `<rect x="${x}" y="${y}" width="${w}" height="${h}" ` +
@@ -504,6 +511,7 @@ function renderRoundedRect(x: number, y: number, w: number, h: number, fill: str
   )
 }
 
+/** Render a stadium (pill) node outline as an SVG `<rect>` whose corner radius equals half the height. */
 function renderStadium(x: number, y: number, w: number, h: number, fill: string, stroke: string, sw: string): string {
   const r = h / 2
   return (
@@ -512,6 +520,7 @@ function renderStadium(x: number, y: number, w: number, h: number, fill: string,
   )
 }
 
+/** Render a circular node outline centred in the node's bounding box. */
 function renderCircle(x: number, y: number, w: number, h: number, fill: string, stroke: string, sw: string): string {
   const cx = x + w / 2
   const cy = y + h / 2
@@ -522,6 +531,7 @@ function renderCircle(x: number, y: number, w: number, h: number, fill: string, 
   )
 }
 
+/** Render a diamond (rhombus) node outline as an SVG `<polygon>` whose vertices sit at the midpoints of the bounding box edges. */
 function renderDiamond(x: number, y: number, w: number, h: number, fill: string, stroke: string, sw: string): string {
   const cx = x + w / 2
   const cy = y + h / 2
@@ -675,6 +685,7 @@ function renderStateEnd(x: number, y: number, w: number, h: number): string {
 // Node label rendering
 // ============================================================================
 
+/** Render a node's label text centred inside its bounding box. State-pseudostate shapes render as a label-less circle/bullseye and short-circuit early. */
 function renderNodeLabel(node: PositionedNode, font: string): string {
   // State pseudostates have no label
   if (node.shape === 'state-start' || node.shape === 'state-end') {
