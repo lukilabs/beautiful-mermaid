@@ -168,7 +168,6 @@ function classifyEdges(
   crossSubgraphRaw: Array<{ index: number; edge: MermaidEdge; sourceSg: string | undefined; targetSg: string | undefined }>
 } {
   const internalEdgesBySubgraph = new Map<string | null, Array<{ index: number; edge: MermaidEdge }>>()
-  internalEdgesBySubgraph.set(null, [])
   const crossSubgraphRaw: Array<{ index: number; edge: MermaidEdge; sourceSg: string | undefined; targetSg: string | undefined }> = []
   for (let i = 0; i < graph.edges.length; i++) {
     const edge = graph.edges[i]!
@@ -302,7 +301,7 @@ function subgraphsOwningCrossSubgraphPort(
   return result
 }
 
-export function computeSubgraphsNeedingSeparate(
+function computeSubgraphsNeedingSeparate(
   subgraphMap: Map<string, MermaidSubgraph>,
   subgraphParent: Map<string, string | undefined>,
   rootDirection: Direction,

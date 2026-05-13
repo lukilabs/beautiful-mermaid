@@ -136,10 +136,9 @@
  * - `postprocess(extraction, w, h, padding)` — stages 9–10 (final touch-ups)
  */
 
-import type { ElkNode } from 'elkjs'
 import type { MermaidGraph, PositionedGraph, RenderOptions } from '../types.ts'
 import { preprocess } from './preprocess-graph.ts'
-import { buildElkInput, elkLayout, type EngineOptions } from './elk-layout.ts'
+import { elkLayout, type EngineOptions } from './elk-layout.ts'
 import { postprocess } from './postprocess-graph.ts'
 
 export { countPerpendicularCrossings } from './elk-layout.ts'
@@ -170,17 +169,4 @@ export function layoutGraphSync(
   const preprocessed = preprocess(graph)
   const { extraction, width, height } = elkLayout(preprocessed, opts)
   return postprocess(extraction, width, height, opts.padding)
-}
-
-/**
- * Convert MermaidGraph to ELK format — exported for benchmarking. Returns the
- * exact input the ELK call uses inside `layoutGraphSync`.
- */
-export function convertToElkFormat(
-  graph: MermaidGraph,
-  options: RenderOptions = {}
-): ElkNode {
-  const opts = resolveOptions(options)
-  const preprocessed = preprocess(graph)
-  return buildElkInput(preprocessed, opts).elkGraph
 }

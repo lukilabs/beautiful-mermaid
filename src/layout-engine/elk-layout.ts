@@ -62,7 +62,7 @@ export interface ExtractionResult {
   nodeMap: Map<string, PositionedNode>
 }
 
-export interface ElkLayoutResult {
+interface ElkLayoutResult {
   extraction: ExtractionResult
   width: number
   height: number
@@ -100,7 +100,7 @@ function buildInternalElkEdge(index: number, edge: MermaidEdge): ElkExtendedEdge
   return elkEdge
 }
 
-export interface BuiltElkInput {
+interface BuiltElkInput {
   elkGraph: ElkGraphNode
   portsBySubgraph: Map<string, CrossSubgraphPort[]>
 }
