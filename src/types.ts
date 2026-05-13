@@ -161,4 +161,6 @@ export interface RenderOptions {
   transparent?: boolean
   /** Enable hover tooltips on chart data points (xychart only). Default: false */
   interactive?: boolean
+  /** When true (default), perpendicular crossings between unrelated edges render as a small arch (hop) so the crossing reads as a bridge rather than a junction. Default: true */
+  renderHops?: boolean
 }

@@ -4,6 +4,7 @@ import { svgOpenTag, buildStyleBlock } from './theme.ts'
 import { FONT_SIZES, FONT_WEIGHTS, STROKE_WIDTHS, ARROW_HEAD, estimateTextWidth, TEXT_BASELINE_SHIFT } from './styles.ts'
 import { measureMultilineText } from './text-metrics.ts'
 import { renderMultilineText, renderMultilineTextWithBackground, escapeXml } from './multiline-utils.ts'
+import { HOP_RADIUS, HOP_HEIGHT, COORDINATE_EQUALITY_TOLERANCE } from './render-geometry.ts'
 
 // ============================================================================
 // SVG renderer — converts a PositionedGraph into an SVG string.
@@ -36,7 +37,8 @@ export function renderSvg(
   graph: PositionedGraph,
   colors: DiagramColors,
   font: string = 'Inter',
-  transparent: boolean = false
+  transparent: boolean = false,
+  renderHops: boolean = true
 ): string {
   const parts: string[] = []
 
@@ -62,10 +64,16 @@ export function renderSvg(
     parts.push(renderGroup(group, font))
   }
 
-  // 2. Edges (polylines — rendered behind nodes)
-  // Each edge is a <polyline> with semantic data-* attributes
+  // 2. Edges (paths — rendered behind nodes)
+  // Each edge is a <path> with semantic data-* attributes. When renderHops
+  // is on, perpendicular crossings between unrelated edges render an arched
+  // "hop" on the horizontal segment so the crossing reads as a bridge
+  // rather than a junction.
+  const crossingMap = renderHops
+    ? buildCrossingMap(graph.edges)
+    : new Map<PositionedEdge, SegmentCrossing[]>()
   for (const edge of graph.edges) {
-    parts.push(renderEdge(edge))
+    parts.push(renderEdge(edge, crossingMap.get(edge)))
   }
 
   // 3. Edge labels (positioned at midpoint of edge)
@@ -146,6 +154,7 @@ function markerSuffix(color: string): string {
 // Group rendering (subgraph backgrounds)
 // ============================================================================
 
+/** Render a subgraph as a labelled background rectangle (header band + body) wrapped in a semantic `<g class="subgraph">`. */
 function renderGroup(group: PositionedGroup, font: string): string {
   const headerHeight = FONT_SIZES.groupHeader + 16
   const parts: string[] = []
@@ -194,10 +203,11 @@ function renderGroup(group: PositionedGroup, font: string): string {
 // Edge rendering
 // ============================================================================
 
-function renderEdge(edge: PositionedEdge): string {
+/** Render a single edge as an SVG `<path>` with semantic data-* attributes for downstream inspection. When `crossings` are supplied, hop arcs are inserted at each crossing point so the edge reads as a bridge rather than a junction. */
+function renderEdge(edge: PositionedEdge, crossings?: SegmentCrossing[]): string {
   if (edge.points.length < 2) return ''
 
-  const pathData = pointsToPolylinePath(edge.points)
+  const pathData = buildEdgePathD(edge.points, crossings)
   const dashArray = edge.style === 'dotted' ? ' stroke-dasharray="4 4"' : ''
   const baseStrokeWidth = edge.style === 'thick' ? STROKE_WIDTHS.connector * 2 : STROKE_WIDTHS.connector
   const strokeColor = escapeAttr(edge.inlineStyle?.stroke ?? 'var(--_line)')
@@ -229,16 +239,119 @@ function renderEdge(edge: PositionedEdge): string {
   }
 
   return (
-    `<polyline ${dataAttrs.join(' ')} points="${pathData}" fill="none" stroke="${strokeColor}" ` +
+    `<path ${dataAttrs.join(' ')} d="${pathData}" fill="none" stroke="${strokeColor}" ` +
     `stroke-width="${strokeWidth}"${dashArray}${markers} />`
   )
 }
 
-/** Convert points to SVG polyline points attribute: "x1,y1 x2,y2 ..." */
-function pointsToPolylinePath(points: Point[]): string {
-  return points.map(p => `${p.x},${p.y}`).join(' ')
+interface SegmentCrossing {
+  segIndex: number
+  /** x of the crossing along the horizontal segment. */
+  x: number
+  /** y of the crossing — equal to the horizontal segment's y. */
+  y: number
 }
 
+/**
+ * Build the SVG `d` attribute for an edge polyline. Straight runs use M/L
+ * commands; where a crossing falls on a horizontal segment, a quadratic
+ * Bezier hop is inserted so the crossing reads as a bridge rather than a
+ * junction.
+ */
+function buildEdgePathD(points: Point[], crossings?: SegmentCrossing[]): string {
+  const bySegment = new Map<number, SegmentCrossing[]>()
+  if (crossings) {
+    for (const c of crossings) {
+      let arr = bySegment.get(c.segIndex)
+      if (!arr) { arr = []; bySegment.set(c.segIndex, arr) }
+      arr.push(c)
+    }
+  }
+
+  let d = `M${points[0]!.x} ${points[0]!.y}`
+  for (let i = 0; i + 1 < points.length; i++) {
+    const p1 = points[i]!
+    const p2 = points[i + 1]!
+    const segCrossings = bySegment.get(i)
+    if (!segCrossings || segCrossings.length === 0) {
+      d += ` L${p2.x} ${p2.y}`
+      continue
+    }
+    const goingRight = p2.x > p1.x
+    // Sort by traversal order along the segment.
+    segCrossings.sort((a, b) => goingRight ? a.x - b.x : b.x - a.x)
+    for (const c of segCrossings) {
+      const beforeX = goingRight ? c.x - HOP_RADIUS : c.x + HOP_RADIUS
+      const afterX = goingRight ? c.x + HOP_RADIUS : c.x - HOP_RADIUS
+      d += ` L${beforeX} ${c.y}`
+      d += ` Q${c.x} ${c.y - HOP_HEIGHT} ${afterX} ${c.y}`
+    }
+    d += ` L${p2.x} ${p2.y}`
+  }
+  return d
+}
+
+/**
+ * Find every perpendicular crossing where one edge's horizontal segment
+ * passes over another edge's vertical segment. Each crossing attaches to
+ * the horizontal segment so that — when emitted — the horizontal arches
+ * over the vertical. ENDPOINT_PAD filters out crossings within HOP_RADIUS+1
+ * of either segment's endpoint, which covers the "spurious junction" case
+ * where two edges sharing a port meet near it — without falsely skipping
+ * a real interior crossing between two edges that just happen to share an
+ * endpoint somewhere else (e.g. `ext1→in_a` and `mid_a→in_a` crossing in
+ * the middle of the diagram, far from `in_a`).
+ */
+function buildCrossingMap(edges: PositionedEdge[]): Map<PositionedEdge, SegmentCrossing[]> {
+  interface SegEntry {
+    edge: PositionedEdge
+    segIndex: number
+    axis: 'H' | 'V'
+    pos: number
+    rangeMin: number
+    rangeMax: number
+  }
+  const segs: SegEntry[] = []
+  for (const e of edges) {
+    const pts = e.points
+    for (let si = 0; si + 1 < pts.length; si++) {
+      const p1 = pts[si]!
+      const p2 = pts[si + 1]!
+      const dx = p2.x - p1.x
+      const dy = p2.y - p1.y
+      if (Math.abs(dy) < COORDINATE_EQUALITY_TOLERANCE && Math.abs(dx) > COORDINATE_EQUALITY_TOLERANCE) {
+        segs.push({ edge: e, segIndex: si, axis: 'H', pos: (p1.y + p2.y) / 2,
+          rangeMin: Math.min(p1.x, p2.x), rangeMax: Math.max(p1.x, p2.x) })
+      } else if (Math.abs(dx) < COORDINATE_EQUALITY_TOLERANCE && Math.abs(dy) > COORDINATE_EQUALITY_TOLERANCE) {
+        segs.push({ edge: e, segIndex: si, axis: 'V', pos: (p1.x + p2.x) / 2,
+          rangeMin: Math.min(p1.y, p2.y), rangeMax: Math.max(p1.y, p2.y) })
+      }
+    }
+  }
+
+  const result = new Map<PositionedEdge, SegmentCrossing[]>()
+  // Endpoint padding: the crossing must fall strictly inside both segments,
+  // not at a shared corner where two consecutive segments of the same edge
+  // meet — those aren't true crossings. The pad is also what stops fan-out
+  // edges from drawing a hop right at a shared port, since the crossing
+  // there sits within HOP_RADIUS of both endpoints.
+  const ENDPOINT_PAD = HOP_RADIUS + 1
+  for (const h of segs) {
+    if (h.axis !== 'H') continue
+    for (const v of segs) {
+      if (v.axis !== 'V') continue
+      if (h.edge === v.edge) continue
+      if (v.pos < h.rangeMin + ENDPOINT_PAD || v.pos > h.rangeMax - ENDPOINT_PAD) continue
+      if (h.pos < v.rangeMin + ENDPOINT_PAD || h.pos > v.rangeMax - ENDPOINT_PAD) continue
+      let arr = result.get(h.edge)
+      if (!arr) { arr = []; result.set(h.edge, arr) }
+      arr.push({ segIndex: h.segIndex, x: v.pos, y: h.pos })
+    }
+  }
+  return result
+}
+
+/** Render an edge label group at the edge's layout-supplied midpoint, falling back to the geometric midpoint of the polyline when layout did not assign a position. */
 function renderEdgeLabel(edge: PositionedEdge, font: string): string {
   // Use layout-computed label position when available (layout-aware, avoids collisions).
   // Fall back to geometric midpoint of the edge polyline.
@@ -300,6 +413,7 @@ function edgeMidpoint(points: Point[]): Point {
   return points[points.length - 1]!
 }
 
+/** Euclidean distance between two points. */
 function dist(a: Point, b: Point): number {
   return Math.sqrt((b.x - a.x) ** 2 + (b.y - a.y) ** 2)
 }
@@ -335,6 +449,7 @@ function renderNode(node: PositionedNode, font: string): string {
   return parts.join('\n')
 }
 
+/** Dispatch to the correct shape renderer based on `node.shape`, returning the SVG element string for the node's outline. */
 function renderNodeShape(node: PositionedNode): string {
   const { x, y, width, height, shape, inlineStyle } = node
 
@@ -380,6 +495,7 @@ function renderNodeShape(node: PositionedNode): string {
 
 // --- Basic shapes ---
 
+/** Render a rectangular node outline as an SVG `<rect>` with sharp corners. */
 function renderRect(x: number, y: number, w: number, h: number, fill: string, stroke: string, sw: string): string {
   return (
     `<rect x="${x}" y="${y}" width="${w}" height="${h}" ` +
@@ -387,6 +503,7 @@ function renderRect(x: number, y: number, w: number, h: number, fill: string, st
   )
 }
 
+/** Render a rounded-rectangle node outline as an SVG `<rect>` with a fixed corner radius. */
 function renderRoundedRect(x: number, y: number, w: number, h: number, fill: string, stroke: string, sw: string): string {
   return (
     `<rect x="${x}" y="${y}" width="${w}" height="${h}" ` +
@@ -394,6 +511,7 @@ function renderRoundedRect(x: number, y: number, w: number, h: number, fill: str
   )
 }
 
+/** Render a stadium (pill) node outline as an SVG `<rect>` whose corner radius equals half the height. */
 function renderStadium(x: number, y: number, w: number, h: number, fill: string, stroke: string, sw: string): string {
   const r = h / 2
   return (
@@ -402,6 +520,7 @@ function renderStadium(x: number, y: number, w: number, h: number, fill: string,
   )
 }
 
+/** Render a circular node outline centred in the node's bounding box. */
 function renderCircle(x: number, y: number, w: number, h: number, fill: string, stroke: string, sw: string): string {
   const cx = x + w / 2
   const cy = y + h / 2
@@ -412,6 +531,7 @@ function renderCircle(x: number, y: number, w: number, h: number, fill: string, 
   )
 }
 
+/** Render a diamond (rhombus) node outline as an SVG `<polygon>` whose vertices sit at the midpoints of the bounding box edges. */
 function renderDiamond(x: number, y: number, w: number, h: number, fill: string, stroke: string, sw: string): string {
   const cx = x + w / 2
   const cy = y + h / 2
@@ -565,6 +685,7 @@ function renderStateEnd(x: number, y: number, w: number, h: number): string {
 // Node label rendering
 // ============================================================================
 
+/** Render a node's label text centred inside its bounding box. State-pseudostate shapes render as a label-less circle/bullseye and short-circuit early. */
 function renderNodeLabel(node: PositionedNode, font: string): string {
   // State pseudostates have no label
   if (node.shape === 'state-start' || node.shape === 'state-end') {

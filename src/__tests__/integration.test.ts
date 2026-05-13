@@ -206,7 +206,7 @@ describe('renderMermaidSVG – Batch 2 shapes', () => {
 describe('renderMermaidSVG – Batch 2 edge features', () => {
   it('renders no-arrow edges', () => {
     const svg = renderMermaidSVG('graph TD\n  A --- B')
-    expect(svg).toContain('<polyline')
+    expect(svg).toContain('<path class="edge"')
     // No marker-end for no-arrow edges
     expect(svg).not.toContain('marker-end')
   })
@@ -224,8 +224,8 @@ describe('renderMermaidSVG – Batch 2 edge features', () => {
     expect(svg).toContain('>B</text>')
     expect(svg).toContain('>C</text>')
     // Should have 2 edges (A→C and B→C)
-    const polylines = (svg.match(/<polyline/g) ?? []).length
-    expect(polylines).toBe(2)
+    const edges = (svg.match(/<path class="edge"/g) ?? []).length
+    expect(edges).toBe(2)
   })
 
   it('applies inline style overrides', () => {
@@ -397,8 +397,8 @@ describe('renderMermaidSVG – edge cases', () => {
 
     expect(svg).toContain('<svg')
     expect(svg).toContain('>Node</text>')
-    // Should have at least one edge polyline
-    expect(svg).toContain('<polyline')
+    // Should have at least one edge path
+    expect(svg).toContain('<path class="edge"')
   })
 
   it('renders a self-loop with label', () => {
