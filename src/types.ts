@@ -48,13 +48,20 @@ export interface MermaidEdge {
   target: string
   label?: string
   style: EdgeStyle
-  /** Whether to render an arrowhead at the start (source end) of the edge */
+  /** Whether to render a marker at the start (source end) of the edge */
   hasArrowStart: boolean
-  /** Whether to render an arrowhead at the end (target end) of the edge */
+  /** Whether to render a marker at the end (target end) of the edge */
   hasArrowEnd: boolean
+  /** Marker shape at start when hasArrowStart=true. Defaults to 'arrow' if undefined. */
+  startMarker?: EdgeMarker
+  /** Marker shape at end when hasArrowEnd=true. Defaults to 'arrow' if undefined. */
+  endMarker?: EdgeMarker
 }
 
 export type EdgeStyle = 'solid' | 'dotted' | 'thick'
+
+/** Edge endpoint marker shape: triangle arrow (default), open circle, or cross. */
+export type EdgeMarker = 'arrow' | 'circle' | 'cross'
 
 export interface MermaidSubgraph {
   id: string
@@ -96,6 +103,10 @@ export interface PositionedEdge {
   style: EdgeStyle
   hasArrowStart: boolean
   hasArrowEnd: boolean
+  /** Marker shape at start when hasArrowStart=true. Defaults to 'arrow' if undefined. */
+  startMarker?: EdgeMarker
+  /** Marker shape at end when hasArrowEnd=true. Defaults to 'arrow' if undefined. */
+  endMarker?: EdgeMarker
   /** Full path including bends — array of {x, y} points */
   points: Point[]
   /** Layout-computed label center position (avoids label-label collisions) */

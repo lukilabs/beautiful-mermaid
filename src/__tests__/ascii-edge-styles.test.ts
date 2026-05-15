@@ -131,4 +131,95 @@ describe('ASCII edge styles', () => {
       expect(result).toContain('D')
     })
   })
+
+  // ==========================================================================
+  // Circle and cross endpoint markers (`--o`, `--x`, `o--o`, `x--x`, ...)
+  // Regression test for https://github.com/lukilabs/beautiful-mermaid/issues/109
+  // ==========================================================================
+
+  describe('open circle endpoints (--o)', () => {
+    it('renders --o with ◯ marker and keeps the target node', () => {
+      const result = renderMermaidAscii(`
+        graph LR
+          A --o B
+      `)
+      expect(result).toContain('◯')
+      expect(result).toContain('A')
+      expect(result).toContain('B')
+    })
+
+    it('renders --o with o marker in ascii mode', () => {
+      const result = renderMermaidAscii(`
+        graph LR
+          A --o B
+      `, { useAscii: true })
+      expect(result).toContain('o')
+      expect(result).toContain('B')
+    })
+
+    it('renders o--o with circles on both endpoints', () => {
+      const result = renderMermaidAscii(`
+        graph LR
+          A o--o B
+      `)
+      expect((result.match(/◯/g) ?? []).length).toBe(2)
+    })
+
+    it('renders vertical --o (TD direction) with the target below', () => {
+      const result = renderMermaidAscii(`
+        graph TD
+          A --o B
+      `)
+      expect(result).toContain('◯')
+      expect(result).toContain('B')
+    })
+  })
+
+  describe('cross endpoints (--x)', () => {
+    it('renders --x with ✕ marker and keeps the target node', () => {
+      const result = renderMermaidAscii(`
+        graph LR
+          A --x B
+      `)
+      expect(result).toContain('✕')
+      expect(result).toContain('B')
+    })
+
+    it('renders --x with x marker in ascii mode', () => {
+      const result = renderMermaidAscii(`
+        graph LR
+          A --x B
+      `, { useAscii: true })
+      expect(result).toContain('x')
+      expect(result).toContain('B')
+    })
+
+    it('renders x--x with crosses on both endpoints', () => {
+      const result = renderMermaidAscii(`
+        graph LR
+          A x--x B
+      `)
+      expect((result.match(/✕/g) ?? []).length).toBe(2)
+    })
+  })
+
+  describe('mixed circle/cross endpoints', () => {
+    it('renders o--x with circle at source and cross at target', () => {
+      const result = renderMermaidAscii(`
+        graph LR
+          A o--x B
+      `)
+      expect(result).toContain('◯')
+      expect(result).toContain('✕')
+    })
+
+    it('renders x--o with cross at source and circle at target', () => {
+      const result = renderMermaidAscii(`
+        graph LR
+          A x--o B
+      `)
+      expect(result).toContain('✕')
+      expect(result).toContain('◯')
+    })
+  })
 })

@@ -324,6 +324,51 @@ describe('renderSvg – edges', () => {
     expect(svg).toContain('marker-end="url(#arrowhead)"')
     expect(svg).toContain('marker-start="url(#arrowhead-start)"')
   })
+
+  // --------------------------------------------------------------------------
+  // Circle / cross endpoint markers (`--o`, `--x`, `o--o`, `x--x`, ...)
+  // Regression: https://github.com/lukilabs/beautiful-mermaid/issues/109
+  // --------------------------------------------------------------------------
+
+  it('renders --o edge with circlehead end marker and defines the circle marker', () => {
+    const edge = makeEdge({ hasArrowEnd: true, endMarker: 'circle' })
+    const graph = makeGraph({ edges: [edge] })
+    const svg = renderSvg(graph, lightColors)
+    expect(svg).toContain('marker-end="url(#circlehead)"')
+    expect(svg).toContain('<marker id="circlehead"')
+    expect(svg).toContain('data-marker-end="circle"')
+  })
+
+  it('renders --x edge with crosshead end marker and defines the cross marker', () => {
+    const edge = makeEdge({ hasArrowEnd: true, endMarker: 'cross' })
+    const graph = makeGraph({ edges: [edge] })
+    const svg = renderSvg(graph, lightColors)
+    expect(svg).toContain('marker-end="url(#crosshead)"')
+    expect(svg).toContain('<marker id="crosshead"')
+    expect(svg).toContain('data-marker-end="cross"')
+  })
+
+  it('renders o--o edge with circlehead markers at both ends', () => {
+    const edge = makeEdge({
+      hasArrowStart: true,
+      hasArrowEnd: true,
+      startMarker: 'circle',
+      endMarker: 'circle',
+    })
+    const graph = makeGraph({ edges: [edge] })
+    const svg = renderSvg(graph, lightColors)
+    expect(svg).toContain('marker-start="url(#circlehead-start)"')
+    expect(svg).toContain('marker-end="url(#circlehead)"')
+    expect(svg).toContain('<marker id="circlehead-start"')
+  })
+
+  it('does not emit circle/cross <marker> defs when no edge needs them', () => {
+    const edge = makeEdge({ hasArrowEnd: true })
+    const graph = makeGraph({ edges: [edge] })
+    const svg = renderSvg(graph, lightColors)
+    expect(svg).not.toContain('<marker id="circlehead"')
+    expect(svg).not.toContain('<marker id="crosshead"')
+  })
 })
 
 // ============================================================================

@@ -68,6 +68,8 @@ export function convertToAsciiGraph(parsed: MermaidGraph, config: AsciiConfig): 
       style: mEdge.style,
       hasArrowStart: mEdge.hasArrowStart,
       hasArrowEnd: mEdge.hasArrowEnd,
+      startMarker: mEdge.startMarker,
+      endMarker: mEdge.endMarker,
     })
   }
 

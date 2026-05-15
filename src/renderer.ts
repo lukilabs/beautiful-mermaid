@@ -1,4 +1,4 @@
-import type { PositionedGraph, PositionedNode, PositionedEdge, PositionedGroup, Point } from './types.ts'
+import type { PositionedGraph, PositionedNode, PositionedEdge, PositionedGroup, Point, EdgeMarker } from './types.ts'
 import type { DiagramColors } from './theme.ts'
 import { svgOpenTag, buildStyleBlock } from './theme.ts'
 import { FONT_SIZES, FONT_WEIGHTS, STROKE_WIDTHS, ARROW_HEAD, estimateTextWidth, TEXT_BASELINE_SHIFT } from './styles.ts'
@@ -45,15 +45,28 @@ export function renderSvg(
   parts.push(buildStyleBlock(font, false))
   parts.push('<defs>')
   parts.push(arrowMarkerDefs())
-  // Per-color arrow markers for edges with custom stroke via linkStyle
+
+  // Walk edges once: collect both custom stroke colors and which marker
+  // families (circle/cross) any edge needs, so we can emit only the defs
+  // actually referenced by this diagram.
   const customStrokeColors = new Set<string>()
+  let needsCircle = false
+  let needsCross = false
   for (const edge of graph.edges) {
-    if (edge.inlineStyle?.stroke) {
-      customStrokeColors.add(edge.inlineStyle.stroke)
-    }
+    if (edge.inlineStyle?.stroke) customStrokeColors.add(edge.inlineStyle.stroke)
+    if (edge.startMarker === 'circle' || edge.endMarker === 'circle') needsCircle = true
+    if (edge.startMarker === 'cross' || edge.endMarker === 'cross') needsCross = true
   }
+
+  if (needsCircle) parts.push(circleFamilyDefs(null))
+  if (needsCross) parts.push(crossFamilyDefs(null))
+
+  // Per-color marker variants for edges with custom stroke via linkStyle.
+  // Only emit the families actually used in the diagram.
   for (const color of customStrokeColors) {
     parts.push(arrowMarkerDefsForColor(color))
+    if (needsCircle) parts.push(circleFamilyDefs(color))
+    if (needsCross) parts.push(crossFamilyDefs(color))
   }
   parts.push('</defs>')
 
@@ -96,22 +109,7 @@ export function renderSvg(
  * Arrow color uses var(--_arrow) CSS variable.
  */
 function arrowMarkerDefs(): string {
-  const w = ARROW_HEAD.width
-  const h = ARROW_HEAD.height
-  // Arrow polygons have both fill and a thin stroke for better definition at small sizes
-  const arrowStyle = 'fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round"'
-  // Pull arrowhead back slightly (refX = w - 1) to prevent clipping at node boundaries
-  const refX = w - 1
-  return (
-    // Forward arrow (marker-end) — orient="auto" ensures arrow points along line direction
-    `  <marker id="arrowhead" markerWidth="${w}" markerHeight="${h}" refX="${refX}" refY="${h / 2}" orient="auto">` +
-    `\n    <polygon points="0 0, ${w} ${h / 2}, 0 ${h}" ${arrowStyle} />` +
-    `\n  </marker>` +
-    // Reverse arrow (marker-start) — refX=1 so it sits at the line start with slight offset, auto-start-reverse flips it
-    `\n  <marker id="arrowhead-start" markerWidth="${w}" markerHeight="${h}" refX="1" refY="${h / 2}" orient="auto-start-reverse">` +
-    `\n    <polygon points="${w} 0, 0 ${h / 2}, ${w} ${h}" ${arrowStyle} />` +
-    `\n  </marker>`
-  )
+  return arrowFamilyDefs(null)
 }
 
 /**
@@ -119,20 +117,79 @@ function arrowMarkerDefs(): string {
  * IDs are suffixed with a sanitized color string to avoid collisions.
  */
 function arrowMarkerDefsForColor(color: string): string {
+  return arrowFamilyDefs(color)
+}
+
+/** Triangle arrow markers — end + start variants, for one color (or default). */
+function arrowFamilyDefs(color: string | null): string {
   const w = ARROW_HEAD.width
   const h = ARROW_HEAD.height
-  const escaped = escapeAttr(color)
-  const arrowStyle = `fill="${escaped}" stroke="${escaped}" stroke-width="0.75" stroke-linejoin="round"`
+  const fillRef = color === null ? 'var(--_arrow)' : escapeAttr(color)
+  const style = `fill="${fillRef}" stroke="${fillRef}" stroke-width="0.75" stroke-linejoin="round"`
   const refX = w - 1
-  const suffix = markerSuffix(color)
+  const suffix = color === null ? '' : `-${markerSuffix(color)}`
   return (
-    `  <marker id="arrowhead-${suffix}" markerWidth="${w}" markerHeight="${h}" refX="${refX}" refY="${h / 2}" orient="auto">` +
-    `\n    <polygon points="0 0, ${w} ${h / 2}, 0 ${h}" ${arrowStyle} />` +
+    `  <marker id="arrowhead${suffix}" markerWidth="${w}" markerHeight="${h}" refX="${refX}" refY="${h / 2}" orient="auto">` +
+    `\n    <polygon points="0 0, ${w} ${h / 2}, 0 ${h}" ${style} />` +
     `\n  </marker>` +
-    `\n  <marker id="arrowhead-start-${suffix}" markerWidth="${w}" markerHeight="${h}" refX="1" refY="${h / 2}" orient="auto-start-reverse">` +
-    `\n    <polygon points="${w} 0, 0 ${h / 2}, ${w} ${h}" ${arrowStyle} />` +
+    `\n  <marker id="arrowhead-start${suffix}" markerWidth="${w}" markerHeight="${h}" refX="1" refY="${h / 2}" orient="auto-start-reverse">` +
+    `\n    <polygon points="${w} 0, 0 ${h / 2}, ${w} ${h}" ${style} />` +
     `\n  </marker>`
   )
+}
+
+/**
+ * Diameter of `--o` / `--x` endpoint markers in SVG user units. Sized to roughly
+ * match the visual weight of the triangular arrowhead (8px wide).
+ */
+const CIRCLE_MARKER_SIZE = 8
+const CROSS_MARKER_SIZE = 8
+
+/** Open-circle (`--o`, `o--`) markers — end + start variants, for one color. */
+function circleFamilyDefs(color: string | null): string {
+  const size = CIRCLE_MARKER_SIZE
+  const r = size / 2 - 0.75
+  const strokeRef = color === null ? 'var(--_arrow)' : escapeAttr(color)
+  const style = `fill="none" stroke="${strokeRef}" stroke-width="1"`
+  const suffix = color === null ? '' : `-${markerSuffix(color)}`
+  // End marker sits with its trailing edge at the line endpoint;
+  // start marker with its leading edge — same as triangle arrows.
+  return (
+    `  <marker id="circlehead${suffix}" markerWidth="${size}" markerHeight="${size}" refX="${size - 0.5}" refY="${size / 2}" orient="auto">` +
+    `\n    <circle cx="${size / 2}" cy="${size / 2}" r="${r}" ${style} />` +
+    `\n  </marker>` +
+    `\n  <marker id="circlehead-start${suffix}" markerWidth="${size}" markerHeight="${size}" refX="0.5" refY="${size / 2}" orient="auto-start-reverse">` +
+    `\n    <circle cx="${size / 2}" cy="${size / 2}" r="${r}" ${style} />` +
+    `\n  </marker>`
+  )
+}
+
+/** Cross (`--x`, `x--`) markers — end + start variants, for one color. */
+function crossFamilyDefs(color: string | null): string {
+  const size = CROSS_MARKER_SIZE
+  const pad = 1.25
+  const strokeRef = color === null ? 'var(--_arrow)' : escapeAttr(color)
+  const style = `stroke="${strokeRef}" stroke-width="1.25" stroke-linecap="round"`
+  const suffix = color === null ? '' : `-${markerSuffix(color)}`
+  const a = pad
+  const b = size - pad
+  return (
+    `  <marker id="crosshead${suffix}" markerWidth="${size}" markerHeight="${size}" refX="${size / 2}" refY="${size / 2}" orient="auto">` +
+    `\n    <line x1="${a}" y1="${a}" x2="${b}" y2="${b}" ${style} />` +
+    `\n    <line x1="${a}" y1="${b}" x2="${b}" y2="${a}" ${style} />` +
+    `\n  </marker>` +
+    `\n  <marker id="crosshead-start${suffix}" markerWidth="${size}" markerHeight="${size}" refX="${size / 2}" refY="${size / 2}" orient="auto-start-reverse">` +
+    `\n    <line x1="${a}" y1="${a}" x2="${b}" y2="${b}" ${style} />` +
+    `\n    <line x1="${a}" y1="${b}" x2="${b}" y2="${a}" ${style} />` +
+    `\n  </marker>`
+  )
+}
+
+/** Map an edge marker kind to its SVG <marker> id prefix. */
+function markerIdPrefix(marker: EdgeMarker): string {
+  if (marker === 'circle') return 'circlehead'
+  if (marker === 'cross') return 'crosshead'
+  return 'arrowhead'
 }
 
 /** Sanitize a color value into a collision-free SVG ID suffix.
@@ -203,18 +260,27 @@ function renderEdge(edge: PositionedEdge): string {
   const strokeColor = escapeAttr(edge.inlineStyle?.stroke ?? 'var(--_line)')
   const strokeWidth = escapeAttr(edge.inlineStyle?.['stroke-width'] ?? String(baseStrokeWidth))
 
-  // Build marker attributes based on arrow direction flags
-  // Use color-specific markers when edge has a custom stroke from linkStyle
+  // Build marker attributes based on arrow direction flags.
+  // The marker family (arrow / circle / cross) is picked from edge.endMarker
+  // and edge.startMarker, falling back to triangle arrows for legacy callers.
+  // Use color-specific markers when edge has a custom stroke from linkStyle.
   const suffix = edge.inlineStyle?.stroke ? `-${markerSuffix(edge.inlineStyle.stroke)}` : ''
   let markers = ''
-  if (edge.hasArrowEnd) markers += ` marker-end="url(#arrowhead${suffix})"`
-  if (edge.hasArrowStart) markers += ` marker-start="url(#arrowhead-start${suffix})"`
+  if (edge.hasArrowEnd) {
+    const prefix = markerIdPrefix(edge.endMarker ?? 'arrow')
+    markers += ` marker-end="url(#${prefix}${suffix})"`
+  }
+  if (edge.hasArrowStart) {
+    const prefix = markerIdPrefix(edge.startMarker ?? 'arrow')
+    markers += ` marker-start="url(#${prefix}-start${suffix})"`
+  }
 
   // Semantic data attributes for edge identification and inspection:
   // - class="edge": CSS targeting and type identification
   // - data-from/data-to: source and target node IDs
   // - data-style: edge style (solid, dotted, thick)
   // - data-arrow-start/end: arrow presence flags
+  // - data-marker-start/end: marker shape (arrow|circle|cross) when present
   // - data-label: edge label if present (for quick lookup without traversing DOM)
   const dataAttrs = [
     'class="edge"',
@@ -224,6 +290,12 @@ function renderEdge(edge: PositionedEdge): string {
     `data-arrow-start="${edge.hasArrowStart}"`,
     `data-arrow-end="${edge.hasArrowEnd}"`,
   ]
+  if (edge.hasArrowStart) {
+    dataAttrs.push(`data-marker-start="${edge.startMarker ?? 'arrow'}"`)
+  }
+  if (edge.hasArrowEnd) {
+    dataAttrs.push(`data-marker-end="${edge.endMarker ?? 'arrow'}"`)
+  }
   if (edge.label) {
     dataAttrs.push(`data-label="${escapeAttr(edge.label)}"`)
   }

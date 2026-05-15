@@ -329,6 +329,88 @@ describe('parseMermaid – bidirectional arrows', () => {
 })
 
 // ============================================================================
+// Circle / cross endpoint markers (`--o`, `--x`, `o--o`, `x--x`, `o--x`, `x--o`)
+// Regression: https://github.com/lukilabs/beautiful-mermaid/issues/109
+// ============================================================================
+
+describe('parseMermaid – circle/cross endpoint markers', () => {
+  it('parses --o as solid edge with circle end marker', () => {
+    const g = parseMermaid('graph LR\n  A --o B')
+    expect(g.nodes.size).toBe(2)
+    expect(g.edges).toHaveLength(1)
+    const e = g.edges[0]!
+    expect(e.source).toBe('A')
+    expect(e.target).toBe('B')
+    expect(e.style).toBe('solid')
+    expect(e.hasArrowEnd).toBe(true)
+    expect(e.hasArrowStart).toBe(false)
+    expect(e.endMarker).toBe('circle')
+    expect(e.startMarker).toBeUndefined()
+  })
+
+  it('parses --x as solid edge with cross end marker', () => {
+    const g = parseMermaid('graph LR\n  A --x B')
+    expect(g.nodes.size).toBe(2)
+    expect(g.edges).toHaveLength(1)
+    const e = g.edges[0]!
+    expect(e.endMarker).toBe('cross')
+    expect(e.hasArrowEnd).toBe(true)
+  })
+
+  it('parses o--o as bidirectional circles', () => {
+    const g = parseMermaid('graph LR\n  A o--o B')
+    expect(g.edges).toHaveLength(1)
+    const e = g.edges[0]!
+    expect(e.hasArrowStart).toBe(true)
+    expect(e.hasArrowEnd).toBe(true)
+    expect(e.startMarker).toBe('circle')
+    expect(e.endMarker).toBe('circle')
+  })
+
+  it('parses x--x as bidirectional crosses', () => {
+    const g = parseMermaid('graph LR\n  A x--x B')
+    const e = g.edges[0]!
+    expect(e.startMarker).toBe('cross')
+    expect(e.endMarker).toBe('cross')
+  })
+
+  it('parses o--x as circle start + cross end', () => {
+    const g = parseMermaid('graph LR\n  A o--x B')
+    const e = g.edges[0]!
+    expect(e.startMarker).toBe('circle')
+    expect(e.endMarker).toBe('cross')
+  })
+
+  it('parses x--o as cross start + circle end', () => {
+    const g = parseMermaid('graph LR\n  A x--o B')
+    const e = g.edges[0]!
+    expect(e.startMarker).toBe('cross')
+    expect(e.endMarker).toBe('circle')
+  })
+
+  it('keeps existing --> arrow operator with arrow marker', () => {
+    const g = parseMermaid('graph LR\n  A --> B')
+    const e = g.edges[0]!
+    expect(e.endMarker).toBe('arrow')
+    expect(e.startMarker).toBeUndefined()
+  })
+
+  it('keeps existing <--> bidirectional arrow with arrow markers', () => {
+    const g = parseMermaid('graph LR\n  A <--> B')
+    const e = g.edges[0]!
+    expect(e.startMarker).toBe('arrow')
+    expect(e.endMarker).toBe('arrow')
+  })
+
+  it('parses --o with a label: --o|maybe| B', () => {
+    const g = parseMermaid('graph LR\n  A --o|maybe| B')
+    const e = g.edges[0]!
+    expect(e.label).toBe('maybe')
+    expect(e.endMarker).toBe('circle')
+  })
+})
+
+// ============================================================================
 // Text-embedded edge labels (fixes #32)
 // Based on PR #36 by @liuxiaopai-ai
 // ============================================================================
