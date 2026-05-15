@@ -8,7 +8,7 @@
 
 import type {
   Canvas, DrawingCoord, GridCoord, Direction,
-  AsciiGraph, AsciiNode, AsciiEdge, AsciiSubgraph, AsciiEdgeStyle, EdgeBundle,
+  AsciiGraph, AsciiNode, AsciiEdge, AsciiSubgraph, AsciiEdgeStyle, EdgeBundle, EdgeMarker,
 } from './types.ts'
 import {
   Up, Down, Left, Right, UpperLeft, UpperRight, LowerLeft, LowerRight, Middle,
@@ -390,21 +390,22 @@ export function drawArrow(
   const [pathCanvas, linesDrawn, lineDirs] = drawPath(graph, edge.path, edge.style)
   const boxStartCanvas = drawBoxStart(graph, edge.path, linesDrawn[0]!, edge.from.shape)
 
-  // Draw end arrowhead only if hasArrowEnd is true (default behavior)
+  // Draw end marker only if hasArrowEnd is true (default behavior)
   let arrowHeadEndCanvas: Canvas
   if (edge.hasArrowEnd) {
-    arrowHeadEndCanvas = drawArrowHead(
+    arrowHeadEndCanvas = drawEndpointMarker(
       graph,
       linesDrawn[linesDrawn.length - 1]!,
       lineDirs[lineDirs.length - 1]!,
+      edge.endMarker,
     )
   } else {
     arrowHeadEndCanvas = copyCanvas(graph.canvas)
   }
 
-  // Draw start arrowhead for bidirectional edges
-  // The start arrowhead needs to be at the box connector position (one step back
-  // from the first line point), pointing into the source node.
+  // Draw start marker for bidirectional / o--o / x--x edges.
+  // The marker sits at the box connector position (one step back from the
+  // first line point), pointing into the source node.
   let arrowHeadStartCanvas: Canvas
   if (edge.hasArrowStart && linesDrawn.length > 0) {
     const firstLine = linesDrawn[0]!
@@ -418,9 +419,9 @@ export function drawArrow(
     else if (dirEquals(lineDirs[0]!, Down)) arrowPos.y = firstPoint.y - 1
     else if (dirEquals(lineDirs[0]!, Up)) arrowPos.y = firstPoint.y + 1
 
-    // Create a synthetic line ending at the arrow position for drawArrowHead
+    // Synthetic line ending at the marker position so direction is preserved
     const syntheticLine: DrawingCoord[] = [firstPoint, arrowPos]
-    arrowHeadStartCanvas = drawArrowHead(graph, syntheticLine, startDir)
+    arrowHeadStartCanvas = drawEndpointMarker(graph, syntheticLine, startDir, edge.startMarker)
   } else {
     arrowHeadStartCanvas = copyCanvas(graph.canvas)
   }
@@ -514,6 +515,37 @@ function drawBoxStart(
  * Draw the arrowhead at the end of an edge path.
  * Uses triangular Unicode symbols (▲▼◄►) or ASCII symbols (^v<>).
  */
+/**
+ * Pick the marker glyph for an open-circle (`--o`) or cross (`--x`) endpoint.
+ * These are direction-independent, unlike triangular arrowheads.
+ */
+function circleOrCrossChar(marker: 'circle' | 'cross', useAscii: boolean): string {
+  if (useAscii) return marker === 'circle' ? 'o' : 'x'
+  return marker === 'circle' ? '◯' : '✕'
+}
+
+/**
+ * Draw the marker at an edge endpoint. Dispatches on marker type:
+ *   - undefined or 'arrow' → triangular arrowhead (existing behavior)
+ *   - 'circle'             → ◯ / o
+ *   - 'cross'              → ✕ / x
+ */
+function drawEndpointMarker(
+  graph: AsciiGraph,
+  lastLine: DrawingCoord[],
+  fallbackDir: Direction,
+  marker: EdgeMarker | undefined,
+): Canvas {
+  if (marker === 'circle' || marker === 'cross') {
+    const canvas = copyCanvas(graph.canvas)
+    if (lastLine.length === 0) return canvas
+    const lastPos = lastLine[lastLine.length - 1]!
+    canvas[lastPos.x]![lastPos.y] = circleOrCrossChar(marker, graph.config.useAscii)
+    return canvas
+  }
+  return drawArrowHead(graph, lastLine, fallbackDir)
+}
+
 function drawArrowHead(
   graph: AsciiGraph,
   lastLine: DrawingCoord[],
@@ -926,24 +958,31 @@ function drawBundleArrowhead(graph: AsciiGraph, bundle: EdgeBundle): Canvas {
   if (graphDir === 'TD') dc.y -= 1
   else dc.x -= 1
 
-  // Draw arrowhead
-  let char: string
-  if (!graph.config.useAscii) {
-    if (dirEquals(dir, Up)) char = '▲'
-    else if (dirEquals(dir, Down)) char = '▼'
-    else if (dirEquals(dir, Left)) char = '◄'
-    else if (dirEquals(dir, Right)) char = '►'
-    else char = '▼'  // default
-  } else {
-    if (dirEquals(dir, Up)) char = '^'
-    else if (dirEquals(dir, Down)) char = 'v'
-    else if (dirEquals(dir, Left)) char = '<'
-    else if (dirEquals(dir, Right)) char = '>'
-    else char = 'v'  // default
-  }
-
-  canvas[dc.x]![dc.y] = char
+  // Draw arrowhead — markers default to triangle arrows; fan-in bundles
+  // collapse multiple incoming edges into one head, so we just pick the first
+  // edge's endMarker as the representative for circle/cross variants.
+  const marker = bundle.edges[0]?.endMarker
+  canvas[dc.x]![dc.y] = bundleMarkerChar(marker, dir, graph.config.useAscii)
   return canvas
+}
+
+/** Pick the glyph for a fan-in / fan-out bundle arrowhead. */
+function bundleMarkerChar(marker: EdgeMarker | undefined, dir: Direction, useAscii: boolean): string {
+  if (marker === 'circle' || marker === 'cross') {
+    return circleOrCrossChar(marker, useAscii)
+  }
+  if (!useAscii) {
+    if (dirEquals(dir, Up)) return '▲'
+    if (dirEquals(dir, Down)) return '▼'
+    if (dirEquals(dir, Left)) return '◄'
+    if (dirEquals(dir, Right)) return '►'
+    return '▼'
+  }
+  if (dirEquals(dir, Up)) return '^'
+  if (dirEquals(dir, Down)) return 'v'
+  if (dirEquals(dir, Left)) return '<'
+  if (dirEquals(dir, Right)) return '>'
+  return 'v'
 }
 
 /**
@@ -968,23 +1007,7 @@ function drawBundledEdgeArrowhead(graph: AsciiGraph, edge: AsciiEdge): Canvas {
   if (graphDir === 'TD') dc.y -= 1
   else dc.x -= 1
 
-  // Draw arrowhead
-  let char: string
-  if (!graph.config.useAscii) {
-    if (dirEquals(dir, Up)) char = '▲'
-    else if (dirEquals(dir, Down)) char = '▼'
-    else if (dirEquals(dir, Left)) char = '◄'
-    else if (dirEquals(dir, Right)) char = '►'
-    else char = '▼'  // default
-  } else {
-    if (dirEquals(dir, Up)) char = '^'
-    else if (dirEquals(dir, Down)) char = 'v'
-    else if (dirEquals(dir, Left)) char = '<'
-    else if (dirEquals(dir, Right)) char = '>'
-    else char = 'v'  // default
-  }
-
-  canvas[dc.x]![dc.y] = char
+  canvas[dc.x]![dc.y] = bundleMarkerChar(edge.endMarker, dir, graph.config.useAscii)
   return canvas
 }
 

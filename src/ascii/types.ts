@@ -6,10 +6,10 @@
 // and graph structures used by the ASCII/Unicode renderer.
 // ============================================================================
 
-import type { NodeShape } from '../types.ts'
+import type { NodeShape, EdgeMarker } from '../types.ts'
 
 // Re-export NodeShape for convenience
-export type { NodeShape }
+export type { NodeShape, EdgeMarker }
 
 /**
  * Shape type for ASCII rendering — maps parser shapes to ASCII renderers.
@@ -101,10 +101,14 @@ export interface AsciiEdge {
   endDir: Direction
   /** Line style: solid (default), dotted (-.->) or thick (==>) */
   style: AsciiEdgeStyle
-  /** Whether to render an arrowhead at the start (source end) of the edge */
+  /** Whether to render a marker at the start (source end) of the edge */
   hasArrowStart: boolean
-  /** Whether to render an arrowhead at the end (target end) of the edge */
+  /** Whether to render a marker at the end (target end) of the edge */
   hasArrowEnd: boolean
+  /** Marker shape at start when hasArrowStart=true. Defaults to 'arrow' if undefined. */
+  startMarker?: EdgeMarker
+  /** Marker shape at end when hasArrowEnd=true. Defaults to 'arrow' if undefined. */
+  endMarker?: EdgeMarker
   /** Bundle this edge belongs to (if any). Set during bundling analysis. */
   bundle?: EdgeBundle
   /**
