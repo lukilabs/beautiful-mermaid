@@ -1,0 +1,34 @@
+flowchart LR
+  Src["Source"]
+  Top["Top Target"]
+  Mid["Middle Target"]
+  Bot["Bottom Target"]
+  Src -->|top*| Top
+  Src -->|mid*| Mid
+  Src -->|bot*| Bot
+---
+┌────────┐           ┌───────────────┐
+│        │           │               │
+│ Source ├────top*──►│   Top Target  │
+│        │           │               │
+└────┬───┘           └───────────────┘
+     │                                
+     │                                
+     │                                
+     │                                
+     │                                
+     │               ┌───────────────┐
+     │               │               │
+     ├─────mid*─────►│ Middle Target │
+     │               │               │
+     │               └───────────────┘
+     │                                
+     │                                
+     │                                
+     │                                
+     │                                
+     │               ┌───────────────┐
+     │               │               │
+     └─────bot*─────►│ Bottom Target │
+                     │               │
+                     └───────────────┘

@@ -36,7 +36,12 @@
     "theming"
   ],
   "author": "Craft Docs",
-  "files": ["src/", "dist/", "LICENSE", "README.md"],
+  "files": [
+    "src/",
+    "dist/",
+    "LICENSE",
+    "README.md"
+  ],
   "scripts": {
     "test": "bun test src/__tests__/",
     "samples": "bun run index.ts",
@@ -50,7 +55,8 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "elkjs": "^0.11.0",
+    "bun": "^1.3.14",
+    "elkjs": "^0.11.1",
     "entities": "^7.0.1"
   },
   "devDependencies": {

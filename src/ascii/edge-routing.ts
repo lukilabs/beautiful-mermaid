@@ -168,12 +168,12 @@ export function determinePath(graph: AsciiGraph, edge: AsciiEdge): void {
   // Try preferred path
   const prefFrom = gridCoordDirection(edge.from.gridCoord!, preferredDir)
   const prefTo = gridCoordDirection(edge.to.gridCoord!, preferredOppositeDir)
-  let preferredPath = getPath(graph.grid, prefFrom, prefTo)
+  let preferredPath = getPath(graph.grid, prefFrom, prefTo, preferredDir)
 
   // Try alternative path
   const altFrom = gridCoordDirection(edge.from.gridCoord!, alternativeDir)
   const altTo = gridCoordDirection(edge.to.gridCoord!, alternativeOppositeDir)
-  let alternativePath = getPath(graph.grid, altFrom, altTo)
+  let alternativePath = getPath(graph.grid, altFrom, altTo, alternativeDir)
 
   // Case 1: Both paths found — pick the shorter one
   if (preferredPath !== null && alternativePath !== null) {
