@@ -387,8 +387,20 @@ export function drawArrow(
   }
 
   const labelCanvas = drawArrowLabel(graph, edge)
-  const [pathCanvas, linesDrawn, lineDirs] = drawPath(graph, edge.path, edge.style)
-  const boxStartCanvas = drawBoxStart(graph, edge.path, linesDrawn[0]!, edge.from.shape)
+
+  // Compute the actual box-border attachment point for the source node.
+  // Using the grid-cell center (via gridToDrawingCoord) is sensitive to
+  // column-width changes from other edges' labels, which shifts the
+  // connector away from the box border.
+  const startPoint = getNodeAttachmentPoint(graph, edge.from, edge.startDir)
+  const [pathCanvas, linesDrawn, lineDirs] = drawPath(graph, edge.path, edge.style, startPoint)
+
+  // Skip box start connectors for state pseudo-states (they have their own
+  // bordered design with integrated edge connection).
+  const isStatePseudo = edge.from.shape === 'state-start' || edge.from.shape === 'state-end'
+  const boxStartCanvas = isStatePseudo
+    ? copyCanvas(graph.canvas)
+    : drawBoxStart(graph, edge.startDir, startPoint)
 
   // Draw end arrowhead only if hasArrowEnd is true (default behavior)
   let arrowHeadEndCanvas: Canvas
@@ -453,6 +465,7 @@ function drawPath(
   graph: AsciiGraph,
   path: GridCoord[],
   style: AsciiEdgeStyle = 'solid',
+  startPointOverride?: DrawingCoord,
 ): [Canvas, DrawingCoord[][], Direction[]] {
   const canvas = copyCanvas(graph.canvas)
   let previousCoord = path[0]!
@@ -461,7 +474,11 @@ function drawPath(
 
   for (let i = 1; i < path.length; i++) {
     const nextCoord = path[i]!
-    const prevDC = gridToDrawingCoord(graph, previousCoord)
+    // First segment: use the override coordinate (box border) if provided,
+    // instead of the grid-cell center which can shift due to label widening.
+    const prevDC = (i === 1 && startPointOverride)
+      ? startPointOverride
+      : gridToDrawingCoord(graph, previousCoord)
     const nextDC = gridToDrawingCoord(graph, nextCoord)
 
     if (drawingCoordEquals(prevDC, nextDC)) {
@@ -482,30 +499,23 @@ function drawPath(
 
 /**
  * Draw the junction character where an edge exits the source node's box.
+ * Uses the actual box-border coordinate (startPoint) instead of deriving
+ * it from the line's first drawn point, which can shift when sibling edge
+ * labels widen the border column.
  * Only applies to Unicode mode (ASCII mode just uses the line characters).
- * Skips drawing for state pseudo-states which have their own visual borders.
  */
 function drawBoxStart(
   graph: AsciiGraph,
-  path: GridCoord[],
-  firstLine: DrawingCoord[],
-  sourceShape: string,
+  startDir: Direction,
+  startPoint: DrawingCoord,
 ): Canvas {
   const canvas = copyCanvas(graph.canvas)
   if (graph.config.useAscii) return canvas
 
-  // Skip box start connectors for state pseudo-states (they have their own bordered design)
-  if (sourceShape === 'state-start' || sourceShape === 'state-end') {
-    return canvas
-  }
-
-  const from = firstLine[0]!
-  const dir = determineDirection(path[0]!, path[1]!)
-
-  if (dirEquals(dir, Up)) canvas[from.x]![from.y + 1] = '┴'
-  else if (dirEquals(dir, Down)) canvas[from.x]![from.y - 1] = '┬'
-  else if (dirEquals(dir, Left)) canvas[from.x + 1]![from.y] = '┤'
-  else if (dirEquals(dir, Right)) canvas[from.x - 1]![from.y] = '├'
+  if (dirEquals(startDir, Right)) canvas[startPoint.x]![startPoint.y] = '├'
+  else if (dirEquals(startDir, Left)) canvas[startPoint.x]![startPoint.y] = '┤'
+  else if (dirEquals(startDir, Down)) canvas[startPoint.x]![startPoint.y] = '┬'
+  else if (dirEquals(startDir, Up)) canvas[startPoint.x]![startPoint.y] = '┴'
 
   return canvas
 }
@@ -581,8 +591,14 @@ function drawCorners(graph: AsciiGraph, path: GridCoord[]): Canvas {
     const prevDir = determineDirection(path[idx - 1]!, coord)
     const nextDir = determineDirection(coord, path[idx + 1]!)
 
-    let corner: string
+    // Skip collinear points — they are intermediate waypoints on a straight
+    // segment (e.g. after merging sibling-edge trunks).  Drawing a fallback
+    // corner ('+') here would overwrite the actual corner character from
+    // the other edge that shares this coordinate.
+    if (dirEquals(prevDir, nextDir)) continue
+
     if (!graph.config.useAscii) {
+      let corner: string | undefined
       if ((dirEquals(prevDir, Right) && dirEquals(nextDir, Down)) ||
           (dirEquals(prevDir, Up) && dirEquals(nextDir, Left))) {
         corner = '┐'
@@ -596,13 +612,12 @@ function drawCorners(graph: AsciiGraph, path: GridCoord[]): Canvas {
                  (dirEquals(prevDir, Down) && dirEquals(nextDir, Right))) {
         corner = '└'
       } else {
-        corner = '+'
+        corner = '+'  // fallback (unusual direction combination)
       }
+      canvas[dc.x]![dc.y] = corner
     } else {
-      corner = '+'
+      canvas[dc.x]![dc.y] = '+'
     }
-
-    canvas[dc.x]![dc.y] = corner
   }
 
   return canvas
@@ -779,8 +794,11 @@ function drawBundledEdgeSegment(
     const prevDir = determineDirection(edge.pathToJunction[idx - 1]!, coord)
     const nextDir = determineDirection(coord, edge.pathToJunction[idx + 1]!)
 
-    let corner: string
+    // Skip collinear points
+    if (dirEquals(prevDir, nextDir)) continue
+
     if (!useAscii) {
+      let corner: string | undefined
       if ((dirEquals(prevDir, Right) && dirEquals(nextDir, Down)) ||
           (dirEquals(prevDir, Up) && dirEquals(nextDir, Left))) {
         corner = '┐'
@@ -796,11 +814,10 @@ function drawBundledEdgeSegment(
       } else {
         corner = '+'
       }
+      cornersCanvas[dc.x]![dc.y] = corner
     } else {
-      corner = '+'
+      cornersCanvas[dc.x]![dc.y] = '+'
     }
-
-    cornersCanvas[dc.x]![dc.y] = corner
   }
 
   // Draw box start connector (for fan-in, from source node)
@@ -875,8 +892,11 @@ function drawBundleSharedPath(graph: AsciiGraph, bundle: EdgeBundle): [Canvas, C
     const prevDir = determineDirection(bundle.sharedPath[idx - 1]!, coord)
     const nextDir = determineDirection(coord, bundle.sharedPath[idx + 1]!)
 
-    let corner: string
+    // Skip collinear points
+    if (dirEquals(prevDir, nextDir)) continue
+
     if (!useAscii) {
+      let corner: string | undefined
       if ((dirEquals(prevDir, Right) && dirEquals(nextDir, Down)) ||
           (dirEquals(prevDir, Up) && dirEquals(nextDir, Left))) {
         corner = '┐'
@@ -892,11 +912,10 @@ function drawBundleSharedPath(graph: AsciiGraph, bundle: EdgeBundle): [Canvas, C
       } else {
         corner = '+'
       }
+      cornersCanvas[dc.x]![dc.y] = corner
     } else {
-      corner = '+'
+      cornersCanvas[dc.x]![dc.y] = '+'
     }
-
-    cornersCanvas[dc.x]![dc.y] = corner
   }
 
   return [pathCanvas, cornersCanvas]
@@ -1357,6 +1376,22 @@ export function drawGraph(graph: AsciiGraph): Canvas {
 
   graph.canvas = mergeCanvases(graph.canvas, zero, useAscii, ...arrowHeadStartCanvases)
   fillRolesFromCanvases(graph.roleCanvas, arrowHeadStartCanvases, zero, 'arrow')
+
+  // Draw trunk-junction T-characters where one edge's path branches off
+  // while another edge's path continues through the same coordinate.
+  // The character depends on trunk orientation:
+  //   Horizontal trunk (TD)  → ┬  (left+right+down)
+  //   Vertical trunk   (LR)  → ├  (up+down+right)
+  const trunkJunctionCanvas = copyCanvas(graph.canvas)
+  for (const jc of graph.trunkJunctions) {
+    // Determine junction char from the edge that continues through.
+    // The trunk runs in the graph direction (horizontal for TD, vertical for LR).
+    const junctionChar = graph.config.graphDirection === 'LR' ? '├' : '┬'
+    const dc = gridToDrawingCoord(graph, jc)
+    trunkJunctionCanvas[dc.x]![dc.y] = junctionChar
+  }
+  graph.canvas = mergeCanvases(graph.canvas, zero, useAscii, trunkJunctionCanvas)
+  fillRolesFromCanvas(graph.roleCanvas, trunkJunctionCanvas, zero, 'junction')
 
   graph.canvas = mergeCanvases(graph.canvas, zero, useAscii, ...labelCanvases)
   fillRolesFromCanvases(graph.roleCanvas, labelCanvases, zero, 'text')

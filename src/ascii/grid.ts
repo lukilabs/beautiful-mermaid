@@ -8,12 +8,13 @@
 // ============================================================================
 
 import type {
-  GridCoord, DrawingCoord, Direction, AsciiGraph, AsciiNode, AsciiSubgraph,
+  GridCoord, DrawingCoord, Direction, AsciiGraph, AsciiNode, AsciiEdge, AsciiSubgraph,
 } from './types.ts'
-import { gridKey } from './types.ts'
+import { gridKey, gridCoordDirection } from './types.ts'
 import { mkCanvas, setCanvasSizeToGrid, setRoleCanvasSizeToGrid } from './canvas.ts'
 import { determinePath, determineLabelLine } from './edge-routing.ts'
 import { analyzeEdgeBundles, processBundles } from './edge-bundling.ts'
+import { getPath, mergePath } from './pathfinder.ts'
 import { drawBox } from './draw.ts'
 import { maxLineWidth, lineCount } from './multiline-utils.ts'
 import { getShapeDimensions } from './shapes/index.ts'
@@ -548,6 +549,68 @@ export function createMapping(graph: AsciiGraph): void {
     determinePath(graph, edge)
     increaseGridSizeForPath(graph, edge.path)
     determineLabelLine(graph, edge)
+  }
+
+  // Post-process: edges from the same source with the same start direction
+  // should share a common trunk segment.  After the first edge is routed,
+  // subsequent sibling edges get re-routed from the first edge's branch
+  // point (where it turns toward its target) instead of from the source.
+  // This avoids the A* heap-tie-breaking problem where old-branch items
+  // interfere with trunk-sharing.
+  const groups = new Map<string, AsciiEdge[]>()
+  for (const edge of graph.edges) {
+    if (edge.bundle) continue
+    const key = `${edge.from.name}:${edge.startDir.x},${edge.startDir.y}`
+    const list = groups.get(key) ?? []
+    list.push(edge)
+    groups.set(key, list)
+  }
+
+  for (const [, edges] of groups) {
+    if (edges.length < 2) continue
+    const first = edges[0]!
+    // Skip groups involving self-referencing edges — their paths have
+    // special shapes (loops) that shouldn't be modified.
+    if (edges.some(e => e.from === e.to)) continue
+    // Find the first corner in the first edge's path — that's where
+    // the trunk ends and sibling edges should branch off.
+    const firstPath = first.path
+    let branchIdx = -1
+    if (firstPath.length >= 3) {
+      const dx = firstPath[1]!.x - firstPath[0]!.x
+      const dy = firstPath[1]!.y - firstPath[0]!.y
+      for (let i = 2; i < firstPath.length; i++) {
+        const ndx = firstPath[i]!.x - firstPath[i - 1]!.x
+        const ndy = firstPath[i]!.y - firstPath[i - 1]!.y
+        if (ndx !== dx || ndy !== dy) {
+          branchIdx = i - 1
+          break
+        }
+      }
+    }
+
+    if (branchIdx === -1) continue // no branch point — edge is straight, nothing to share
+
+    const trunk = firstPath.slice(0, branchIdx + 1) // e.g. [(2,1), (5,1)]
+    const branchPoint = firstPath[branchIdx]!
+
+    for (let i = 1; i < edges.length; i++) {
+      const edge = edges[i]!
+      const to = gridCoordDirection(edge.to.gridCoord!, edge.endDir)
+      const newRoute = getPath(graph.grid, branchPoint, to, edge.startDir)
+      if (!newRoute) continue
+      // Merge the new route to collapse intermediate cells, then
+      // concatenate with the trunk (keeping branchPoint as waypoint
+      // so drawPath leaves a gap there for the ┬ junction character).
+      const mergedRoute = mergePath(newRoute)
+      const newPath = [...trunk, ...mergedRoute.slice(1)]
+      edge.path = newPath
+      // Record the branch point as a trunk junction for later drawing
+      graph.trunkJunctions.push(branchPoint)
+      // Re-run sizing and label placement with the updated path
+      increaseGridSizeForPath(graph, edge.path)
+      determineLabelLine(graph, edge)
+    }
   }
 
   // Convert grid coords → drawing coords and generate box drawings

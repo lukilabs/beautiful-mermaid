@@ -161,6 +161,13 @@ export interface AsciiGraph {
   offsetY: number
   /** Edge bundles for parallel link visualization. Set during bundling analysis. */
   bundles: EdgeBundle[]
+  /**
+   * Grid coordinates where a trunk-continuation T-junction (┬) should be drawn.
+   * Populated during trunk-sharing post-processing in createMapping.
+   * These are points where one edge's path turns down while another edge's
+   * path continues horizontally through the same coordinate.
+   */
+  trunkJunctions: GridCoord[]
 }
 
 // ============================================================================

@@ -1,0 +1,24 @@
+flowchart TB
+    Src["Source"]
+    Left["Left Target"]
+    Center["Center Target"]
+    Right["Right Target"]
+    Src -->|left*| Left
+    Src -->|center*| Center
+    Src -->|right*| Right
+---
++-------------+                                           
+|             |                                           
+|    Source   |-------------┬---------------------+       
+|             |             |                     |       
++-------------+          center*               right*     
+       |                    |                     |       
+     left*                  |                     |       
+       |                    |                     |       
+       |                    |                     |       
+       v                    v                     v       
++-------------+     +---------------+     +--------------+
+|             |     |               |     |              |
+| Left Target |     | Center Target |     | Right Target |
+|             |     |               |     |              |
++-------------+     +---------------+     +--------------+

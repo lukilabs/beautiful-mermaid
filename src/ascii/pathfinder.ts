@@ -6,7 +6,7 @@
 // paths between nodes on the grid. Prefers straight lines over zigzags.
 // ============================================================================
 
-import type { GridCoord, AsciiNode } from './types.ts'
+import type { GridCoord, AsciiNode, Direction } from './types.ts'
 import { gridKey, gridCoordEquals } from './types.ts'
 
 // ============================================================================
@@ -63,10 +63,10 @@ class MinHeap {
       let smallest = i
       const left = 2 * i + 1
       const right = 2 * i + 2
-      if (left < n && this.items[left]!.priority < this.items[smallest]!.priority) {
+      if (left < n && this.items[left]!.priority <= this.items[smallest]!.priority) {
         smallest = left
       }
-      if (right < n && this.items[right]!.priority < this.items[smallest]!.priority) {
+      if (right < n && this.items[right]!.priority <= this.items[smallest]!.priority) {
         smallest = right
       }
       if (smallest !== i) {
@@ -101,12 +101,45 @@ export function heuristic(a: GridCoord, b: GridCoord): number {
 // ============================================================================
 
 /** 4-directional movement (no diagonals in grid pathfinding). */
-const MOVE_DIRS: GridCoord[] = [
+const MOVE_DIRS: readonly GridCoord[] = [
   { x: 1, y: 0 },
   { x: -1, y: 0 },
   { x: 0, y: 1 },
   { x: 0, y: -1 },
 ]
+
+/**
+ * Build a move-direction list that puts the preferred cardinal direction first.
+ * This breaks A* ties in favour of continuing in the edge's initial direction,
+ * which makes sibling edges from the same source converge on shared trunk segments.
+ *
+ * Examples:
+ *   preferredDir = Right  →  [Right, Left, Down, Up]  (default — stay horizontal)
+ *   preferredDir = Down   →  [Down, Up, Right, Left]  (stay vertical)
+ *   preferredDir = null   →  [Right, Left, Down, Up]  (default order)
+ */
+function buildMoveDirs(preferredDir?: Direction): GridCoord[] {
+  if (!preferredDir) return [...MOVE_DIRS]
+
+  // Determine the dominant cardinal axis from the direction.
+  // Direction constants like Right={x:2,y:1} have larger x → horizontal preference.
+  // Direction constants like  Down={x:1,y:2} have larger y → vertical preference.
+  const preferHorizontal = Math.abs(preferredDir.x) >= Math.abs(preferredDir.y)
+
+  if (preferHorizontal) {
+    // Horizontal-first: Right or Left first, then Down/Up.
+    if (preferredDir.x > 0) {
+      return [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }]
+    }
+    return [{ x: -1, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }]
+  }
+
+  // Vertical-first: Down or Up first, then Right/Left.
+  if (preferredDir.y > 0) {
+    return [{ x: 0, y: 1 }, { x: 0, y: -1 }, { x: 1, y: 0 }, { x: -1, y: 0 }]
+  }
+  return [{ x: 0, y: -1 }, { x: 0, y: 1 }, { x: 1, y: 0 }, { x: -1, y: 0 }]
+}
 
 /** Check if a grid cell is unoccupied and has non-negative coordinates. */
 function isFreeInGrid(grid: Map<string, AsciiNode>, c: GridCoord): boolean {
@@ -122,8 +155,10 @@ export function getPath(
   grid: Map<string, AsciiNode>,
   from: GridCoord,
   to: GridCoord,
+  preferredDir?: Direction,
 ): GridCoord[] | null {
   const pq = new MinHeap()
+  const moveDirs = buildMoveDirs(preferredDir)
   pq.push({ coord: from, priority: 0 })
 
   const costSoFar = new Map<string, number>()
@@ -148,7 +183,7 @@ export function getPath(
 
     const currentCost = costSoFar.get(gridKey(current))!
 
-    for (const dir of MOVE_DIRS) {
+    for (const dir of moveDirs) {
       const next: GridCoord = { x: current.x + dir.x, y: current.y + dir.y }
 
       // Allow moving to the destination even if it's occupied (it's a node boundary)
