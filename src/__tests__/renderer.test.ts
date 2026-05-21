@@ -433,6 +433,81 @@ describe('renderSvg – inline styles', () => {
 })
 
 // ============================================================================
+// Auto-contrast text color for custom fills
+// ============================================================================
+
+describe('renderSvg – auto-contrast text color', () => {
+  it('uses black text on light fill in dark mode', () => {
+    // Light pastel fill + dark-mode fg (#FAFAFA) would produce invisible white-on-pastel
+    const node = makeNode({ inlineStyle: { fill: '#FFFACD' } }) // lemon chiffon
+    const graph = makeGraph({ nodes: [node] })
+    const svg = renderSvg(graph, darkColors)
+    // Text should be black, not the dark-mode fg
+    expect(svg).toContain('fill="#000000"')
+  })
+
+  it('uses white text on dark fill in light mode', () => {
+    const node = makeNode({ inlineStyle: { fill: '#1a1a1a' } })
+    const graph = makeGraph({ nodes: [node] })
+    const svg = renderSvg(graph, lightColors)
+    expect(svg).toContain('fill="#FFFFFF"')
+  })
+
+  it('uses white text on dark fill in dark mode', () => {
+    const node = makeNode({ inlineStyle: { fill: '#000080' } }) // navy
+    const graph = makeGraph({ nodes: [node] })
+    const svg = renderSvg(graph, darkColors)
+    expect(svg).toContain('fill="#FFFFFF"')
+  })
+
+  it('uses black text on bright red fill', () => {
+    const node = makeNode({ inlineStyle: { fill: '#FF6B6B' } })
+    const graph = makeGraph({ nodes: [node] })
+    const svg = renderSvg(graph, darkColors)
+    // #FF6B6B luminance ≈ 0.56 → should pick black
+    expect(svg).toContain('fill="#000000"')
+  })
+
+  it('uses black text on light green fill', () => {
+    const node = makeNode({ inlineStyle: { fill: '#90EE90' } })
+    const graph = makeGraph({ nodes: [node] })
+    const svg = renderSvg(graph, darkColors)
+    expect(svg).toContain('fill="#000000"')
+  })
+
+  it('handles short hex (#RGB) fills', () => {
+    const node = makeNode({ inlineStyle: { fill: '#f00' } }) // red
+    const graph = makeGraph({ nodes: [node] })
+    const svg = renderSvg(graph, darkColors)
+    // #ff0000 luminance ≈ 0.30 → white text
+    expect(svg).toContain('fill="#FFFFFF"')
+  })
+
+  it('respects explicit color even with custom fill', () => {
+    // User set both fill and color — color takes precedence
+    const node = makeNode({ inlineStyle: { fill: '#FFFACD', color: '#0000FF' } })
+    const graph = makeGraph({ nodes: [node] })
+    const svg = renderSvg(graph, darkColors)
+    expect(svg).toContain('fill="#0000FF"')
+  })
+
+  it('uses var(--_text) when fill is a CSS variable', () => {
+    // CSS variable fills can\'t be parsed at render time — fall back to theme
+    const node = makeNode({ inlineStyle: { fill: 'var(--_node-fill)' } })
+    const graph = makeGraph({ nodes: [node] })
+    const svg = renderSvg(graph, darkColors)
+    expect(svg).toContain('fill="var(--_text)"')
+  })
+
+  it('uses var(--_text) when no inline style at all', () => {
+    const node = makeNode()
+    const graph = makeGraph({ nodes: [node] })
+    const svg = renderSvg(graph, darkColors)
+    expect(svg).toContain('fill="var(--_text)"')
+  })
+})
+
+// ============================================================================
 // XML escaping
 // ============================================================================
 

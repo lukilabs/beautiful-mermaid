@@ -565,6 +565,73 @@ function renderStateEnd(x: number, y: number, w: number, h: number): string {
 // Node label rendering
 // ============================================================================
 
+/**
+ * Parse a hex color string (#RGB, #RRGGBB, or #RRGGBBAA) into RGB components.
+ * Returns null if the string is not a valid hex color.
+ */
+function parseHexToRgb(hex: string): { r: number; g: number; b: number } | null {
+  const m = hex.match(/^#([0-9a-fA-F]{3,8})$/)
+  if (!m) return null
+  const h = m[1]!
+  if (h.length === 3) {
+    return {
+      r: parseInt(h[0]! + h[0]!, 16),
+      g: parseInt(h[1]! + h[1]!, 16),
+      b: parseInt(h[2]! + h[2]!, 16),
+    }
+  }
+  if (h.length >= 6) {
+    return {
+      r: parseInt(h.slice(0, 2), 16),
+      g: parseInt(h.slice(2, 4), 16),
+      b: parseInt(h.slice(4, 6), 16),
+    }
+  }
+  return null
+}
+
+/**
+ * Parse an rgb()/rgba() CSS function into RGB components.
+ * Handles both comma and space syntax: rgb(255, 0, 0) and rgb(255 0 0).
+ */
+function parseRgbFunc(color: string): { r: number; g: number; b: number } | null {
+  const m = color.match(/^rgba?\(\s*(\d{1,3})[\s,]+(\d{1,3})[\s,]+(\d{1,3})/)
+  if (!m) return null
+  return { r: parseInt(m[1]!, 10), g: parseInt(m[2]!, 10), b: parseInt(m[3]!, 10) }
+}
+
+/**
+ * Determine whether a color string is a concrete (resolvable) color value
+ * rather than a CSS variable reference like var(--_node-fill).
+ */
+function isConcreteColor(color: string): boolean {
+  return color.startsWith('#') || color.startsWith('rgb')
+}
+
+/**
+ * Choose a high-contrast text color (black or white) for the given background.
+ *
+ * Uses the BT.601 perceived brightness formula to determine whether the
+ * background is light or dark, then returns the opposite for maximum readability.
+ * Returns null if the background color cannot be parsed.
+ */
+function contrastTextColor(bgColor: string): string | null {
+  const rgb = parseHexToRgb(bgColor) ?? parseRgbFunc(bgColor)
+  if (!rgb) return null
+  // BT.601 perceived brightness — good enough for black-vs-white decisions
+  const luminance = (0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b) / 255
+  return luminance > 0.55 ? '#000000' : '#FFFFFF'
+}
+
+/**
+ * Render the text label for a node.
+ *
+ * Text color resolution order:
+ * 1. Explicit `color` from classDef / style → use as-is.
+ * 2. Concrete `fill` (e.g. #FF6B6B) without explicit `color` → auto-pick
+ *    black or white based on fill luminance for guaranteed readability.
+ * 3. No inline style → fall back to theme variable var(--_text).
+ */
 function renderNodeLabel(node: PositionedNode, font: string): string {
   // State pseudostates have no label
   if (node.shape === 'state-start' || node.shape === 'state-end') {
@@ -574,8 +641,19 @@ function renderNodeLabel(node: PositionedNode, font: string): string {
   const cx = node.x + node.width / 2
   const cy = node.y + node.height / 2
 
-  // Resolve text color — inline styles can override the CSS variable default
-  const textColor = escapeAttr(node.inlineStyle?.color ?? 'var(--_text)')
+  // Resolve text color with auto-contrast for custom fills
+  let textColor: string
+  if (node.inlineStyle?.color) {
+    // User explicitly set text color — respect it
+    textColor = escapeAttr(node.inlineStyle.color)
+  } else if (node.inlineStyle?.fill && isConcreteColor(node.inlineStyle.fill)) {
+    // Custom fill without explicit text color — auto-pick for contrast.
+    // This prevents white-on-pastel in dark mode and black-on-dark in light mode.
+    textColor = contrastTextColor(node.inlineStyle.fill) ?? 'var(--_text)'
+  } else {
+    // No custom fill — follow the theme
+    textColor = 'var(--_text)'
+  }
 
   return renderMultilineText(
     node.label,
