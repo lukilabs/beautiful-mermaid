@@ -10,6 +10,7 @@
 //   - Sequence diagrams (sequenceDiagram) — column-based timeline layout
 //   - Class diagrams (classDiagram) — level-based UML layout
 //   - ER diagrams (erDiagram) — grid layout with crow's foot notation
+//   - Timeline diagrams (timeline) — chronological outline with grouped milestones
 //
 // Usage:
 //   import { renderMermaidASCII } from 'beautiful-mermaid'
@@ -24,6 +25,7 @@ import { canvasToString, flipCanvasVertically, flipRoleCanvasVertically } from '
 import { renderSequenceAscii } from './sequence.ts'
 import { renderClassAscii } from './class-diagram.ts'
 import { renderErAscii } from './er-diagram.ts'
+import { renderTimelineAscii } from './timeline.ts'
 import { renderXYChartAscii } from './xychart.ts'
 import { detectColorMode, DEFAULT_ASCII_THEME, diagramColorsToAsciiTheme } from './ansi.ts'
 import type { AsciiConfig, AsciiTheme, ColorMode } from './types.ts'
@@ -60,10 +62,11 @@ export interface AsciiRenderOptions {
  * Detect the diagram type from the mermaid source text.
  * Mirrors the detection logic in src/index.ts for the SVG renderer.
  */
-function detectDiagramType(text: string): 'flowchart' | 'sequence' | 'class' | 'er' | 'xychart' {
+function detectDiagramType(text: string): 'flowchart' | 'sequence' | 'class' | 'er' | 'timeline' | 'xychart' {
   const firstLine = text.trim().split('\n')[0]?.trim().toLowerCase() ?? ''
 
   if (/^xychart(-beta)?\b/.test(firstLine)) return 'xychart'
+  if (/^timeline\s*$/.test(firstLine)) return 'timeline'
   if (/^sequencediagram\s*$/.test(firstLine)) return 'sequence'
   if (/^classdiagram\s*$/.test(firstLine)) return 'class'
   if (/^erdiagram\s*$/.test(firstLine)) return 'er'
@@ -132,6 +135,11 @@ export function renderMermaidASCII(
 
     case 'er':
       return renderErAscii(text, config, colorMode, theme)
+
+    case 'timeline': {
+      const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0 && !l.startsWith('%%'))
+      return renderTimelineAscii(lines, config, colorMode, theme)
+    }
 
     case 'flowchart':
     default: {

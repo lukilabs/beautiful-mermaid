@@ -10,6 +10,7 @@
 //   - Sequence diagrams (sequenceDiagram)
 //   - Class diagrams (classDiagram)
 //   - ER diagrams (erDiagram)
+//   - Timeline diagrams (timeline)
 //
 // Theming uses CSS custom properties (--bg, --fg, + optional enrichment).
 // See src/theme.ts for the full variable system.
@@ -43,6 +44,9 @@ import { renderClassSvg } from './class/renderer.ts'
 import { parseErDiagram } from './er/parser.ts'
 import { layoutErDiagramSync } from './er/layout.ts'
 import { renderErSvg } from './er/renderer.ts'
+import { parseTimelineDiagram } from './timeline/parser.ts'
+import { layoutTimelineDiagram } from './timeline/layout.ts'
+import { renderTimelineSvg } from './timeline/renderer.ts'
 import { parseXYChart } from './xychart/parser.ts'
 import { layoutXYChart } from './xychart/layout.ts'
 import { renderXYChartSvg } from './xychart/renderer.ts'
@@ -51,10 +55,11 @@ import { renderXYChartSvg } from './xychart/renderer.ts'
  * Detect the diagram type from the mermaid source text.
  * Returns the type keyword used for routing to the correct pipeline.
  */
-function detectDiagramType(text: string): 'flowchart' | 'sequence' | 'class' | 'er' | 'xychart' {
+function detectDiagramType(text: string): 'flowchart' | 'sequence' | 'class' | 'er' | 'timeline' | 'xychart' {
   const firstLine = text.trim().split(/[\n;]/)[0]?.trim().toLowerCase() ?? ''
 
   if (/^xychart(-beta)?\b/.test(firstLine)) return 'xychart'
+  if (/^timeline\s*$/.test(firstLine)) return 'timeline'
   if (/^sequencediagram\s*$/.test(firstLine)) return 'sequence'
   if (/^classdiagram\s*$/.test(firstLine)) return 'class'
   if (/^erdiagram\s*$/.test(firstLine)) return 'er'
@@ -138,6 +143,11 @@ export function renderMermaidSVG(
       const diagram = parseErDiagram(lines)
       const positioned = layoutErDiagramSync(diagram, options)
       return renderErSvg(positioned, colors, font, transparent)
+    }
+    case 'timeline': {
+      const diagram = parseTimelineDiagram(lines)
+      const positioned = layoutTimelineDiagram(diagram, options)
+      return renderTimelineSvg(positioned, colors, font, transparent)
     }
     case 'xychart': {
       const chart = parseXYChart(lines)
