@@ -21,6 +21,7 @@
 
 export type { RenderOptions, MermaidGraph, PositionedGraph } from './types.ts'
 export type { DiagramColors, ThemeName } from './theme.ts'
+export type { MermaidRuntimeConfig, MermaidThemeVariables } from './mermaid-source.ts'
 export { fromShikiTheme, THEMES, DEFAULTS } from './theme.ts'
 export { parseMermaid } from './parser.ts'
 export { renderMermaidASCII, renderMermaidAscii } from './ascii/index.ts'
@@ -32,7 +33,9 @@ import { layoutGraphSync } from './layout.ts'
 import { renderSvg } from './renderer.ts'
 import type { RenderOptions } from './types.ts'
 import type { DiagramColors } from './theme.ts'
-import { DEFAULTS } from './theme.ts'
+import { DEFAULTS, THEMES } from './theme.ts'
+import { normalizeMermaidSource } from './mermaid-source.ts'
+import type { MermaidRuntimeConfig, MermaidThemeVariables } from './mermaid-source.ts'
 
 import { parseSequenceDiagram } from './sequence/parser.ts'
 import { layoutSequenceDiagram } from './sequence/layout.ts'
@@ -68,16 +71,54 @@ function detectDiagramType(text: string): 'flowchart' | 'sequence' | 'class' | '
  * Uses DEFAULTS for bg/fg when not provided, and passes through
  * optional enrichment colors (line, accent, muted, surface, border).
  */
-function buildColors(options: RenderOptions): DiagramColors {
+const ZINC_DARK = THEMES['zinc-dark'] ?? { bg: '#18181B', fg: '#FAFAFA' }
+
+const MERMAID_THEME_COLORS: Record<string, DiagramColors> = {
+  default: { bg: DEFAULTS.bg, fg: DEFAULTS.fg },
+  base: { bg: DEFAULTS.bg, fg: DEFAULTS.fg },
+  neutral: { bg: '#ffffff', fg: '#1f2937', line: '#9ca3af', accent: '#6b7280', muted: '#6b7280' },
+  dark: {
+    bg: ZINC_DARK.bg,
+    fg: ZINC_DARK.fg,
+    line: ZINC_DARK.line,
+    accent: ZINC_DARK.accent,
+    muted: ZINC_DARK.muted,
+    surface: ZINC_DARK.surface,
+    border: ZINC_DARK.border,
+  },
+  forest: { bg: '#f0fdf4', fg: '#14532d', line: '#4d7c0f', accent: '#15803d', muted: '#65a30d', border: '#86efac' },
+}
+
+function buildColors(options: RenderOptions, config: MermaidRuntimeConfig): DiagramColors {
+  const theme = resolveThemeColors(config.theme)
+  const vars = config.themeVariables
+
   return {
-    bg: options.bg ?? DEFAULTS.bg,
-    fg: options.fg ?? DEFAULTS.fg,
-    line: options.line,
-    accent: options.accent,
-    muted: options.muted,
-    surface: options.surface,
-    border: options.border,
+    bg: options.bg ?? readThemeValue(vars, 'background', 'mainBkg') ?? theme?.bg ?? DEFAULTS.bg,
+    fg: options.fg ?? readThemeValue(vars, 'primaryTextColor', 'textColor', 'nodeTextColor') ?? theme?.fg ?? DEFAULTS.fg,
+    line: options.line ?? readThemeValue(vars, 'lineColor', 'defaultLinkColor') ?? theme?.line,
+    accent: options.accent ?? readThemeValue(vars, 'arrowheadColor', 'primaryColor') ?? theme?.accent,
+    muted: options.muted ?? readThemeValue(vars, 'secondaryTextColor', 'tertiaryTextColor') ?? theme?.muted,
+    surface: options.surface ?? readThemeValue(vars, 'primaryColor', 'nodeBkg', 'mainBkg') ?? theme?.surface,
+    border: options.border ?? readThemeValue(vars, 'primaryBorderColor', 'secondaryBorderColor') ?? theme?.border,
   }
+}
+
+function resolveThemeColors(themeName: string | undefined): DiagramColors | undefined {
+  if (!themeName) return undefined
+  if (themeName in THEMES) return THEMES[themeName as keyof typeof THEMES]
+  return MERMAID_THEME_COLORS[themeName.toLowerCase()]
+}
+
+function readThemeValue(vars: MermaidThemeVariables | undefined, ...keys: string[]): string | undefined {
+  if (!vars) return undefined
+
+  for (const key of keys) {
+    const value = vars[key]
+    if (typeof value === 'string' && value.length > 0) return value
+  }
+
+  return undefined
 }
 
 /**
@@ -115,13 +156,16 @@ export function renderMermaidSVG(
   // Decode XML entities that may leak from markdown parsers (e.g. rehype-raw).
   // Without this, escapeXml() double-encodes them: &lt; → &amp;lt; → literal "&lt;" in SVG.
   text = decodeXML(text)
+  const normalizedSource = normalizeMermaidSource(text, options.mermaidConfig ?? {})
 
-  const colors = buildColors(options)
-  const font = options.font ?? 'Inter'
+  const colors = buildColors(options, normalizedSource.config)
+  const font = options.font
+    ?? normalizedSource.config.fontFamily
+    ?? readThemeValue(normalizedSource.config.themeVariables, 'fontFamily')
+    ?? 'Inter'
   const transparent = options.transparent ?? false
-  const diagramType = detectDiagramType(text)
-
-  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0 && !l.startsWith('%%'))
+  const diagramType = detectDiagramType(normalizedSource.text)
+  const lines = normalizedSource.lines
 
   switch (diagramType) {
     case 'sequence': {
@@ -146,7 +190,7 @@ export function renderMermaidSVG(
     }
     case 'flowchart':
     default: {
-      const graph = parseMermaid(text)
+      const graph = parseMermaid(normalizedSource.text)
       const positioned = layoutGraphSync(graph, options)
       return renderSvg(positioned, colors, font, transparent)
     }

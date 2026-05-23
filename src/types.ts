@@ -1,3 +1,5 @@
+import type { MermaidRuntimeConfig } from './mermaid-source.ts'
+
 // ============================================================================
 // Parsed graph — logical structure extracted from Mermaid text
 // ============================================================================
@@ -161,4 +163,6 @@ export interface RenderOptions {
   transparent?: boolean
   /** Enable hover tooltips on chart data points (xychart only). Default: false */
   interactive?: boolean
+  /** Optional Mermaid-style runtime config, merged before frontmatter and init directives. */
+  mermaidConfig?: MermaidRuntimeConfig
 }

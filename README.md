@@ -518,6 +518,20 @@ Render a Mermaid diagram to SVG. Synchronous. Auto-detects diagram type.
 | `componentSpacing` | `number` | `24` | Spacing between disconnected components |
 | `thoroughness` | `number` | `3` | Crossing minimization trials (1-7, higher = better but slower) |
 | `interactive` | `boolean` | `false` | Enable hover tooltips on XY chart bars and data points |
+| `mermaidConfig` | `MermaidRuntimeConfig` | `{}` | Base Mermaid-style config merged before frontmatter and `%%{init}%%` directives |
+
+**Mermaid config:** Leading YAML frontmatter and `%%{init: ...}%%` / `%%{initialize: ...}%%` directives are stripped before parsing and merged into runtime config. Explicit render options still win over config-derived theme values.
+
+```mermaid
+---
+theme: dark
+themeVariables:
+  primaryTextColor: "#f8fafc"
+  primaryColor: "#38bdf8"
+---
+graph TD
+  A[Configured] --> B[Diagram]
+```
 
 **XY Charts:** Diagrams starting with `xychart-beta` are auto-detected — no separate function needed. The `accent` color option drives the chart series color palette.
 
@@ -539,6 +553,7 @@ Render a Mermaid diagram to ASCII/Unicode text. Synchronous.
 | `boxBorderPadding` | `number` | `1` | Inner box padding |
 | `colorMode` | `string` | `'auto'` | `'none'`, `'auto'`, `'ansi16'`, `'ansi256'`, `'truecolor'`, or `'html'` |
 | `theme` | `Partial<AsciiTheme>` | — | Override default colors for ASCII output |
+| `mermaidConfig` | `MermaidRuntimeConfig` | `{}` | Base Mermaid-style config merged before frontmatter and `%%{init}%%` directives |
 
 ### `parseMermaid(text): MermaidGraph`
 

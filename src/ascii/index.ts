@@ -27,6 +27,8 @@ import { renderErAscii } from './er-diagram.ts'
 import { renderXYChartAscii } from './xychart.ts'
 import { detectColorMode, DEFAULT_ASCII_THEME, diagramColorsToAsciiTheme } from './ansi.ts'
 import type { AsciiConfig, AsciiTheme, ColorMode } from './types.ts'
+import { normalizeMermaidSource } from '../mermaid-source.ts'
+import type { MermaidRuntimeConfig } from '../mermaid-source.ts'
 
 // Re-export types for external use
 export type { AsciiTheme, ColorMode }
@@ -54,15 +56,15 @@ export interface AsciiRenderOptions {
   colorMode?: ColorMode | 'auto'
   /** Theme colors for ASCII output. Uses default theme if not provided. */
   theme?: Partial<AsciiTheme>
+  /** Optional Mermaid-style runtime config, merged before frontmatter and init directives. */
+  mermaidConfig?: MermaidRuntimeConfig
 }
 
 /**
  * Detect the diagram type from the mermaid source text.
  * Mirrors the detection logic in src/index.ts for the SVG renderer.
  */
-function detectDiagramType(text: string): 'flowchart' | 'sequence' | 'class' | 'er' | 'xychart' {
-  const firstLine = text.trim().split('\n')[0]?.trim().toLowerCase() ?? ''
-
+function detectDiagramType(firstLine: string): 'flowchart' | 'sequence' | 'class' | 'er' | 'xychart' {
   if (/^xychart(-beta)?\b/.test(firstLine)) return 'xychart'
   if (/^sequencediagram\s*$/.test(firstLine)) return 'sequence'
   if (/^classdiagram\s*$/.test(firstLine)) return 'class'
@@ -117,26 +119,27 @@ export function renderMermaidASCII(
 
   // Merge user theme with defaults
   const theme: AsciiTheme = { ...DEFAULT_ASCII_THEME, ...options.theme }
+  const normalizedSource = normalizeMermaidSource(text, options.mermaidConfig ?? {})
 
-  const diagramType = detectDiagramType(text)
+  const diagramType = detectDiagramType(normalizedSource.firstLine)
 
   switch (diagramType) {
     case 'xychart':
-      return renderXYChartAscii(text, config, colorMode, theme)
+      return renderXYChartAscii(normalizedSource.text, config, colorMode, theme)
 
     case 'sequence':
-      return renderSequenceAscii(text, config, colorMode, theme)
+      return renderSequenceAscii(normalizedSource.text, config, colorMode, theme)
 
     case 'class':
-      return renderClassAscii(text, config, colorMode, theme)
+      return renderClassAscii(normalizedSource.text, config, colorMode, theme)
 
     case 'er':
-      return renderErAscii(text, config, colorMode, theme)
+      return renderErAscii(normalizedSource.text, config, colorMode, theme)
 
     case 'flowchart':
     default: {
       // Flowchart + state diagram pipeline (original)
-      const parsed = parseMermaid(text)
+      const parsed = parseMermaid(normalizedSource.text)
 
       // Normalize direction for grid layout.
       // BT is laid out as TD then flipped vertically after drawing.
