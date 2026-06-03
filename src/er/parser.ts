@@ -15,10 +15,10 @@ import { normalizeBrTags } from '../multiline-utils.ts'
 //   }
 //
 // Cardinality notation:
-//   ||  exactly one
-//   o|  zero or one (also |o)
-//   }|  one or more (also |{)
-//   o{  zero or more (also {o)
+//   ||  ||  exactly one
+//   |o  o|  zero or one
+//   }|  |{  one or more
+//   }o  o{  zero or more
 //
 // Line style:
 //   --  identifying (solid line)
@@ -128,9 +128,9 @@ function parseAttribute(line: string): ErAttribute | null {
  * Parse a relationship line.
  *
  * Cardinality symbols on each side of the line style:
- *   Left side (entity1):  ||  |o  o|  }|  |{  o{  {o
+ *   Left side (entity1):  ||  |o  }|  }o
  *   Line:                 --  (identifying) or  ..  (non-identifying)
- *   Right side (entity2): ||  o|  |o  |{  }|  {o  o{
+ *   Right side (entity2): ||  o|  |{  o{
  *
  * Full pattern example: CUSTOMER ||--o{ ORDER : places
  */
@@ -174,8 +174,8 @@ function parseCardinality(str: string): Cardinality | null {
   if (sorted === 'o|') return 'zero-one'
   // One or more: }| or |{ → sorted "|}" or "{|"
   if (sorted === '|}' || sorted === '{|') return 'many'
-  // Zero or more: o{ or {o → sorted "{o" or "o{"
-  if (sorted === '{o' || sorted === 'o{') return 'zero-many'
+  // Zero or more: }o or o{ → sorted "o}" or "o{"
+  if (sorted === 'o}' || sorted === 'o{') return 'zero-many'
 
   return null
 }
