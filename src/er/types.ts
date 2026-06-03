@@ -34,10 +34,10 @@ export interface ErAttribute {
 
 /**
  * Cardinality notation (crow's foot):
- *   'one'       ||  exactly one
- *   'zero-one'  |o  zero or one
- *   'many'      }|  one or more
- *   'zero-many' o{  zero or more
+ *   'one'       ||  ||  exactly one
+ *   'zero-one'  |o  o|  zero or one
+ *   'many'      }|  |{  one or more
+ *   'zero-many' }o  o{  zero or more
  */
 export type Cardinality = 'one' | 'zero-one' | 'many' | 'zero-many'
 

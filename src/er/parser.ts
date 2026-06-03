@@ -154,8 +154,8 @@ function parseRelationshipLine(line: string): ErRelationship | null {
   const lineStyle = lineMatch[2]!
   const rightStr = lineMatch[3]!
 
-  const cardinality1 = parseCardinality(leftStr)
-  const cardinality2 = parseCardinality(rightStr)
+  const cardinality1 = parseLeftCardinality(leftStr)
+  const cardinality2 = parseRightCardinality(rightStr)
   const identifying = lineStyle === '--'
 
   if (!cardinality1 || !cardinality2) return null
@@ -164,18 +164,19 @@ function parseRelationshipLine(line: string): ErRelationship | null {
 }
 
 /** Parse a cardinality notation string into a Cardinality type */
-function parseCardinality(str: string): Cardinality | null {
-  // Normalize: sort the characters to handle both orders (e.g., |o and o|)
-  const sorted = str.split('').sort().join('')
+function parseLeftCardinality(str: string): Cardinality | null {
+  if (str === '||') return 'one'
+  if (str === '|o') return 'zero-one'
+  if (str === '}|') return 'many'
+  if (str === '}o') return 'zero-many'
+  return null
+}
 
-  // Exact one: || → sorted "||"
-  if (sorted === '||') return 'one'
-  // Zero or one: o| or |o → sorted "o|" (o=111 < |=124 in char codes)
-  if (sorted === 'o|') return 'zero-one'
-  // One or more: }| or |{ → sorted "|}" or "{|"
-  if (sorted === '|}' || sorted === '{|') return 'many'
-  // Zero or more: }o or o{ → sorted "o}" or "o{"
-  if (sorted === 'o}' || sorted === 'o{') return 'zero-many'
-
+/** Parse a cardinality notation string into a Cardinality type */
+function parseRightCardinality(str: string): Cardinality | null {
+  if (str === '||') return 'one'
+  if (str === 'o|') return 'zero-one'
+  if (str === '|{') return 'many'
+  if (str === 'o{') return 'zero-many'
   return null
 }
