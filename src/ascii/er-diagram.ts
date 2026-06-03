@@ -63,7 +63,7 @@ function getCrowsFootChars(card: Cardinality, useAscii: boolean, isRight = false
   if (useAscii) {
     switch (card) {
       case 'one':       return '|'
-      case 'zero-one':  return 'o|'
+      case 'zero-one':  return isRight ? 'o|' : '|o'
       case 'many':      return isRight ? '<' : '>'
       case 'zero-many': return isRight ? 'o<' : '>o'
     }
@@ -71,7 +71,7 @@ function getCrowsFootChars(card: Cardinality, useAscii: boolean, isRight = false
     // Use cleaner Unicode characters
     switch (card) {
       case 'one':       return '│'
-      case 'zero-one':  return '○│'
+      case 'zero-one':  return isRight ? '○│' : '│○'
       case 'many':      return isRight ? '╟' : '╢'
       case 'zero-many': return isRight ? '○╟' : '╢○'
     }
