@@ -489,6 +489,51 @@ XY charts render to ASCII with dedicated chart-drawing characters:
 
 ---
 
+## MCP Server
+
+`beautiful-mermaid` ships with a built-in [MCP (Model Context Protocol)](https://modelcontextprotocol.io) server, letting AI coding assistants render diagrams natively through the tool-calling protocol.
+
+### Configure
+
+Add to your MCP client (Cursor, Claude Desktop, etc.):
+
+```json
+{
+  "mcpServers": {
+    "beautiful-mermaid": {
+      "command": "npx",
+      "args": ["beautiful-mermaid"]
+    }
+  }
+}
+```
+
+Or use Bun for faster startup:
+
+```json
+{
+  "mcpServers": {
+    "beautiful-mermaid": {
+      "command": "bun",
+      "args": ["run", "beautiful-mermaid"]
+    }
+  }
+}
+```
+
+### Available Tools
+
+| Tool | Description |
+|------|-------------|
+| `render_mermaid_svg` | Render diagrams to SVG with theme support |
+| `render_mermaid_ascii` | Render diagrams to ASCII/Unicode art |
+| `parse_mermaid` | Parse Mermaid source into a JSON graph |
+| `list_diagram_types` | List all 6 supported diagram types |
+
+The SVG tool supports theme selection via `theme_name` (all 15 built-in themes), custom `bg`/`fg` overrides, and transparent background. The ASCII tool detects CJK characters and can emit warnings for terminal alignment.
+
+---
+
 ## API Reference
 
 ### `renderMermaidSVG(text, options?): string`

@@ -6,11 +6,19 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "bin": {
+    "beautiful-mermaid": "./dist/mcp/cli.js"
+  },
   "exports": {
     ".": {
       "bun": "./src/index.ts",
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./mcp": {
+      "bun": "./src/mcp/server.ts",
+      "import": "./dist/mcp/cli.js",
+      "types": "./dist/mcp/cli.d.ts"
     }
   },
   "repository": {
@@ -50,8 +58,11 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
+    "@cfworker/json-schema": "^4.1.1",
+    "@modelcontextprotocol/server": "^2.0.0-alpha.2",
     "elkjs": "^0.11.0",
-    "entities": "^7.0.1"
+    "entities": "^7.0.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/bun": "^1.3.9",
