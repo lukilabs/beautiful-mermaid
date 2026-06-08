@@ -3,11 +3,16 @@
 //
 // Wraps renderMermaidSVG() with theme resolution and best-effort
 // partial rendering on parse/rendering errors.
+//
+// Supports optional output_path — when provided, writes SVG to disk
+// and returns { saved, size }; otherwise returns SVG content as text.
 // ============================================================================
 
 import { renderMermaidSVG, THEMES, DEFAULTS } from '../../index.ts'
 import { formatError } from '../errors.ts'
 import type { DiagramColors, ThemeName } from '../../index.ts'
+import { resolve } from 'node:path'
+import { writeFileSync } from 'node:fs'
 
 // ============================================================================
 // Theme resolution
@@ -79,6 +84,10 @@ function attemptPartialRendering(mermaidCode: string, colors: { bg: string; fg: 
 /**
  * MCP tool handler for `render_mermaid_svg`.
  * Renders Mermaid code to SVG with theme resolution.
+ *
+ * When `output_path` is provided, writes the SVG to disk and returns
+ * { saved: "/absolute/path/to/file.svg", size: 12345 }.
+ * Otherwise returns the SVG content as text.
  */
 export function handleRenderSVG(args: {
   mermaid_code: string
@@ -86,6 +95,7 @@ export function handleRenderSVG(args: {
   bg?: string
   fg?: string
   transparent?: boolean
+  output_path?: string
 }): {
   content: Array<{ type: 'text'; text: string }>
   isError?: boolean
@@ -93,13 +103,36 @@ export function handleRenderSVG(args: {
   const colors = resolveColors(args)
   const transparent = args.transparent ?? false
 
-  try {
-    const svg = renderMermaidSVG(args.mermaid_code, {
+  const render = (code: string): string =>
+    renderMermaidSVG(code, {
       bg: colors.bg,
       fg: colors.fg,
       ...colors.enrichment,
       transparent,
     })
+
+  try {
+    const svg = render(args.mermaid_code)
+
+    // File output path
+    if (args.output_path) {
+      try {
+        const absPath = resolve(args.output_path)
+        writeFileSync(absPath, svg, 'utf-8')
+        const result = JSON.stringify({
+          saved: absPath,
+          size: Buffer.byteLength(svg, 'utf-8'),
+        })
+        return { content: [{ type: 'text', text: result }] }
+      } catch (fsError) {
+        return {
+          content: [{ type: 'text', text: formatError(fsError) }],
+          isError: true,
+        }
+      }
+    }
+
+    // Default: return SVG content
     return {
       content: [{ type: 'text', text: svg }],
     }

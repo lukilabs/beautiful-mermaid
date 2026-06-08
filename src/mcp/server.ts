@@ -50,6 +50,9 @@ const renderSVGSchema = z.object({
   transparent: z.boolean().optional().describe(
     'Render with transparent background. Default: false.'
   ),
+  output_path: z.string().optional().describe(
+    'File path to save the SVG to (relative or absolute). When provided, writes the SVG to disk instead of returning it as text. Returns { saved, size } on success.'
+  ),
 })
 
 const renderAsciiSchema = z.object({
@@ -98,11 +101,11 @@ export function createServer(): McpServer {
     (args) => handleParseMermaid(args),
   )
 
-  // 3. render_mermaid_svg — render to SVG with theme support
+  // 3. render_mermaid_svg — render to SVG with theme support, optional file output
   server.registerTool(
     'render_mermaid_svg',
     {
-      description: 'Render a Mermaid diagram to a beautiful, themeable SVG string. Supports flowcharts, state diagrams, sequence diagrams, class diagrams, ER diagrams, and XY charts.',
+      description: 'Render a Mermaid diagram to a beautiful, themeable SVG string. Supports flowcharts, state diagrams, sequence diagrams, class diagrams, ER diagrams, and XY charts. Use output_path to write the SVG directly to a file instead of returning it as text.',
       inputSchema: renderSVGSchema,
     },
     (args) => handleRenderSVG(args),

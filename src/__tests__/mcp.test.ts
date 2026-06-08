@@ -908,6 +908,74 @@ describe('render_mermaid_svg', () => {
       expect(polylines).toBeGreaterThanOrEqual(3)
     })
   })
+
+  // --- File output (output_path) ---
+
+  describe('render_mermaid_svg – file output', () => {
+    it('writes SVG to file when output_path is provided', () => {
+      const tmpFile = `/tmp/test-mcp-output-${Date.now()}.svg`
+      try {
+        const result = handleRenderSVG({
+          mermaid_code: SIMPLE_FLOWCHART,
+          output_path: tmpFile,
+        })
+        expectSuccessResponse(result)
+
+        const info = JSON.parse(result.content[0]!.text) as {
+          saved: string
+          size: number
+        }
+        expect(info.saved).toContain(tmpFile)
+        expect(info.size).toBeGreaterThan(100)
+
+        // Verify file exists and contains valid SVG
+        const { readFileSync } = require('node:fs')
+        const content = readFileSync(tmpFile, 'utf-8')
+        expect(content).toContain('<svg xmlns="http://www.w3.org/2000/svg"')
+        expect(content).toContain('</svg>')
+      } finally {
+        // Cleanup
+        try { require('node:fs').unlinkSync(tmpFile) } catch {}
+      }
+    })
+
+    it('still applies theme when writing to file', () => {
+      const tmpFile = `/tmp/test-mcp-themed-${Date.now()}.svg`
+      try {
+        handleRenderSVG({
+          mermaid_code: SIMPLE_FLOWCHART,
+          theme_name: 'tokyo-night',
+          output_path: tmpFile,
+        })
+        const { readFileSync } = require('node:fs')
+        const content = readFileSync(tmpFile, 'utf-8')
+        expect(content).toContain('--bg:#1a1b26')
+        expect(content).toContain('--fg:#a9b1d6')
+      } finally {
+        try { require('node:fs').unlinkSync(tmpFile) } catch {}
+      }
+    })
+
+    it('returns error for invalid output path', () => {
+      const result = handleRenderSVG({
+        mermaid_code: SIMPLE_FLOWCHART,
+        output_path: '/nonexistent/dir/should/not/exist/file.svg',
+      })
+      expect(result.isError).toBe(true)
+      const payload = JSON.parse(result.content[0]!.text)
+      expect(payload.error).toBeDefined()
+    })
+
+    it('returns error for invalid mermaid even with output_path', () => {
+      const result = handleRenderSVG({
+        mermaid_code: '',
+        output_path: '/tmp/test-output.svg',
+      })
+      expect(result.isError).toBe(true)
+      const payload = JSON.parse(result.content[0]!.text)
+      expect(payload.error).toBeDefined()
+    })
+  })
 })
 
 // ============================================================================
