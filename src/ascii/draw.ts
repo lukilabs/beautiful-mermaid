@@ -21,6 +21,7 @@ import { gridToDrawingCoord, lineToDrawing } from './grid.ts'
 import { splitLines } from './multiline-utils.ts'
 import { getCorners } from './shapes/corners.ts'
 import { getShapeAttachmentPoint } from './shapes/index.ts'
+import { displayWidth, toCells, WIDE_PAD } from '../text-metrics.ts'
 
 // ============================================================================
 // Node drawing — renders a node using shape-aware rendering
@@ -104,10 +105,11 @@ function drawBoxWithGridDimensions(node: AsciiNode, graph: AsciiGraph): Canvas {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!
-    const textX = from.x + Math.floor(w / 2) - Math.ceil(line.length / 2) + 1
-    for (let j = 0; j < line.length; j++) {
+    const cells = toCells(line)
+    const textX = from.x + Math.floor(w / 2) - Math.ceil(cells.length / 2) + 1
+    for (let j = 0; j < cells.length; j++) {
       if (textX + j >= 0 && textX + j < box.length && startY + i >= 0 && startY + i < box[0]!.length) {
-        box[textX + j]![startY + i] = line[j]!
+        box[textX + j]![startY + i] = cells[j]!
       }
     }
   }
@@ -147,7 +149,7 @@ export function drawMultiBox(
   let maxTextWidth = 0
   for (const section of sections) {
     for (const line of section) {
-      maxTextWidth = Math.max(maxTextWidth, line.length)
+      maxTextWidth = Math.max(maxTextWidth, displayWidth(line))
     }
   }
   const innerWidth = maxTextWidth + 2 * padding
@@ -198,8 +200,9 @@ export function drawMultiBox(
     // Draw section text lines
     for (const line of lines) {
       const startX = 1 + padding
-      for (let i = 0; i < line.length; i++) {
-        canvas[startX + i]![row] = line[i]!
+      const cells = toCells(line)
+      for (let i = 0; i < cells.length; i++) {
+        canvas[startX + i]![row] = cells[i]!
       }
       row++
     }
@@ -673,7 +676,7 @@ function drawTextOnLine(canvas: Canvas, line: DrawingCoord[], label: string, isU
 
   for (let i = 0; i < lines.length; i++) {
     const lineText = lines[i]!
-    const startX = middleX - Math.floor(lineText.length / 2)
+    const startX = middleX - Math.floor(displayWidth(lineText) / 2)
     drawText(canvas, { x: startX, y: startY + i }, lineText)
   }
 }
@@ -1142,13 +1145,19 @@ export function drawSubgraphLabel(sg: AsciiSubgraph, graph: AsciiGraph): [Canvas
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!
     const labelY = 1 + i
-    let labelX = Math.floor(width / 2) - Math.floor(line.length / 2)
+    let labelX = Math.floor(width / 2) - Math.floor(displayWidth(line) / 2)
     if (labelX < 1) labelX = 1
 
-    for (let j = 0; j < line.length; j++) {
-      if (labelX + j < width && labelY < height) {
-        canvas[labelX + j]![labelY] = line[j]!
-      }
+    const cells = toCells(line)
+    for (let j = 0; j < cells.length; j++) {
+      const cell = cells[j]!
+      if (cell === WIDE_PAD) continue // written atomically with its lead
+      const cx = labelX + j
+      const wide = cells[j + 1] === WIDE_PAD
+      // Keep wide-glyph pairs atomic at the subgraph edge
+      if (cx + (wide ? 1 : 0) >= width || labelY >= height) continue
+      canvas[cx]![labelY] = cell
+      if (wide) canvas[cx + 1]![labelY] = WIDE_PAD
     }
   }
 

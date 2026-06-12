@@ -15,6 +15,7 @@ import type { Canvas, AsciiConfig, RoleCanvas, CharRole, AsciiTheme, ColorMode }
 import { mkCanvas, mkRoleCanvas, canvasToString, increaseSize, increaseRoleCanvasSize, setRole } from './canvas.ts'
 import { drawMultiBox } from './draw.ts'
 import { splitLines } from './multiline-utils.ts'
+import { displayWidth, toCells, WIDE_PAD } from '../text-metrics.ts'
 
 /** Classify a character from a box drawing as 'border' or 'text'. */
 function classifyBoxChar(ch: string): CharRole {
@@ -180,7 +181,7 @@ export function renderErAscii(text: string, config: AsciiConfig, colorMode?: Col
 
     let maxTextW = 0
     for (const section of sections) {
-      for (const line of section) maxTextW = Math.max(maxTextW, line.length)
+      for (const line of section) maxTextW = Math.max(maxTextW, displayWidth(line))
     }
     const boxW = maxTextW + 4 // 2 border + 2 padding
 
@@ -344,16 +345,21 @@ export function renderErAscii(text: string, config: AsciiConfig, colorMode?: Col
         // Place lines below the relationship line (lineY + 1, lineY + 2, ...)
         for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
           const line = lines[lineIdx]!
-          const labelStart = Math.max(startX, gapMid - Math.floor(line.length / 2))
+          const cells = toCells(line)
+          const labelStart = Math.max(startX, gapMid - Math.floor(cells.length / 2))
           const labelY = lineY + 1 + lineIdx
           // Ensure canvas is tall enough
-          increaseSize(canvas, Math.max(labelStart + line.length, 1), Math.max(labelY + 1, 1))
-          increaseRoleCanvasSize(rc, Math.max(labelStart + line.length, 1), Math.max(labelY + 1, 1))
-          for (let i = 0; i < line.length; i++) {
+          increaseSize(canvas, Math.max(labelStart + cells.length, 1), Math.max(labelY + 1, 1))
+          increaseRoleCanvasSize(rc, Math.max(labelStart + cells.length, 1), Math.max(labelY + 1, 1))
+          for (let i = 0; i < cells.length; i++) {
+            const cell = cells[i]!
+            if (cell === WIDE_PAD) continue // written atomically with its lead
             const lx = labelStart + i
-            if (lx >= startX && lx <= endX) {
-              setC(lx, labelY, line[i]!, 'text')
-            }
+            const wide = cells[i + 1] === WIDE_PAD
+            // Keep wide-glyph pairs atomic within the gap region
+            if (lx < startX || lx + (wide ? 1 : 0) > endX) continue
+            setC(lx, labelY, cell, 'text')
+            if (wide) setC(lx + 1, labelY, WIDE_PAD, 'text')
           }
         }
       }
@@ -413,16 +419,16 @@ export function renderErAscii(text: string, config: AsciiConfig, colorMode?: Col
         const startLabelY = midY - Math.floor((lines.length - 1) / 2)
 
         for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
-          const line = lines[lineIdx]!
+          const cells = toCells(lines[lineIdx]!)
           const labelX = lineX + 2
           const y = startLabelY + lineIdx
           if (y >= 0) {
-            for (let i = 0; i < line.length; i++) {
+            for (let i = 0; i < cells.length; i++) {
               const lx = labelX + i
               if (lx >= 0) {
                 increaseSize(canvas, lx + 1, y + 1)
                 increaseRoleCanvasSize(rc, lx + 1, y + 1)
-                setC(lx, y, line[i]!, 'text')
+                setC(lx, y, cells[i]!, 'text')
               }
             }
           }

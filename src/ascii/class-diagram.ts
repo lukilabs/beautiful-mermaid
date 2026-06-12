@@ -16,6 +16,7 @@ import type { Canvas, AsciiConfig, RoleCanvas, CharRole, AsciiTheme, ColorMode }
 import { mkCanvas, mkRoleCanvas, canvasToString, increaseSize, increaseRoleCanvasSize, setRole } from './canvas.ts'
 import { drawMultiBox } from './draw.ts'
 import { splitLines } from './multiline-utils.ts'
+import { displayWidth, toCells } from '../text-metrics.ts'
 
 /** Classify a character from a box drawing as 'border' or 'text'. */
 function classifyBoxChar(ch: string): CharRole {
@@ -170,7 +171,7 @@ export function renderClassAscii(text: string, config: AsciiConfig, colorMode?: 
     // Compute box dimensions from drawMultiBox logic
     let maxTextW = 0
     for (const section of sections) {
-      for (const line of section) maxTextW = Math.max(maxTextW, line.length)
+      for (const line of section) maxTextW = Math.max(maxTextW, displayWidth(line))
     }
     const boxW = maxTextW + 4 // 2 border + 2 padding
 
@@ -602,7 +603,7 @@ export function renderClassAscii(text: string, config: AsciiConfig, colorMode?: 
     // Add padding around the label for readability
     if (rel.label) {
       const lines = splitLines(rel.label)
-      const maxLabelWidth = Math.max(...lines.map(l => l.length)) + 2 // +2 for padding
+      const maxLabelWidth = Math.max(...lines.map(l => displayWidth(l))) + 2 // +2 for padding
 
       // Calculate ideal label position based on routing direction
       let baseMidY: number
@@ -672,21 +673,22 @@ export function renderClassAscii(text: string, config: AsciiConfig, colorMode?: 
 
       for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
         const paddedLine = ` ${lines[lineIdx]!} `  // Add space padding on both sides
+        const cells = toCells(paddedLine)
         // Calculate label start, but ensure it doesn't go negative
-        const idealLabelStart = idealMidX - Math.floor(paddedLine.length / 2)
+        const idealLabelStart = idealMidX - Math.floor(cells.length / 2)
         const labelStart = Math.max(0, idealLabelStart)
         const y = startY + lineIdx
         // Ensure canvas is wide enough for the label
-        const labelEnd = labelStart + paddedLine.length
+        const labelEnd = labelStart + cells.length
         if (labelEnd > 0 && y >= 0) {
           increaseSize(canvas, Math.max(labelEnd, 1), Math.max(y + 1, 1))
           increaseRoleCanvasSize(rc, Math.max(labelEnd, 1), Math.max(y + 1, 1))
         }
         // Clear the area first (overwrite line characters) then draw the padded label
-        for (let i = 0; i < paddedLine.length; i++) {
+        for (let i = 0; i < cells.length; i++) {
           const lx = labelStart + i
           if (lx >= 0 && y >= 0) {
-            setC(lx, y, paddedLine[i]!, 'text')
+            setC(lx, y, cells[i]!, 'text')
           }
         }
       }

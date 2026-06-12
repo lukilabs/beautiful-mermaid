@@ -8,6 +8,7 @@
 
 import type { Canvas, DrawingCoord, RoleCanvas, CharRole, AsciiTheme, ColorMode } from './types.ts'
 import { colorizeLine, DEFAULT_ASCII_THEME } from './ansi.ts'
+import { displayWidth, toCells, WIDE_PAD } from '../text-metrics.ts'
 
 /**
  * Create a blank canvas filled with spaces.
@@ -178,9 +179,33 @@ export function isJunctionChar(c: string): boolean {
   return JUNCTION_CHARS.has(c)
 }
 
-/** Check if a character is alphanumeric (part of a label). */
-function isAlphanumeric(c: string): boolean {
-  return /^[a-zA-Z0-9]$/.test(c)
+/**
+ * Check if a cell holds label content for first-label-wins collision
+ * handling during merges: letters/digits in any script, the continuation
+ * cell of a wide glyph, or any 2-column glyph. Wide glyphs are only ever
+ * produced by labels (CJK ideographs, Hangul, emoji) — the renderer's own
+ * structural glyphs (borders, the narrow arrowheads ◀▶) are 1 column — so
+ * width 2 is a sufficient signal for emoji labels (🚀, 🇨🇳, 👍🏽) that the
+ * letter/digit test misses.
+ */
+function isLabelChar(c: string): boolean {
+  return c === WIDE_PAD || displayWidth(c) === 2 || /[\p{L}\p{N}]/u.test(c)
+}
+
+/**
+ * Write one cell, dissolving any wide-glyph pair the write would split:
+ * overwriting a WIDE_PAD orphans its lead, and overwriting a lead orphans
+ * its pad — the orphaned half becomes a space so serialized rows keep
+ * exactly one column per cell.
+ */
+function writeCell(canvas: Canvas, x: number, y: number, c: string): void {
+  const current = canvas[x]![y]!
+  if (current === WIDE_PAD && x > 0 && c !== WIDE_PAD) {
+    canvas[x - 1]![y] = ' '
+  } else if (current !== WIDE_PAD && canvas[x + 1]?.[y] === WIDE_PAD && c !== current) {
+    canvas[x + 1]![y] = ' '
+  }
+  canvas[x]![y] = c
 }
 
 /**
@@ -243,18 +268,25 @@ export function mergeCanvases(
     for (let x = 0; x < overlay.length; x++) {
       for (let y = 0; y < overlay[0]!.length; y++) {
         const c = overlay[x]![y]!
-        if (c !== ' ') {
-          const mx = x + offset.x
-          const my = y + offset.y
-          const current = merged[mx]![my]!
-          if (!useAscii && isJunctionChar(c) && isJunctionChar(current)) {
-            merged[mx]![my] = mergeJunctions(current, c)
-          } else if (isAlphanumeric(current) && isAlphanumeric(c)) {
-            // Don't overwrite existing label text with new label text
-            // This prevents label collisions (first label wins)
-          } else {
-            merged[mx]![my] = c
+        // WIDE_PAD cells are written atomically with their lead below
+        if (c === ' ' || c === WIDE_PAD) continue
+        const mx = x + offset.x
+        const my = y + offset.y
+        const current = merged[mx]![my]!
+        const isWide = overlay[x + 1]?.[y] === WIDE_PAD
+        if (!useAscii && isJunctionChar(c) && isJunctionChar(current)) {
+          merged[mx]![my] = mergeJunctions(current, c)
+        } else if (isWide) {
+          // Wide glyphs land or yield as a whole pair (first label wins)
+          if (!isLabelChar(current) && !isLabelChar(merged[mx + 1]?.[my] ?? ' ')) {
+            writeCell(merged, mx, my, c)
+            writeCell(merged, mx + 1, my, WIDE_PAD)
           }
+        } else if (isLabelChar(current) && isLabelChar(c)) {
+          // Don't overwrite existing label text with new label text
+          // This prevents label collisions (first label wins)
+        } else {
+          writeCell(merged, mx, my, c)
         }
       }
     }
@@ -294,7 +326,9 @@ export function canvasToString(canvas: Canvas, options?: CanvasToStringOptions):
       // Plain text output — no colors
       let line = ''
       for (let x = 0; x <= maxX; x++) {
-        line += canvas[x]![y]!
+        const c = canvas[x]![y]!
+        // Skip wide-glyph continuation cells: the glyph itself spans 2 columns
+        if (c !== WIDE_PAD) line += c
       }
       lines.push(line)
     } else {
@@ -302,7 +336,9 @@ export function canvasToString(canvas: Canvas, options?: CanvasToStringOptions):
       const chars: string[] = []
       const roles: (CharRole | null)[] = []
       for (let x = 0; x <= maxX; x++) {
-        chars.push(canvas[x]![y]!)
+        const c = canvas[x]![y]!
+        if (c === WIDE_PAD) continue
+        chars.push(c)
         roles.push(roleCanvas[x]?.[y] ?? null)
       }
       lines.push(colorizeLine(chars, roles, theme, colorMode))
@@ -387,13 +423,22 @@ export function drawText(
   text: string,
   forceOverwrite = false
 ): void {
-  increaseSize(canvas, start.x + text.length, start.y)
-  for (let i = 0; i < text.length; i++) {
+  const cells = toCells(text)
+  increaseSize(canvas, start.x + cells.length, start.y)
+  for (let i = 0; i < cells.length; i++) {
+    const cell = cells[i]!
+    // WIDE_PAD cells are written atomically with their lead below
+    if (cell === WIDE_PAD) continue
     const x = start.x + i
-    const current = canvas[x]![start.y]!
-    // Only write if target is empty or we're forcing overwrite
-    if (forceOverwrite || current === ' ') {
-      canvas[x]![start.y] = text[i]!
+    if (cells[i + 1] === WIDE_PAD) {
+      // Wide glyph: needs both its cells free (or forced) to land
+      const pairFree = canvas[x]![start.y] === ' ' && canvas[x + 1]![start.y] === ' '
+      if (forceOverwrite || pairFree) {
+        writeCell(canvas, x, start.y, cell)
+        writeCell(canvas, x + 1, start.y, WIDE_PAD)
+      }
+    } else if (forceOverwrite || canvas[x]![start.y] === ' ') {
+      writeCell(canvas, x, start.y, cell)
     }
   }
 }
