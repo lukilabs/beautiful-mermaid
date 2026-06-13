@@ -110,6 +110,103 @@ function isEmoji(char: string): boolean {
   return EMOJI_REGEX.test(char)
 }
 
+// ============================================================================
+// Terminal display width — used by the ASCII renderer
+//
+// Terminals render most characters in 1 column, but East Asian wide
+// characters (CJK ideographs, Hangul, kana, fullwidth forms) and
+// emoji-presentation glyphs occupy 2 columns. The ASCII canvas is a
+// cell-per-column grid, so its width math counts display columns rather
+// than code units.
+//
+// Text is measured in grapheme clusters (Intl.Segmenter): a cluster that
+// renders 2 columns is stored as its full string in one canvas cell
+// followed by WIDE_PAD in the continuation cell it covers. The ASCII
+// serializers drop WIDE_PAD cells when joining a row, so the emitted line
+// occupies exactly as many terminal columns as the canvas has cells.
+//
+// Width policy (terminal wcwidth-style, locale-insensitive):
+//   - East Asian Wide/Fullwidth code points ............ 2
+//   - Emoji_Presentation scalars (e.g. 🚀, ⌚) .......... 2
+//   - VS16 / ZWJ emoji sequences, regional-indicator flags 2
+//   - combining marks / variation selectors / ZWJ ....... 0 (within cluster)
+//   - everything else (incl. text-presentation symbols
+//     like ◀ ▶ △ that the renderer uses as 1-cell glyphs) 1
+// East Asian Ambiguous characters (e.g. ½ ·) are treated as narrow.
+// ============================================================================
+
+/**
+ * Placeholder occupying the second cell of a fullwidth glyph on the ASCII
+ * canvas. U+0000 cannot appear in parsed Mermaid labels, is treated as
+ * occupied label content by canvas merging, and is stripped at
+ * serialization time. Invariant: a WIDE_PAD cell always sits immediately
+ * right of its lead cell; canvas writes keep the pair atomic.
+ */
+export const WIDE_PAD = '\u0000'
+
+/** Scalars that default to emoji presentation render 2 columns wide. */
+const EMOJI_PRESENTATION = /\p{Emoji_Presentation}/u
+
+const ZWJ = '\u200d'
+const VS16 = '\ufe0f'
+
+const graphemeSegmenter = new Intl.Segmenter()
+
+/** Display width of a single grapheme cluster in terminal columns. */
+function clusterWidth(cluster: string): number {
+  const first = cluster.codePointAt(0) ?? 0
+  // Regional-indicator pair renders as one 2-column flag glyph.
+  if (first >= 0x1f1e6 && first <= 0x1f1ff) return 2
+  // ZWJ emoji sequence renders as a single 2-column glyph.
+  if (cluster.includes(ZWJ)) return 2
+  // An extended grapheme cluster renders as one glyph at its base scalar's
+  // width; trailing extenders (combining marks, emoji/skin-tone modifiers,
+  // variation selectors) fold into the base and add no columns.
+  const base = String.fromCodePoint(first)
+  let width = isFullwidth(first) || EMOJI_PRESENTATION.test(base) ? 2 : 1
+  // VS16 upgrades a text-presentation base to emoji presentation (2 cols).
+  if (width === 1 && cluster.includes(VS16)) width = 2
+  return width
+}
+
+/**
+ * Display width of a string in terminal columns, measured over grapheme
+ * clusters. ASCII-only strings take a fast path.
+ */
+export function displayWidth(text: string): number {
+  let ascii = true
+  for (let i = 0; i < text.length; i++) {
+    if (text.charCodeAt(i) > 0x7e) {
+      ascii = false
+      break
+    }
+  }
+  if (ascii) return text.length
+
+  let width = 0
+  for (const seg of graphemeSegmenter.segment(text)) {
+    width += clusterWidth(seg.segment)
+  }
+  return width
+}
+
+/**
+ * Expand a string into ASCII-canvas cells: each 2-column grapheme cluster
+ * is stored whole in one cell and followed by WIDE_PAD, so that
+ * cells.length === displayWidth(text). Per-character placement loops can
+ * iterate the result with plain cell offsets.
+ */
+export function toCells(text: string): string[] {
+  const cells: string[] = []
+  for (const seg of graphemeSegmenter.segment(text)) {
+    cells.push(seg.segment)
+    if (clusterWidth(seg.segment) === 2) {
+      cells.push(WIDE_PAD)
+    }
+  }
+  return cells
+}
+
 /**
  * Get the relative width of a single character.
  *

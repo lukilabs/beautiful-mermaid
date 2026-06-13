@@ -14,6 +14,7 @@ import type { SequenceDiagram, Block } from '../sequence/types.ts'
 import type { Canvas, AsciiConfig, RoleCanvas, CharRole, AsciiTheme, ColorMode } from './types.ts'
 import { mkCanvas, mkRoleCanvas, canvasToString, increaseSize, increaseRoleCanvasSize, setRole } from './canvas.ts'
 import { splitLines, maxLineWidth, lineCount } from './multiline-utils.ts'
+import { displayWidth, toCells, WIDE_PAD } from '../text-metrics.ts'
 
 /** Classify a box-drawing character as 'border' or 'text'. */
 function classifyBoxChar(ch: string): CharRole {
@@ -148,7 +149,7 @@ export function renderSequenceAscii(text: string, config: AsciiConfig, colorMode
         curY += 1
         const note = diagram.notes[n]!
         const nLines = splitLines(note.text)
-        const nWidth = Math.max(...nLines.map(l => l.length)) + 4
+        const nWidth = Math.max(...nLines.map(l => displayWidth(l))) + 4
         const nHeight = nLines.length + 2
 
         // Determine x position based on note.position
@@ -198,7 +199,7 @@ export function renderSequenceAscii(text: string, config: AsciiConfig, colorMode
     const msg = diagram.messages[m]!
     if (msg.from === msg.to) {
       const fi = actorIdx.get(msg.from)!
-      const selfRight = llX[fi]! + 6 + 2 + msg.label.length
+      const selfRight = llX[fi]! + 6 + 2 + displayWidth(msg.label)
       totalW = Math.max(totalW, selfRight + 1)
     }
   }
@@ -214,6 +215,24 @@ export function renderSequenceAscii(text: string, config: AsciiConfig, colorMode
     if (x >= 0 && x < canvas.length && y >= 0 && y < (canvas[0]?.length ?? 0)) {
       canvas[x]![y] = ch
       setRole(rc, x, y, role)
+    }
+  }
+
+  /**
+   * Write label cells starting at x0, keeping wide-glyph pairs atomic:
+   * a glyph and its WIDE_PAD continuation land together or not at all,
+   * clamped to [minX, maxXExcl) and the canvas bounds.
+   */
+  function setCells(x0: number, y: number, cells: string[], role: CharRole, minX = 0, maxXExcl = canvas.length): void {
+    const limit = Math.min(maxXExcl, canvas.length)
+    for (let i = 0; i < cells.length; i++) {
+      const cell = cells[i]!
+      if (cell === WIDE_PAD) continue // written atomically with its lead
+      const x = x0 + i
+      const wide = cells[i + 1] === WIDE_PAD
+      if (x < minX || x + (wide ? 1 : 0) >= limit) continue
+      setC(x, y, cell, role)
+      if (wide) setC(x + 1, y, WIDE_PAD, role)
     }
   }
 
@@ -238,10 +257,9 @@ export function renderSequenceAscii(text: string, config: AsciiConfig, colorMode
       setC(left + w - 1, row, V, 'border')
       // Center this line within the box
       const line = lines[i]!
-      const ls = left + 1 + boxPad + Math.floor((maxW - line.length) / 2)
-      for (let j = 0; j < line.length; j++) {
-        setC(ls + j, row, line[j]!, 'text')
-      }
+      const cells = toCells(line)
+      const ls = left + 1 + boxPad + Math.floor((maxW - cells.length) / 2)
+      setCells(ls, row, cells, 'text')
     }
 
     // Bottom border
@@ -305,9 +323,8 @@ export function renderSequenceAscii(text: string, config: AsciiConfig, colorMode
       // Row 1: vertical on right side + label
       setC(fromX + loopW, y0 + 1, V, 'line')
       const labelX = fromX + loopW + 2
-      for (let i = 0; i < msg.label.length; i++) {
-        if (labelX + i < totalW) setC(labelX + i, y0 + 1, msg.label[i]!, 'text')
-      }
+      const selfCells = toCells(msg.label)
+      setCells(labelX, y0 + 1, selfCells, 'text', 0, totalW)
 
       // Row 2: arrow-back + horizontal + bottom-right corner
       const arrowChar = isFilled ? (useAscii ? '<' : '◀') : (useAscii ? '<' : '◁')
@@ -325,13 +342,10 @@ export function renderSequenceAscii(text: string, config: AsciiConfig, colorMode
       const msgLines = splitLines(msg.label)
 
       for (let lineIdx = 0; lineIdx < msgLines.length; lineIdx++) {
-        const line = msgLines[lineIdx]!
-        const labelStart = midX - Math.floor(line.length / 2)
+        const cells = toCells(msgLines[lineIdx]!)
+        const labelStart = midX - Math.floor(cells.length / 2)
         const y = labelY + lineIdx
-        for (let i = 0; i < line.length; i++) {
-          const lx = labelStart + i
-          if (lx >= 0 && lx < totalW) setC(lx, y, line[i]!, 'text')
-        }
+        setCells(labelStart, y, cells, 'text', 0, totalW)
       }
 
       // Draw arrow line
@@ -380,10 +394,8 @@ export function renderSequenceAscii(text: string, config: AsciiConfig, colorMode
     const hdrLines = splitLines(hdrLabel)
 
     for (let lineIdx = 0; lineIdx < hdrLines.length && topY + lineIdx < botY; lineIdx++) {
-      const line = hdrLines[lineIdx]!
-      for (let i = 0; i < line.length && bLeft + 1 + i < bRight; i++) {
-        setC(bLeft + 1 + i, topY + lineIdx, line[i]!, 'text')
-      }
+      const cells = toCells(hdrLines[lineIdx]!)
+      setCells(bLeft + 1, topY + lineIdx, cells, 'text', bLeft + 1, bRight)
     }
 
     // Bottom border
@@ -408,10 +420,8 @@ export function renderSequenceAscii(text: string, config: AsciiConfig, colorMode
       // Divider label
       const dLabel = block.dividers[d]!.label
       if (dLabel) {
-        const dStr = `[${dLabel}]`
-        for (let i = 0; i < dStr.length && bLeft + 1 + i < bRight; i++) {
-          setC(bLeft + 1 + i, dY, dStr[i]!, 'text')
-        }
+        const dCells = toCells(`[${dLabel}]`)
+        setCells(bLeft + 1, dY, dCells, 'text', bLeft + 1, bRight)
       }
     }
   }
@@ -431,9 +441,8 @@ export function renderSequenceAscii(text: string, config: AsciiConfig, colorMode
       const ly = np.y + 1 + l
       setC(np.x, ly, V, 'border')
       setC(np.x + np.width - 1, ly, V, 'border')
-      for (let i = 0; i < np.lines[l]!.length; i++) {
-        setC(np.x + 2 + i, ly, np.lines[l]![i]!, 'text')
-      }
+      const cells = toCells(np.lines[l]!)
+      setCells(np.x + 2, ly, cells, 'text')
     }
     // Bottom border
     const by = np.y + np.height - 1
