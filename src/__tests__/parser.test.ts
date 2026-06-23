@@ -543,6 +543,41 @@ describe('parseMermaid – subgraphs', () => {
     expect(g.subgraphs[0]!.label).toBe('My Group')
   })
 
+  it('strips wrapping quotes from a quoted bracket title: subgraph id ["Title"]', () => {
+    const g = parseMermaid(`graph TD
+      subgraph be ["Backend Services"]
+        A --> B
+      end`)
+    expect(g.subgraphs[0]!.id).toBe('be')
+    expect(g.subgraphs[0]!.label).toBe('Backend Services')
+  })
+
+  it('parses a bracket title on a non-ASCII (CJK) subgraph id', () => {
+    const g = parseMermaid(`flowchart TB
+      subgraph 柜体 ["PLC 控制柜正面布局"]
+        A --> B
+      end`)
+    expect(g.subgraphs[0]!.id).toBe('柜体')
+    expect(g.subgraphs[0]!.label).toBe('PLC 控制柜正面布局')
+  })
+
+  it('keeps a non-empty id for a CJK-only subgraph label (regression: #89)', () => {
+    const g = parseMermaid(`flowchart TB
+      subgraph 关系三元组
+        A --> B
+      end`)
+    expect(g.subgraphs[0]!.id).toBe('关系三元组')
+    expect(g.subgraphs[0]!.label).toBe('关系三元组')
+  })
+
+  it('strips wrapping quotes from a quoted label without a separate id', () => {
+    const g = parseMermaid(`graph TD
+      subgraph "My Quoted Group"
+        A --> B
+      end`)
+    expect(g.subgraphs[0]!.label).toBe('My Quoted Group')
+  })
+
   it('parses nested subgraphs', () => {
     const g = parseMermaid(`graph TD
       subgraph Outer

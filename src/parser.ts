@@ -1,6 +1,18 @@
 import type { MermaidGraph, MermaidNode, MermaidEdge, MermaidSubgraph, Direction, NodeShape, EdgeStyle } from './types.ts'
 import { normalizeBrTags } from './multiline-utils.ts'
 
+/** Remove a single layer of matching wrapping quotes (`"…"` or `'…'`). */
+function stripWrappingQuotes(s: string): string {
+  const t = s.trim()
+  if (
+    t.length >= 2 &&
+    ((t[0] === '"' && t[t.length - 1] === '"') || (t[0] === "'" && t[t.length - 1] === "'"))
+  ) {
+    return t.slice(1, -1)
+  }
+  return t
+}
+
 // ============================================================================
 // Mermaid parser — flowcharts and state diagrams
 //
@@ -126,18 +138,22 @@ function parseFlowchart(lines: string[]): MermaidGraph {
     const subgraphMatch = line.match(/^subgraph\s+(.+)$/)
     if (subgraphMatch) {
       const rest = subgraphMatch[1]!.trim()
-      // Check for "subgraph id [Label]" form
-      // ID can contain hyphens (e.g. "us-east"), so use [\w-]+ not \w+
-      const bracketMatch = rest.match(/^([\w-]+)\s*\[(.+)\]$/)
+      // Check for `subgraph id [Label]` / `subgraph id ["Label"]` form. The id
+      // may contain non-ASCII chars (e.g. CJK), so match any run of non-space,
+      // non-`[` chars rather than ASCII [\w-]; strip optional quotes wrapping
+      // the title.
+      const bracketMatch = rest.match(/^([^\s[]+)\s*\[(.+)\]$/)
       let id: string
       let label: string
       if (bracketMatch) {
         id = bracketMatch[1]!
-        label = normalizeBrTags(bracketMatch[2]!)
+        label = normalizeBrTags(stripWrappingQuotes(bracketMatch[2]!))
       } else {
-        // Use the label text as id (slugified)
-        label = normalizeBrTags(rest)
-        id = rest.replace(/\s+/g, '_').replace(/[^\w]/g, '')
+        // `subgraph Label` (optionally quoted): the label doubles as the id,
+        // slugified — but preserve unicode letters/numbers so a CJK-only title
+        // doesn't collapse to an empty id (which broke nested layout).
+        label = normalizeBrTags(stripWrappingQuotes(rest))
+        id = label.replace(/\s+/g, '_').replace(/[^\p{L}\p{N}_-]/gu, '')
       }
       const sg: MermaidSubgraph = { id, label, nodeIds: [], children: [] }
       subgraphStack.push(sg)
