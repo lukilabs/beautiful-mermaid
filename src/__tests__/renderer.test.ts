@@ -74,6 +74,21 @@ describe('renderSvg – SVG structure', () => {
     expect(svg).toContain('</defs>')
   })
 
+  it('start marker is not double-reversed (regression)', () => {
+    // orient="auto-start-reverse" already rotates the head 180° to point back out
+    // of the start node, so the polygon must match the forward (end) marker.
+    // Reversing BOTH is a double reversal: the head points into the line and
+    // disappears in librsvg/Inkscape/browsers.
+    const svg = renderSvg(makeGraph(), lightColors)
+    const polygonOf = (id: string) =>
+      svg.match(new RegExp(`<marker id="${id}"[^>]*>\\s*<polygon points="([^"]+)"`))?.[1]
+    const orientOf = (id: string) =>
+      svg.match(new RegExp(`<marker id="${id}"[^>]*orient="([^"]+)"`))?.[1]
+
+    expect(orientOf('arrowhead-start')).toBe('auto-start-reverse')
+    expect(polygonOf('arrowhead-start')).toBe(polygonOf('arrowhead'))
+  })
+
   it('includes embedded Google Fonts import', () => {
     const svg = renderSvg(makeGraph(), lightColors, 'Inter')
     expect(svg).toContain('fonts.googleapis.com')
