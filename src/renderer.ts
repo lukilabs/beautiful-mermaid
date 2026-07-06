@@ -92,47 +92,41 @@ export function renderSvg(
 
 /**
  * Reusable arrow head markers — both forward (end) and reverse (start) variants.
- * The reverse marker uses orient="auto-start-reverse" to flip automatically.
- * Arrow color uses var(--_arrow) CSS variable.
+ * Arrow color uses the var(--_arrow) CSS variable.
  */
 function arrowMarkerDefs(): string {
-  const w = ARROW_HEAD.width
-  const h = ARROW_HEAD.height
-  // Arrow polygons have both fill and a thin stroke for better definition at small sizes
-  const arrowStyle = 'fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round"'
-  // Pull arrowhead back slightly (refX = w - 1) to prevent clipping at node boundaries
-  const refX = w - 1
-  return (
-    // Forward arrow (marker-end) — orient="auto" ensures arrow points along line direction
-    `  <marker id="arrowhead" markerWidth="${w}" markerHeight="${h}" refX="${refX}" refY="${h / 2}" orient="auto">` +
-    `\n    <polygon points="0 0, ${w} ${h / 2}, 0 ${h}" ${arrowStyle} />` +
-    `\n  </marker>` +
-    // Reverse arrow (marker-start) — refX=1 so it sits at the line start with slight offset, auto-start-reverse flips it
-    `\n  <marker id="arrowhead-start" markerWidth="${w}" markerHeight="${h}" refX="1" refY="${h / 2}" orient="auto-start-reverse">` +
-    `\n    <polygon points="${w} 0, 0 ${h / 2}, ${w} ${h}" ${arrowStyle} />` +
-    `\n  </marker>`
-  )
+  return arrowMarkerPair('var(--_arrow)', '')
 }
 
 /**
- * Generate arrow markers tinted to a specific color (for linkStyle stroke overrides).
+ * Arrow markers tinted to a specific color (for linkStyle stroke overrides).
  * IDs are suffixed with a sanitized color string to avoid collisions.
  */
 function arrowMarkerDefsForColor(color: string): string {
+  return arrowMarkerPair(escapeAttr(color), `-${markerSuffix(color)}`)
+}
+
+/**
+ * Build the forward (marker-end) + reverse (marker-start) arrow-head marker pair.
+ *
+ * Both heads share one polygon. The reverse head differs only by
+ * orient="auto-start-reverse", which flips it 180° to point back out of
+ * the start node — so the polygon must NOT be pre-reversed. Reversing both is a
+ * double reversal: the head points into the line and vanishes in librsvg/Inkscape/browsers.
+ */
+function arrowMarkerPair(color: string, idSuffix: string): string {
   const w = ARROW_HEAD.width
   const h = ARROW_HEAD.height
-  const escaped = escapeAttr(color)
-  const arrowStyle = `fill="${escaped}" stroke="${escaped}" stroke-width="0.75" stroke-linejoin="round"`
+  // Pull arrowhead back slightly (refX = w - 1) to prevent clipping at node boundaries.
   const refX = w - 1
-  const suffix = markerSuffix(color)
-  return (
-    `  <marker id="arrowhead-${suffix}" markerWidth="${w}" markerHeight="${h}" refX="${refX}" refY="${h / 2}" orient="auto">` +
-    `\n    <polygon points="0 0, ${w} ${h / 2}, 0 ${h}" ${arrowStyle} />` +
-    `\n  </marker>` +
-    `\n  <marker id="arrowhead-start-${suffix}" markerWidth="${w}" markerHeight="${h}" refX="1" refY="${h / 2}" orient="auto-start-reverse">` +
-    `\n    <polygon points="${w} 0, 0 ${h / 2}, ${w} ${h}" ${arrowStyle} />` +
+  // Both fill and a thin stroke for better definition at small sizes.
+  const style = `fill="${color}" stroke="${color}" stroke-width="0.75" stroke-linejoin="round"`
+  const polygon = `<polygon points="0 0, ${w} ${h / 2}, 0 ${h}" ${style} />`
+  const marker = (id: string, orient: string) =>
+    `  <marker id="${id}" markerWidth="${w}" markerHeight="${h}" refX="${refX}" refY="${h / 2}" orient="${orient}">` +
+    `\n    ${polygon}` +
     `\n  </marker>`
-  )
+  return marker(`arrowhead${idSuffix}`, 'auto') + '\n' + marker(`arrowhead-start${idSuffix}`, 'auto-start-reverse')
 }
 
 /** Sanitize a color value into a collision-free SVG ID suffix.
