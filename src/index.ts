@@ -33,6 +33,7 @@ import { renderSvg } from './renderer.ts'
 import type { RenderOptions } from './types.ts'
 import type { DiagramColors } from './theme.ts'
 import { DEFAULTS } from './theme.ts'
+import { isMonospaceFont, setMonospaceMetrics } from './styles.ts'
 
 import { parseSequenceDiagram } from './sequence/parser.ts'
 import { layoutSequenceDiagram } from './sequence/layout.ts'
@@ -118,6 +119,8 @@ export function renderMermaidSVG(
 
   const colors = buildColors(options)
   const font = options.font ?? 'Inter'
+  // Box sizing depends on the metrics model, so pick it before any layout runs.
+  setMonospaceMetrics(isMonospaceFont(font))
   const transparent = options.transparent ?? false
   const diagramType = detectDiagramType(text)
 
