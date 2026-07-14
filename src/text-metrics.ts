@@ -172,7 +172,47 @@ export function getCharWidth(char: string): number {
  * @param fontWeight - Font weight (affects width slightly)
  * @returns Estimated width in pixels
  */
+/** Advance width of a monospace glyph, as a fraction of font size. */
+const MONO_ADVANCE = 0.6
+
+/**
+ * Whether text is measured with monospace metrics.
+ *
+ * The character buckets above model a proportional face (they are calibrated for Inter), but
+ * `RenderOptions.font` accepts any family. Measuring a monospace font with them sizes every box
+ * for the wrong glyph widths: narrow strings under-measure by ~60% and overflow, wide ones
+ * over-measure by ~37%.
+ *
+ * The switch lives here rather than in `styles.ts` because this is the single choke point every
+ * diagram type measures through — `estimateTextWidth` and `measureMultilineText` both land here,
+ * and flowchart layout only reaches text metrics via the latter.
+ */
+let monospaceMetrics = false
+
+/** Fonts whose glyphs all share one advance width. */
+export function isMonospaceFont(font: string): boolean {
+  // `mono` unanchored so it also catches `ui-monospace`; `code` bounded so it does not fire on
+  // unrelated names. "Mona Sans" is deliberately not a match.
+  return /mono|consol|menlo|courier|\bcode\b/i.test(font)
+}
+
+/** Select the metrics model for subsequent measurements. Called once per render. */
+export function setMonospaceMetrics(monospace: boolean): void {
+  monospaceMetrics = monospace
+}
+
 export function measureTextWidth(text: string, fontSize: number, fontWeight: number): number {
+  // Add minimum padding to prevent truncation at text boundaries
+  // Increased from 0.1 to 0.15 for better label separation and collision prevention
+  const minPadding = fontSize * 0.15
+
+  if (monospaceMetrics) {
+    let count = 0
+    // Count code points, so surrogate pairs stay one cell wide.
+    for (const _ of text) count += 1
+    return count * fontSize * MONO_ADVANCE + minPadding
+  }
+
   // Base ratio calibrated for Inter font family
   // Heavier weights are slightly wider
   // Added +0.02 buffer to prevent edge truncation of characters like 's' at line ends
@@ -185,9 +225,6 @@ export function measureTextWidth(text: string, fontSize: number, fontWeight: num
     totalWidth += getCharWidth(char)
   }
 
-  // Add minimum padding to prevent truncation at text boundaries
-  // Increased from 0.1 to 0.15 for better label separation and collision prevention
-  const minPadding = fontSize * 0.15
   return totalWidth * fontSize * baseRatio + minPadding
 }
 
