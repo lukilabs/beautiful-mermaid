@@ -9,32 +9,8 @@
 
 import { measureTextWidth } from './text-metrics'
 
-/**
- * Whether label text is measured with monospace metrics.
- *
- * `measureTextWidth` models a proportional font (its buckets are calibrated for Inter), so a
- * monospace `font` option would size every box for the wrong glyph widths — narrow strings like
- * "iiii" under-measure by ~60% and overflow their boxes, wide ones like "WWWW" over-measure by
- * ~37%. Rendering is synchronous, so a module-level mode set once per render is safe, and it keeps
- * `font` from having to be threaded through every layout call site.
- */
-let monospaceMetrics = false
-
-/** Fonts whose glyphs all share one advance width. */
-export function isMonospaceFont(font: string): boolean {
-  // `mono` unanchored so it also catches `ui-monospace`; `code` bounded so it does not fire on
-  // unrelated names. "Mona Sans" is deliberately not a match.
-  return /mono|consol|menlo|courier|\bcode\b/i.test(font)
-}
-
-/** Select the metrics model for subsequent measurements. Called once per render. */
-export function setMonospaceMetrics(monospace: boolean): void {
-  monospaceMetrics = monospace
-}
-
-/** Average character width in px at the given font size and weight */
+/** Average character width in px at the given font size and weight (proportional font) */
 export function estimateTextWidth(text: string, fontSize: number, fontWeight: number): number {
-  if (monospaceMetrics) return estimateMonoTextWidth(text, fontSize)
   // Delegate to variable-width character measurement for better accuracy
   // with mixed character sets (Latin narrow/wide, CJK, emoji, etc.)
   return measureTextWidth(text, fontSize, fontWeight)

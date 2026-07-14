@@ -33,7 +33,7 @@ import { renderSvg } from './renderer.ts'
 import type { RenderOptions } from './types.ts'
 import type { DiagramColors } from './theme.ts'
 import { DEFAULTS } from './theme.ts'
-import { isMonospaceFont, setMonospaceMetrics } from './styles.ts'
+import { isMonospaceFont, setMonospaceMetrics } from './text-metrics.ts'
 
 import { parseSequenceDiagram } from './sequence/parser.ts'
 import { layoutSequenceDiagram } from './sequence/layout.ts'
