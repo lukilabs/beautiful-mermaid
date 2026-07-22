@@ -10,69 +10,63 @@ import { getCharWidth, measureTextWidth } from '../text-metrics'
 
 describe('getCharWidth', () => {
   describe('narrow characters', () => {
-    it('returns 0.4 for thin letters (i, l, t, f, j, I)', () => {
-      expect(getCharWidth('i')).toBe(0.4)
-      expect(getCharWidth('l')).toBe(0.4)
-      expect(getCharWidth('t')).toBe(0.4)
-      expect(getCharWidth('f')).toBe(0.4)
-      expect(getCharWidth('j')).toBe(0.4)
-      expect(getCharWidth('I')).toBe(0.4)
+    it('measures thin letters as narrow (i, l, t, f, j, I)', () => {
+      for (const ch of ['i', 'l', 't', 'f', 'j', 'I']) {
+        expect(getCharWidth(ch), ch).toBeLessThan(0.7)
+      }
     })
 
-    it('returns 0.4 for thin punctuation', () => {
-      expect(getCharWidth('!')).toBe(0.4)
-      expect(getCharWidth('|')).toBe(0.4)
-      expect(getCharWidth('.')).toBe(0.4)
-      expect(getCharWidth(',')).toBe(0.4)
-      expect(getCharWidth(':')).toBe(0.4)
-      expect(getCharWidth(';')).toBe(0.4)
-      expect(getCharWidth("'")).toBe(0.4)
-      expect(getCharWidth('1')).toBe(0.4)
+    it('measures thin punctuation as narrow', () => {
+      for (const ch of ['!', '|', '.', ',', ':', ';', "'", '1']) {
+        expect(getCharWidth(ch), ch).toBeLessThan(0.8)
+      }
     })
 
-    it('returns 0.8 for semi-narrow r', () => {
-      expect(getCharWidth('r')).toBe(0.8)
+    it('measures r as semi-narrow', () => {
+      expect(getCharWidth('r')).toBeGreaterThan(getCharWidth('i'))
+      expect(getCharWidth('r')).toBeLessThan(getCharWidth('a'))
     })
   })
 
   describe('normal characters', () => {
-    it('returns 1.0 for average lowercase letters', () => {
-      expect(getCharWidth('a')).toBe(1.0)
-      expect(getCharWidth('e')).toBe(1.0)
-      expect(getCharWidth('o')).toBe(1.0)
-      expect(getCharWidth('n')).toBe(1.0)
-      expect(getCharWidth('s')).toBe(1.0)
+    it('measures average lowercase letters near 1.0', () => {
+      for (const ch of ['a', 'e', 'o', 'n', 's']) {
+        expect(getCharWidth(ch), ch).toBeGreaterThan(0.9)
+        expect(getCharWidth(ch), ch).toBeLessThan(1.15)
+      }
     })
 
-    it('returns 1.0 for digits', () => {
-      expect(getCharWidth('0')).toBe(1.0)
-      expect(getCharWidth('2')).toBe(1.0)
-      expect(getCharWidth('9')).toBe(1.0)
+    it('measures digits near 1.0-1.2 (tabular width)', () => {
+      for (const ch of ['0', '2', '9']) {
+        expect(getCharWidth(ch), ch).toBeGreaterThan(1.0)
+        expect(getCharWidth(ch), ch).toBeLessThan(1.2)
+      }
     })
   })
 
   describe('wide characters', () => {
-    it('returns 1.2 for uppercase letters (except I)', () => {
-      expect(getCharWidth('A')).toBe(1.2)
-      expect(getCharWidth('B')).toBe(1.2)
-      expect(getCharWidth('N')).toBe(1.2)
-      expect(getCharWidth('Z')).toBe(1.2)
+    it('measures uppercase letters wider than lowercase (except I)', () => {
+      for (const ch of ['A', 'B', 'N', 'Z']) {
+        expect(getCharWidth(ch), ch).toBeGreaterThan(1.1)
+        expect(getCharWidth(ch), ch).toBeLessThan(1.45)
+      }
     })
 
-    it('returns 1.2 for wide lowercase (w, m)', () => {
-      expect(getCharWidth('w')).toBe(1.2)
-      expect(getCharWidth('m')).toBe(1.2)
+    it('measures wide lowercase (w, m) above 1.4', () => {
+      expect(getCharWidth('w')).toBeGreaterThan(1.4)
+      expect(getCharWidth('m')).toBeGreaterThan(1.4)
     })
 
-    it('returns 1.5 for very wide characters (W, M)', () => {
-      expect(getCharWidth('W')).toBe(1.5)
-      expect(getCharWidth('M')).toBe(1.5)
+    it('measures very wide characters (W, M) above 1.6', () => {
+      expect(getCharWidth('W')).toBeGreaterThan(1.6)
+      expect(getCharWidth('M')).toBeGreaterThan(1.6)
     })
   })
 
   describe('space', () => {
-    it('returns 0.3 for space character', () => {
-      expect(getCharWidth(' ')).toBe(0.3)
+    it('measures space at its real Inter advance (~0.52)', () => {
+      // The old bucket value of 0.3 underestimated every word gap by ~1.3px
+      expect(getCharWidth(' ')).toBeCloseTo(0.521, 3)
     })
   })
 
@@ -88,13 +82,13 @@ describe('getCharWidth', () => {
   })
 
   describe('accented characters (precomposed)', () => {
-    it('returns normal width for precomposed accented letters', () => {
-      // These are single code points, treated as normal letters
-      expect(getCharWidth('é')).toBe(1.0) // U+00E9
-      expect(getCharWidth('ñ')).toBe(1.0) // U+00F1
-      expect(getCharWidth('ü')).toBe(1.0) // U+00FC
-      expect(getCharWidth('ç')).toBe(1.0) // U+00E7
-      expect(getCharWidth('ö')).toBe(1.0) // U+00F6
+    it('returns the base letter width for precomposed accented letters', () => {
+      // Accents don't change the advance — é measures the same as e
+      expect(getCharWidth('é')).toBe(getCharWidth('e')) // U+00E9
+      expect(getCharWidth('ñ')).toBe(getCharWidth('n')) // U+00F1
+      expect(getCharWidth('ü')).toBe(getCharWidth('u')) // U+00FC
+      expect(getCharWidth('ç')).toBe(getCharWidth('c')) // U+00E7
+      expect(getCharWidth('ö')).toBe(getCharWidth('o')) // U+00F6
     })
   })
 
@@ -146,10 +140,12 @@ describe('measureTextWidth', () => {
     expect(measureTextWidth('', fontSize, fontWeight)).toBeCloseTo(minPadding, 1)
   })
 
+  // Sum of per-char ratios — verifies the formula without pinning calibration
+  const ratioSum = (text: string) => [...text].reduce((s, ch) => s + getCharWidth(ch), 0)
+
   it('handles lowercase text with narrow letters', () => {
-    // "hello" = h(1.0) + e(1.0) + l(0.4) + l(0.4) + o(1.0) = 3.8
     const width = measureTextWidth('hello', fontSize, fontWeight)
-    expect(width).toBeCloseTo(3.8 * fontSize * baseRatio + minPadding, 1)
+    expect(width).toBeCloseTo(ratioSum('hello') * fontSize * baseRatio + minPadding, 1)
   })
 
   it('narrow text is narrower than uniform estimate', () => {
@@ -167,15 +163,13 @@ describe('measureTextWidth', () => {
   })
 
   it('handles mixed Latin text', () => {
-    // "Will" = W(1.5) + i(0.4) + l(0.4) + l(0.4) = 2.7
     const width = measureTextWidth('Will', fontSize, fontWeight)
-    expect(width).toBeCloseTo(2.7 * fontSize * baseRatio + minPadding, 1)
+    expect(width).toBeCloseTo(ratioSum('Will') * fontSize * baseRatio + minPadding, 1)
   })
 
   it('handles spaces correctly', () => {
-    // "a b" = a(1.0) + space(0.3) + b(1.0) = 2.3
     const width = measureTextWidth('a b', fontSize, fontWeight)
-    expect(width).toBeCloseTo(2.3 * fontSize * baseRatio + minPadding, 1)
+    expect(width).toBeCloseTo(ratioSum('a b') * fontSize * baseRatio + minPadding, 1)
   })
 
   it('handles decomposed accents (base + combining mark)', () => {
@@ -195,9 +189,8 @@ describe('measureTextWidth', () => {
   })
 
   it('handles mixed Latin and CJK', () => {
-    // "Hello中国" = H(1.2) + e(1.0) + l(0.4) + l(0.4) + o(1.0) + 中(2.0) + 国(2.0) = 8.0
     const width = measureTextWidth('Hello中国', fontSize, fontWeight)
-    expect(width).toBeCloseTo(8.0 * fontSize * baseRatio + minPadding, 1)
+    expect(width).toBeCloseTo(ratioSum('Hello中国') * fontSize * baseRatio + minPadding, 1)
   })
 
   it('heavier weights produce wider estimates', () => {
@@ -215,6 +208,55 @@ describe('measureTextWidth', () => {
 
     expect(large).toBeGreaterThan(small)
     expect(large / small).toBeCloseTo(16 / 11, 1)
+  })
+})
+
+// ============================================================================
+// Calibration against real Inter metrics
+// ============================================================================
+//
+// Fixtures measured with canvas measureText in headless Chrome 138 with the
+// real Inter font loaded (400 weight, 11px — the edge-label spec). If the
+// estimator underestimates these, edge-label text overflows its 8px-padded
+// background rect; if it grossly overestimates, layout gets bloated.
+
+describe('calibration against real Inter widths (11px, weight 400)', () => {
+  const REAL_INTER_WIDTHS: Record<string, number> = {
+    'yes': 18.19,
+    'no': 13.09,
+    'on failure': 48.47,
+    'validates credentials': 106.56,
+    'sends confirmation email': 130.6,
+    'asynchronous message processing': 184.1,
+    'returns HTTP 401 Unauthorized response': 215.65,
+    'WRITES TO DATABASE': 119.44,
+    'user_id + session_token validation': 177.51,
+    'retry with exponential backoff (max 5)': 197.49,
+  }
+
+  it('never underestimates real width by more than 3%', () => {
+    for (const [text, real] of Object.entries(REAL_INTER_WIDTHS)) {
+      const est = measureTextWidth(text, 11, 400)
+      expect(est, `"${text}" est ${est.toFixed(1)} vs real ${real}`).toBeGreaterThanOrEqual(real * 0.97)
+    }
+  })
+
+  it('never overestimates real width by more than 12% + 3px', () => {
+    for (const [text, real] of Object.entries(REAL_INTER_WIDTHS)) {
+      const est = measureTextWidth(text, 11, 400)
+      expect(est, `"${text}" est ${est.toFixed(1)} vs real ${real}`).toBeLessThanOrEqual(real * 1.12 + 3)
+    }
+  })
+
+  it('preserves at least 6px of the nominal 8px edge-label padding per side', () => {
+    // Edge-label background rect = estimated width + 8px padding each side.
+    // The visible gap between glyphs and rect wall must stay close to 8px.
+    const EDGE_LABEL_PADDING = 8
+    for (const [text, real] of Object.entries(REAL_INTER_WIDTHS)) {
+      const est = measureTextWidth(text, 11, 400)
+      const gapPerSide = (est + EDGE_LABEL_PADDING * 2 - real) / 2
+      expect(gapPerSide, `"${text}" gap ${gapPerSide.toFixed(1)}px`).toBeGreaterThanOrEqual(6)
+    }
   })
 })
 
