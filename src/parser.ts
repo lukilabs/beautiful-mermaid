@@ -76,7 +76,11 @@ function parseFlowchart(lines: string[]): MermaidGraph {
     }
 
     // --- class assignment: `class A,B className` ---
-    const classAssignMatch = line.match(/^class\s+([\w,-]+)\s+(\w+)$/)
+    // Allow an optional trailing semicolon (`class A,B foo;`) — Mermaid treats
+    // it as valid/optional, and `classDef`/`style` already tolerate it via their
+    // `(.+)$` capture. Without this, the semicolon form fails to match here and
+    // falls through to node parsing, rendering a stray node labelled "class".
+    const classAssignMatch = line.match(/^class\s+([\w,-]+)\s+(\w+)\s*;?\s*$/)
     if (classAssignMatch) {
       const nodeIds = classAssignMatch[1]!.split(',').map(s => s.trim())
       const className = classAssignMatch[2]!

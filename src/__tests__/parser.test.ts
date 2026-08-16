@@ -637,6 +637,53 @@ describe('parseMermaid – classDef and class', () => {
     expect(g.classAssignments.get('A')).toBe('highlight')
     expect(g.classAssignments.get('B')).toBe('highlight')
   })
+
+  it('tolerates a trailing semicolon on class assignments', () => {
+    const g = parseMermaid(`graph TD
+      A --> B
+      class B highlight;`)
+    // The assignment is recorded...
+    expect(g.classAssignments.get('B')).toBe('highlight')
+    // ...and no stray node labelled "class" leaks from the unmatched statement.
+    expect(g.nodes.has('class')).toBe(false)
+    expect(g.nodes.size).toBe(2)
+  })
+
+  it('tolerates a trailing semicolon on multi-node class assignments', () => {
+    const g = parseMermaid(`graph TD
+      A --> B --> C
+      class A,B highlight;`)
+    expect(g.classAssignments.get('A')).toBe('highlight')
+    expect(g.classAssignments.get('B')).toBe('highlight')
+    expect(g.nodes.has('class')).toBe(false)
+  })
+
+  it('tolerates space before trailing semicolon', () => {
+    const g = parseMermaid(`graph TD
+      A --> B
+      class B highlight ;`)
+    expect(g.classAssignments.get('B')).toBe('highlight')
+    expect(g.nodes.has('class')).toBe(false)
+    expect(g.nodes.size).toBe(2)
+  })
+
+  it('tolerates space after trailing semicolon', () => {
+    const g = parseMermaid(`graph TD
+      A --> B
+      class B highlight; `)
+    expect(g.classAssignments.get('B')).toBe('highlight')
+    expect(g.nodes.has('class')).toBe(false)
+    expect(g.nodes.size).toBe(2)
+  })
+
+  it('tolerates multiple spaces around trailing semicolon', () => {
+    const g = parseMermaid(`graph TD
+      A --> B
+      class B highlight  ;  `)
+    expect(g.classAssignments.get('B')).toBe('highlight')
+    expect(g.nodes.has('class')).toBe(false)
+    expect(g.nodes.size).toBe(2)
+  })
 })
 
 // ============================================================================
