@@ -20,9 +20,13 @@
 // ============================================================================
 
 export type { RenderOptions, MermaidGraph, PositionedGraph } from './types.ts'
+export type { PieChart, PieSlice, PositionedPieChart, PositionedSlice } from './pie/types.ts'
 export type { DiagramColors, ThemeName } from './theme.ts'
 export { fromShikiTheme, THEMES, DEFAULTS } from './theme.ts'
 export { parseMermaid } from './parser.ts'
+export { parsePieChart } from './pie/parser.ts'
+export { layoutPieChart } from './pie/layout.ts'
+export { renderPieChartSvg, renderPieSvg } from './pie/renderer.ts'
 export { renderMermaidASCII, renderMermaidAscii } from './ascii/index.ts'
 export type { AsciiRenderOptions } from './ascii/index.ts'
 
@@ -46,15 +50,20 @@ import { renderErSvg } from './er/renderer.ts'
 import { parseXYChart } from './xychart/parser.ts'
 import { layoutXYChart } from './xychart/layout.ts'
 import { renderXYChartSvg } from './xychart/renderer.ts'
+import { parsePieChart } from './pie/parser.ts'
+import { layoutPieChart } from './pie/layout.ts'
+import { renderPieSvg } from './pie/renderer.ts'
 
 /**
  * Detect the diagram type from the mermaid source text.
  * Returns the type keyword used for routing to the correct pipeline.
  */
-function detectDiagramType(text: string): 'flowchart' | 'sequence' | 'class' | 'er' | 'xychart' {
-  const firstLine = text.trim().split(/[\n;]/)[0]?.trim().toLowerCase() ?? ''
+function detectDiagramType(text: string): 'flowchart' | 'sequence' | 'class' | 'er' | 'xychart' | 'pie' {
+  const lines = text.trim().split(/[\n;]/).map(l => l.trim()).filter(l => l.length > 0 && !l.startsWith('%%'))
+  const firstLine = lines[0]?.toLowerCase() ?? ''
 
   if (/^xychart(-beta)?\b/.test(firstLine)) return 'xychart'
+  if (/^pie\b/.test(firstLine)) return 'pie'
   if (/^sequencediagram\s*$/.test(firstLine)) return 'sequence'
   if (/^classdiagram\s*$/.test(firstLine)) return 'class'
   if (/^erdiagram\s*$/.test(firstLine)) return 'er'
@@ -143,6 +152,11 @@ export function renderMermaidSVG(
       const chart = parseXYChart(lines)
       const positioned = layoutXYChart(chart, options)
       return renderXYChartSvg(positioned, colors, font, transparent, options.interactive ?? false)
+    }
+    case 'pie': {
+      const chart = parsePieChart(lines)
+      const positioned = layoutPieChart(chart, options)
+      return renderPieSvg(positioned, colors, font, transparent, options.interactive ?? false)
     }
     case 'flowchart':
     default: {
