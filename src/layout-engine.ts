@@ -710,7 +710,9 @@ function extractEdgesRecursively(
 ): void {
   // First pass: collect all edge segments
   const segments = new Map<number, { external?: EdgeSegment; incoming?: EdgeSegment; outgoing?: EdgeSegment }>()
-  collectEdgeSegments(elkNode, segments, 0, 0)
+  const containerOffsets = new Map<string, Point>()
+  collectContainerOffsets(elkNode, containerOffsets, 0, 0)
+  collectEdgeSegments(elkNode, segments, 0, 0, containerOffsets)
 
   // Track margin-routed edge count for spacing offsets
   let marginEdgeIndex = 0
@@ -789,6 +791,24 @@ function extractEdgesRecursively(
   }
 }
 
+/** Build absolute root-coordinate offsets for every ELK container. */
+function collectContainerOffsets(
+  elkNode: ElkNode,
+  offsets: Map<string, Point>,
+  offsetX: number,
+  offsetY: number
+): void {
+  offsets.set(elkNode.id, { x: offsetX, y: offsetY })
+  for (const child of elkNode.children ?? []) {
+    collectContainerOffsets(
+      child,
+      offsets,
+      offsetX + (child.x ?? 0),
+      offsetY + (child.y ?? 0),
+    )
+  }
+}
+
 /**
  * Post-process edge points to ensure all segments are purely orthogonal.
  *
@@ -863,7 +883,8 @@ function collectEdgeSegments(
   elkNode: ElkNode,
   segments: Map<number, { external?: EdgeSegment; incoming?: EdgeSegment; outgoing?: EdgeSegment }>,
   offsetX: number,
-  offsetY: number
+  offsetY: number,
+  containerOffsets: Map<string, Point>
 ): void {
   if (elkNode.edges) {
     for (const elkEdge of elkNode.edges) {
@@ -872,22 +893,31 @@ function collectEdgeSegments(
       const edgeIndex = parseInt(elkEdge.id.substring(1), 10)
       if (isNaN(edgeIndex)) continue
 
+      // ELK may retain a cross-hierarchy edge in an ancestor's `edges` array
+      // while reporting sections and labels in the coordinate space named by
+      // `edge.container`. Prefer that container's accumulated root offset;
+      // edges without a container retain the owning-array behavior.
+      const container = (elkEdge as ElkExtendedEdge & { container?: string }).container
+      const containerOffset = container ? containerOffsets.get(container) : undefined
+      const edgeOffsetX = containerOffset?.x ?? offsetX
+      const edgeOffsetY = containerOffset?.y ?? offsetY
+
       // Extract points
       const points: Point[] = []
       if (elkEdge.sections && elkEdge.sections.length > 0) {
         const section = elkEdge.sections[0]!
         points.push({
-          x: section.startPoint.x + offsetX,
-          y: section.startPoint.y + offsetY,
+          x: section.startPoint.x + edgeOffsetX,
+          y: section.startPoint.y + edgeOffsetY,
         })
         if (section.bendPoints) {
           for (const bp of section.bendPoints) {
-            points.push({ x: bp.x + offsetX, y: bp.y + offsetY })
+            points.push({ x: bp.x + edgeOffsetX, y: bp.y + edgeOffsetY })
           }
         }
         points.push({
-          x: section.endPoint.x + offsetX,
-          y: section.endPoint.y + offsetY,
+          x: section.endPoint.x + edgeOffsetX,
+          y: section.endPoint.y + edgeOffsetY,
         })
       }
 
@@ -897,8 +927,8 @@ function collectEdgeSegments(
         const label = elkEdge.labels[0]!
         if (label.x != null && label.y != null) {
           labelPosition = {
-            x: label.x + (label.width ?? 0) / 2 + offsetX,
-            y: label.y + (label.height ?? 0) / 2 + offsetY,
+            x: label.x + (label.width ?? 0) / 2 + edgeOffsetX,
+            y: label.y + (label.height ?? 0) / 2 + edgeOffsetY,
           }
         }
       }
@@ -933,7 +963,13 @@ function collectEdgeSegments(
   // Recurse into children with accumulated offset
   if (elkNode.children) {
     for (const child of elkNode.children) {
-      collectEdgeSegments(child, segments, offsetX + (child.x ?? 0), offsetY + (child.y ?? 0))
+      collectEdgeSegments(
+        child,
+        segments,
+        offsetX + (child.x ?? 0),
+        offsetY + (child.y ?? 0),
+        containerOffsets,
+      )
     }
   }
 }
