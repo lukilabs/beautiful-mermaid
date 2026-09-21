@@ -103,7 +103,7 @@ describe('ELK edge container offsets', () => {
     expectEdgesMeetNodes(result)
   })
 
-  it('preserves ordinary root-level graph geometry', () => {
+  it('falls back to owning-array offsets when edge.container is absent', () => {
     const result = layoutGraphSync(parseMermaid('flowchart LR\n  a["A"] -->|yes| b["B"]'))
     expectEdgesMeetNodes(result)
     expect(result.nodes[0]).toMatchObject({ id: 'a', x: 40, y: 40, width: 60 })
