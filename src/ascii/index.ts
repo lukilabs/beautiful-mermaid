@@ -25,6 +25,10 @@ import { renderSequenceAscii } from './sequence.ts'
 import { renderClassAscii } from './class-diagram.ts'
 import { renderErAscii } from './er-diagram.ts'
 import { renderXYChartAscii } from './xychart.ts'
+import { renderPieAscii } from './pie.ts'
+import { renderTimelineAscii } from './timeline.ts'
+import { renderMindmapAscii } from './mindmap.ts'
+import { renderQuadrantAscii } from './quadrant.ts'
 import { detectColorMode, DEFAULT_ASCII_THEME, diagramColorsToAsciiTheme } from './ansi.ts'
 import type { AsciiConfig, AsciiTheme, ColorMode } from './types.ts'
 
@@ -60,13 +64,17 @@ export interface AsciiRenderOptions {
  * Detect the diagram type from the mermaid source text.
  * Mirrors the detection logic in src/index.ts for the SVG renderer.
  */
-function detectDiagramType(text: string): 'flowchart' | 'sequence' | 'class' | 'er' | 'xychart' {
+function detectDiagramType(text: string): 'flowchart' | 'sequence' | 'class' | 'er' | 'xychart' | 'pie' | 'timeline' | 'mindmap' | 'quadrant' {
   const firstLine = text.trim().split('\n')[0]?.trim().toLowerCase() ?? ''
 
   if (/^xychart(-beta)?\b/.test(firstLine)) return 'xychart'
   if (/^sequencediagram\s*$/.test(firstLine)) return 'sequence'
   if (/^classdiagram\s*$/.test(firstLine)) return 'class'
   if (/^erdiagram\s*$/.test(firstLine)) return 'er'
+  if (/^pie(?:\s|$)/i.test(firstLine)) return 'pie'
+  if (/^timeline(?:\s|$)/i.test(firstLine)) return 'timeline'
+  if (/^mindmap(?:\s|$)/i.test(firstLine)) return 'mindmap'
+  if (/^quadrantChart(?:\s|$)/i.test(firstLine)) return 'quadrant'
 
   // Default: flowchart/state (handled by parseMermaid internally)
   return 'flowchart'
@@ -124,6 +132,9 @@ export function renderMermaidASCII(
     case 'xychart':
       return renderXYChartAscii(text, config, colorMode, theme)
 
+    case 'pie':
+      return renderPieAscii(text, config, colorMode, theme)
+
     case 'sequence':
       return renderSequenceAscii(text, config, colorMode, theme)
 
@@ -132,6 +143,15 @@ export function renderMermaidASCII(
 
     case 'er':
       return renderErAscii(text, config, colorMode, theme)
+
+    case 'timeline':
+      return renderTimelineAscii(text, config, colorMode, theme)
+
+    case 'mindmap':
+      return renderMindmapAscii(text, config, colorMode, theme)
+
+    case 'quadrant':
+      return renderQuadrantAscii(text, config, colorMode, theme)
 
     case 'flowchart':
     default: {

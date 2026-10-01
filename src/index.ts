@@ -46,18 +46,34 @@ import { renderErSvg } from './er/renderer.ts'
 import { parseXYChart } from './xychart/parser.ts'
 import { layoutXYChart } from './xychart/layout.ts'
 import { renderXYChartSvg } from './xychart/renderer.ts'
+import { parsePieDiagram } from './pie/parser.ts'
+import { layoutPieDiagram } from './pie/layout.ts'
+import { renderPieSvg } from './pie/renderer.ts'
+import { parseTimelineDiagram } from './timeline/parser.ts'
+import { layoutTimelineDiagram } from './timeline/layout.ts'
+import { renderTimelineSvg } from './timeline/renderer.ts'
+import { parseMindmapDiagram } from './mindmap/parser.ts'
+import { layoutMindmapDiagram } from './mindmap/layout.ts'
+import { renderMindmapSvg } from './mindmap/renderer.ts'
+import { parseQuadrantDiagram } from './quadrant/parser.ts'
+import { layoutQuadrantDiagram } from './quadrant/layout.ts'
+import { renderQuadrantSvg } from './quadrant/renderer.ts'
 
 /**
  * Detect the diagram type from the mermaid source text.
  * Returns the type keyword used for routing to the correct pipeline.
  */
-function detectDiagramType(text: string): 'flowchart' | 'sequence' | 'class' | 'er' | 'xychart' {
+function detectDiagramType(text: string): 'flowchart' | 'sequence' | 'class' | 'er' | 'xychart' | 'pie' | 'timeline' | 'mindmap' | 'quadrant' {
   const firstLine = text.trim().split(/[\n;]/)[0]?.trim().toLowerCase() ?? ''
 
   if (/^xychart(-beta)?\b/.test(firstLine)) return 'xychart'
+  if (/^pie(?:\s|$)/i.test(firstLine)) return 'pie'
   if (/^sequencediagram\s*$/.test(firstLine)) return 'sequence'
   if (/^classdiagram\s*$/.test(firstLine)) return 'class'
   if (/^erdiagram\s*$/.test(firstLine)) return 'er'
+  if (/^timeline(?:\s|$)/i.test(firstLine)) return 'timeline'
+  if (/^mindmap(?:\s|$)/i.test(firstLine)) return 'mindmap'
+  if (/^quadrantChart(?:\s|$)/i.test(firstLine)) return 'quadrant'
 
   // Default: flowchart/state (handled by parseMermaid internally)
   return 'flowchart'
@@ -143,6 +159,27 @@ export function renderMermaidSVG(
       const chart = parseXYChart(lines)
       const positioned = layoutXYChart(chart, options)
       return renderXYChartSvg(positioned, colors, font, transparent, options.interactive ?? false)
+    }
+    case 'pie': {
+      const diagram = parsePieDiagram(lines)
+      const positioned = layoutPieDiagram(diagram, options)
+      return renderPieSvg(positioned, colors, font, transparent)
+    }
+    case 'timeline': {
+      const diagram = parseTimelineDiagram(lines)
+      const positioned = layoutTimelineDiagram(diagram, options)
+      return renderTimelineSvg(positioned, colors, font, transparent)
+    }
+    case 'mindmap': {
+      const rawLines = text.split('\n').filter(l => l.trim().length > 0 && !l.trim().startsWith('%%'))
+      const diagram = parseMindmapDiagram(rawLines)
+      const positioned = layoutMindmapDiagram(diagram, options)
+      return renderMindmapSvg(positioned, colors, font, transparent)
+    }
+    case 'quadrant': {
+      const chart = parseQuadrantDiagram(lines)
+      const positioned = layoutQuadrantDiagram(chart, options)
+      return renderQuadrantSvg(positioned, colors, font, transparent)
     }
     case 'flowchart':
     default: {

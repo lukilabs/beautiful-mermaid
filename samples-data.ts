@@ -1295,4 +1295,140 @@ export const samples: Sample[] = [
     line [72, 65, 58, 50, 43, 36, 29, 22, 14, 0]`,
     options: { interactive: true },
   },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  PIE — Donut charts
+  // ══════════════════════════════════════════════════════════════════════════
+
+  {
+    title: 'Pie: Revenue by Product',
+    category: 'Pie',
+    description: 'Donut chart with showData, showing value labels.',
+    source: `pie showData
+  title "Revenue by Product"
+  "Product A" : 45
+  "Product B" : 30
+  "Product C" : 25`,
+  },
+  {
+    title: 'Pie: Simple Donut',
+    category: 'Pie',
+    description: 'Clean three-slice donut with percentages on slices.',
+    source: `pie
+  title "Market Share"
+  "Chrome" : 64
+  "Safari" : 19
+  "Firefox" : 8
+  "Edge" : 9`,
+  },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  TIMELINE
+  // ══════════════════════════════════════════════════════════════════════════
+
+  {
+    title: 'Timeline: History of Social Media',
+    category: 'Timeline',
+    description: 'LR timeline with sections and multi-event periods.',
+    source: `timeline
+  title History of Social Media
+  section Platforms
+    2002 : LinkedIn
+    2004 : Facebook : The facebook
+  section Mobile
+    2007 : iPhone : Android
+    2010 : Instagram`,
+  },
+  {
+    title: 'Timeline: Release Plan (TD)',
+    category: 'Timeline',
+    description: 'Top-down timeline for a release plan.',
+    source: `timeline TD
+  title 2025 Release Plan
+  section Q1
+    January : Alpha
+    February : Beta : Feature freeze
+    March : Release candidate
+  section Q2
+    April : Stable : 1.0
+    June : 1.1`,
+  },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  MINDMAP
+  // ══════════════════════════════════════════════════════════════════════════
+
+  {
+    title: 'Mindmap: Project Structure',
+    category: 'Mindmap',
+    description: 'Indentation tree with a mix of shapes.',
+    source: `mindmap
+  root((App))
+    Frontend
+      [React]
+      (Vite)
+      {{Routing}}
+    Backend
+      [Bun]
+      [SQLite]
+    Infra
+      Cloudflare
+      Workers`,
+  },
+  {
+    title: 'Mindmap: Knowledge Map',
+    category: 'Mindmap',
+    description: 'Deep indentation hierarchy.',
+    source: `mindmap
+  root((Learning))
+    Programming
+      TypeScript
+        Types
+        Generics
+      Rust
+        Ownership
+        Lifetimes
+    Design
+      Typography
+      Color
+        Contrast
+        Harmony`,
+  },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  QUADRANT — 2×2 prioritization
+  // ══════════════════════════════════════════════════════════════════════════
+
+  {
+    title: 'Quadrant: Product Prioritization',
+    category: 'Quadrant',
+    description: 'Impact vs effort matrix.',
+    source: `quadrantChart
+  title Product Prioritization
+  x-axis Low Effort --> High Effort
+  y-axis Low Impact --> High Impact
+  quadrant-1 Quick wins
+  quadrant-2 Big bets
+  quadrant-3 Fill-ins
+  quadrant-4 Maybe later
+  "Ship fast" : [0.2, 0.8]
+  "Rewrite" : [0.85, 0.2]
+  "Polish" : [0.4, 0.5]
+  "Deprecate" : [0.9, 0.9]`,
+  },
+  {
+    title: 'Quadrant: Simple Matrix',
+    category: 'Quadrant',
+    description: 'Minimal quadrant chart.',
+    source: `quadrantChart
+  title Strategy
+  x-axis Low --> High
+  y-axis Low --> High
+  quadrant-1 Grow
+  quadrant-2 Hold
+  quadrant-3 Cut
+  quadrant-4 Explore
+  "A" : [0.2, 0.3]
+  "B" : [0.8, 0.7]`,
+  },
 ]

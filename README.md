@@ -37,7 +37,7 @@ The ASCII rendering engine is based on [mermaid-ascii](https://github.com/Alexan
 
 ## Features
 
-- **6 diagram types** — Flowcharts, State, Sequence, Class, ER, and XY Charts (bar, line, combined)
+- **10 diagram types** — Flowcharts, State, Sequence, Class, ER, XY Charts (bar, line, combined), Pie, Timeline, Mindmap, and Quadrant
 - **Dual output** — SVG for rich UIs, ASCII/Unicode for terminals
 - **Synchronous rendering** — No async, no flash. Works with React `useMemo()`
 - **15 built-in themes** — And dead simple to add your own
@@ -342,6 +342,62 @@ erDiagram
   ORDER ||--|{ LINE_ITEM : contains
   PRODUCT ||--o{ LINE_ITEM : "is in"
 ```
+
+### Pie Charts
+
+```
+pie showData
+  title "Revenue by Product"
+  "Product A" : 45
+  "Product B" : 30
+  "Product C" : 25
+```
+
+Donut chart with slice percentages and legend. `showData` shows values; slices expose `data-value` attributes.
+
+### Timeline
+
+```
+timeline LR
+  title History of Social Media
+  section Platforms
+    2002 : LinkedIn
+    2004 : Facebook
+  section Mobile
+    2010 : Instagram
+```
+
+Event timelines (`LR` default, `TD` supported). `{period} : {event}` with colon-separated events, `:` continuation lines, and optional `section` grouping.
+
+### Mindmaps
+
+```
+mindmap
+  root((Mindmap))
+    Origins
+      Long history
+    Research
+      [Shapes]
+      (Branches)
+```
+
+Indentation-based tree. Shapes: `(text)` rounded, `[text]` square, `((text))` circle, `{{text}}` hexagon.
+
+### Quadrant Charts
+
+```
+quadrantChart
+  title Reach and engagement
+  x-axis Low Reach --> High Reach
+  y-axis Low Engagement --> High Engagement
+  quadrant-1 We should expand
+  quadrant-2 Need to promote
+  quadrant-3 Re-evaluate
+  quadrant-4 May be improved
+  Campaign A: [0.3, 0.6]
+```
+
+2×2 grid with axis labels, quadrant labels, and plotted points.
 
 ### Inline Edge Styling
 
