@@ -226,6 +226,12 @@ describe('parseMermaid – edges (original)', () => {
     expect(g.edges[0]!.label).toBe('Yes')
   })
 
+  it('parses edge label after a space: --> |label|', () => {
+    const g = parseMermaid('graph TD\n  A --> |Yes| B')
+    expect(g.edges[0]!.label).toBe('Yes')
+    expect(g.edges[0]!.target).toBe('B')
+  })
+
   it('parses edge label on dotted edges', () => {
     const g = parseMermaid('graph TD\n  A -.->|Maybe| B')
     expect(g.edges[0]!.label).toBe('Maybe')

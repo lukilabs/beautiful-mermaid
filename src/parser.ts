@@ -396,7 +396,7 @@ function parseStyleProps(propsStr: string): Record<string, string> {
  *
  * Optional label: -->|label text|
  */
-const ARROW_REGEX = /^(<)?(-->|-.->|==>|---|-\.-|===)(?:\|([^|]*)\|)?/
+const ARROW_REGEX = /^(<)?(-->|-.->|==>|---|-\.-|===)(?:\s*\|([^|]*)\|)?/
 
 /**
  * Text-embedded label regex — matches "-- label -->", "-. label .->", "== label ==>" syntax.
