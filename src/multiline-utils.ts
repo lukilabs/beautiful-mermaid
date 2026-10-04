@@ -16,7 +16,7 @@ import { LINE_HEIGHT_RATIO } from './text-metrics.ts'
 export function normalizeBrTags(label: string): string {
   // Strip surrounding double quotes (Mermaid uses them for special chars in labels)
   const unquoted = label.startsWith('"') && label.endsWith('"') ? label.slice(1, -1) : label
-  return unquoted
+  return decodeMermaidEntities(unquoted)
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/\\n/g, '\n')
     .replace(/<\/?(?:sub|sup|small|mark)\s*>/gi, '')
@@ -24,6 +24,20 @@ export function normalizeBrTags(label: string): string {
     .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
     .replace(/(?<!\*)\*([^\s*](?:[^*]*[^\s*])?)\*(?!\*)/g, '<i>$1</i>')
     .replace(/~~(.+?)~~/g, '<s>$1</s>')
+}
+
+const NAMED_ENTITIES: Record<string, string> = { quot: '"', amp: '&', lt: '<', gt: '>', apos: "'", nbsp: '\u00a0' }
+
+/**
+ * Decode Mermaid's entity codes (#quot;, #lt;, #35;, #x5B;), the way Mermaid
+ * writes characters that would otherwise end a label or break its syntax.
+ */
+export function decodeMermaidEntities(text: string): string {
+  return text.replace(/#(x[0-9a-fA-F]+|[0-9]+|[a-zA-Z]+);/g, (m, code: string) => {
+    if (/^x/i.test(code)) return String.fromCodePoint(parseInt(code.slice(1), 16))
+    if (/^[0-9]+$/.test(code)) return String.fromCodePoint(parseInt(code, 10))
+    return NAMED_ENTITIES[code.toLowerCase()] ?? m
+  })
 }
 
 /**

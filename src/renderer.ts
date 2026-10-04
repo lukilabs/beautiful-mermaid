@@ -65,13 +65,13 @@ export function renderSvg(
   // 2. Edges (polylines — rendered behind nodes)
   // Each edge is a <polyline> with semantic data-* attributes
   for (const edge of graph.edges) {
-    parts.push(renderEdge(edge))
+    if (edge.style !== 'invisible') parts.push(renderEdge(edge))
   }
 
   // 3. Edge labels (positioned at midpoint of edge)
   // Each label is wrapped in <g class="edge-label">
   for (const edge of graph.edges) {
-    if (edge.label) {
+    if (edge.label && edge.style !== 'invisible') {
       parts.push(renderEdgeLabel(edge, font))
     }
   }

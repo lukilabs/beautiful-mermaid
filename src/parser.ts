@@ -396,7 +396,7 @@ function parseStyleProps(propsStr: string): Record<string, string> {
  *
  * Optional label: -->|label text|
  */
-const ARROW_REGEX = /^(<)?(-->|-.->|==>|---|-\.-|===)(?:\|([^|]*)\|)?/
+const ARROW_REGEX = /^(<)?(-->|-.->|==>|---|-\.-|===|~~~)(?:\|([^|]*)\|)?/
 
 /**
  * Text-embedded label regex — matches "-- label -->", "-. label .->", "== label ==>" syntax.
@@ -435,6 +435,16 @@ const NODE_PATTERNS: Array<{ regex: RegExp; shape: NodeShape }> = [
   { regex: /^([\w-]+)\((.+?)\)/,         shape: 'rounded' },       // A(text)
   { regex: /^([\w-]+)\{(.+?)\}/,         shape: 'diamond' },       // A{text}
 ]
+
+/**
+ * Quoted-label variants of NODE_PATTERNS, tried first: inside "..." any
+ * delimiter is literal text, so A["x [y] z"] keeps its brackets instead of
+ * ending at the first "]".
+ */
+const QUOTED_NODE_PATTERNS = NODE_PATTERNS.map(({ regex, shape }) => ({
+  regex: new RegExp(regex.source.replace('(.+?)', '("[^"]*")')),
+  shape,
+}))
 
 /** Regex for a bare node reference (just an ID, no shape brackets) */
 const BARE_NODE_REGEX = /^([\w-]+)/
@@ -515,6 +525,10 @@ function parseEdgeLine(
   }
 }
 
+function isSubgraphId(subgraphs: MermaidSubgraph[], id: string): boolean {
+  return subgraphs.some(sg => sg.id === id || isSubgraphId(sg.children, id))
+}
+
 interface ConsumedNodeGroup {
   ids: string[]
   remaining: string
@@ -567,7 +581,7 @@ function consumeNode(
   let remaining: string = text
 
   // Try each node pattern (shape-qualified)
-  for (const { regex, shape } of NODE_PATTERNS) {
+  for (const { regex, shape } of [...QUOTED_NODE_PATTERNS, ...NODE_PATTERNS]) {
     const match = text.match(regex)
     if (match) {
       id = match[1]!
@@ -585,7 +599,8 @@ function consumeNode(
     const bareMatch = text.match(BARE_NODE_REGEX)
     if (bareMatch) {
       id = bareMatch[1]!
-      if (!graph.nodes.has(id)) {
+      // A subgraph's id used as an endpoint (A --> sg, sg1 ~~~ sg2) names the subgraph, not a new node
+      if (!graph.nodes.has(id) && !isSubgraphId([...graph.subgraphs, ...subgraphStack], id)) {
         registerNode(graph, subgraphStack, { id, label: id, shape: 'rectangle' })
       }
       remaining = text.slice(bareMatch[0].length)
@@ -629,6 +644,8 @@ function trackInSubgraph(subgraphStack: MermaidSubgraph[], nodeId: string): void
 
 /** Map arrow operator string to edge style (ignoring direction) */
 function arrowStyleFromOp(op: string): EdgeStyle {
+  // '~~~' is Mermaid's invisible link: it shapes the layout but is never drawn
+  if (op === '~~~') return 'invisible'
   if (op === '-.->') return 'dotted'
   if (op === '-.-') return 'dotted'
   if (op === '==>') return 'thick'

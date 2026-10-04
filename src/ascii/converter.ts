@@ -56,6 +56,8 @@ export function convertToAsciiGraph(parsed: MermaidGraph, config: AsciiConfig): 
     const from = nodeMap.get(mEdge.source)
     const to = nodeMap.get(mEdge.target)
     if (!from || !to) continue
+    // Invisible links (~~~) only shape the SVG layout; the ASCII grid has no use for them
+    if (mEdge.style === 'invisible') continue
 
     edges.push({
       from,

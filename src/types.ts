@@ -54,7 +54,7 @@ export interface MermaidEdge {
   hasArrowEnd: boolean
 }
 
-export type EdgeStyle = 'solid' | 'dotted' | 'thick'
+export type EdgeStyle = 'solid' | 'dotted' | 'thick' | 'invisible'
 
 export interface MermaidSubgraph {
   id: string

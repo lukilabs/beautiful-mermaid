@@ -16,6 +16,7 @@
 //   const ascii = renderMermaidASCII('graph LR\n  A --> B')
 // ============================================================================
 
+import { decodeXML } from 'entities'
 import { parseMermaid } from '../parser.ts'
 import { convertToAsciiGraph } from './converter.ts'
 import { createMapping } from './grid.ts'
@@ -117,6 +118,9 @@ export function renderMermaidASCII(
 
   // Merge user theme with defaults
   const theme: AsciiTheme = { ...DEFAULT_ASCII_THEME, ...options.theme }
+
+  // Same as renderMermaidSVG: decode XML entities (&quot;, &lt;) so they print as characters
+  text = decodeXML(text)
 
   const diagramType = detectDiagramType(text)
 
