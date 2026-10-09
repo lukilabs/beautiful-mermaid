@@ -69,6 +69,7 @@ function buildClassElkGraph(
       'elk.spacing.nodeNode': String(CLS.nodeSpacing),
       'elk.layered.spacing.nodeNodeBetweenLayers': String(CLS.layerSpacing),
       'elk.padding': `[top=${CLS.padding},left=${CLS.padding},bottom=${CLS.padding},right=${CLS.padding}]`,
+      'elk.layered.nodePlacement.bk.fixedAlignment': 'BALANCED',
       'elk.edgeRouting': 'ORTHOGONAL',
       'elk.edgeLabels.placement': 'CENTER',
     },
