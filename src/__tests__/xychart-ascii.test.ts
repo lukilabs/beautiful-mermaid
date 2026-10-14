@@ -284,9 +284,10 @@ describe('xychart ASCII – axis structure', () => {
   })
 
   it('has x-axis ticks (┬) at category positions', () => {
+    // A bar standing on the axis covers its tick with ▀, so use a line chart
     const result = render(`xychart-beta
       x-axis [A, B, C]
-      bar [25, 50, 75]`)
+      line [25, 50, 75]`)
     expect(result).toContain('┬')
   })
 
@@ -307,4 +308,133 @@ describe('xychart ASCII – axis structure', () => {
     expect(result).not.toContain('┬')
     expect(result).not.toContain('┼')
   })
+})
+
+// ============================================================================
+// Bar heights against the y-axis
+// ============================================================================
+
+/** Render a vertical chart and locate its tick rows, x-axis line and bar columns. */
+function plot(text: string, useAscii = false) {
+  const lines = render(text, useAscii).split('\n')
+  const ticks = lines.flatMap((line, row) => {
+    const label = line.match(/^\s*(-?[\d.]+)[┤┼+]/)?.[1]
+    return label === undefined ? [] : [{ row, value: Number(label) }]
+  })
+  const axis = ticks[ticks.length - 1]!.row
+  // A bar's column is its x-axis tick, or the middle of the ▀ run it stands on
+  const bars = [...lines[axis]!.matchAll(/┬|▀+/g)].map(m => m.index! + Math.floor(m[0].length / 2))
+  return { lines, ticks, axis, bars }
+}
+
+const isBar = (c = '') => /[█▀▄#]/.test(c)
+
+describe('xychart ASCII – bar heights', () => {
+  const charts: [string, number[]][] = [
+    ['y-axis 0 --> 2500', [400, 1200, 1900, 2500, 800]],
+    ['y-axis 0 --> 14', [12, 10, 8]],
+    ['', [400, 1200, 1900, 2500, 800]],
+  ]
+
+  for (const [axisLine, values] of charts) {
+    it(`reaches every tick at or below its value and stops on a tick it equals: ${values.join(', ')}`, () => {
+      const { lines, ticks, axis, bars } = plot(`xychart-beta
+        x-axis [${values.map((_, i) => `c${i}`).join(', ')}]
+        ${axisLine}
+        bar [${values.join(', ')}]`)
+      expect(bars.length).toBe(values.length)
+      for (const { row, value: tick } of ticks.filter(t => t.row !== axis)) {
+        bars.forEach((col, i) => {
+          expect(isBar(lines[row]![col])).toBe(tick <= values[i]!)
+          if (tick === values[i]) expect(lines[row]![col]).toBe('▄')
+        })
+      }
+    })
+  }
+
+  it('stands each bar on the x-axis line with a half block', () => {
+    const { lines, axis, bars } = plot(`xychart-beta
+      x-axis [A, B, C]
+      y-axis 0 --> 100
+      bar [25, 50, 75]`)
+    expect(bars.length).toBe(3)
+    bars.forEach(col => expect(lines[axis]![col]).toBe('▀'))
+  })
+
+  it('gives every tick interval the same number of rows', () => {
+    const { ticks } = plot(`xychart-beta
+      x-axis [A, B, C, D, E]
+      y-axis 0 --> 2500
+      bar [400, 1200, 1900, 2500, 800]`)
+    const gaps = ticks.slice(1).map((t, i) => t.row - ticks[i]!.row)
+    expect(new Set(gaps).size).toBe(1)
+  })
+
+  it('fills whole cells in ASCII mode, up to every tick at or below the value', () => {
+    const values = [400, 1200, 1900, 2500, 800]
+    const result = render(`xychart-beta
+      x-axis [A, B, C, D, E]
+      y-axis 0 --> 2500
+      bar [${values.join(', ')}]`, true)
+    expect(result).not.toMatch(/[▀▄█]/)
+    const lines = result.split('\n')
+    const axis = lines.findIndex(l => /^\s*0\+/.test(l))
+    const cols = [...lines[axis]!.matchAll(/\+/g)].map(m => m.index!).slice(1)
+    expect(cols.length).toBe(values.length)
+    for (const line of lines.slice(0, axis)) {
+      const tick = line.match(/^\s*(\d+)\+/)?.[1]
+      if (tick !== undefined) cols.forEach((col, i) => expect(line[col] === '#').toBe(Number(tick) <= values[i]!))
+    }
+  })
+})
+
+describe('xychart ASCII – negative bars', () => {
+  for (const values of [[-6, 6, -2, 2], [-5, 3, 8, -2, 0], [-5, -3, -8]]) {
+    it(`grows bars both ways from a solid base line and stops them on their tick: ${values.join(', ')}`, () => {
+      const { lines, ticks, axis, bars } = plot(`xychart-beta
+        x-axis [${values.map((_, i) => `c${i}`).join(', ')}]
+        bar [${values.join(', ')}]`)
+      expect(bars.length).toBe(values.length)
+      // Bars grow from 0, or from the top tick when every value is negative
+      const base = Math.min(Math.max(0, ticks[ticks.length - 1]!.value), ticks[0]!.value)
+      const baseRow = ticks.find(t => t.value === base)!.row
+      expect(lines[baseRow]).toMatch(/^\s*-?[\d.]+┼[─▀▄]+$/)
+      bars.forEach((col, i) => expect(lines[baseRow]![col]).toBe(values[i] === base ? '─' : values[i]! > base ? '▀' : '▄'))
+      for (const { row, value: tick } of ticks.filter(t => t.row !== axis && t.row !== baseRow)) {
+        bars.forEach((col, i) => {
+          expect(isBar(lines[row]![col])).toBe((base < tick && tick <= values[i]!) || (values[i]! <= tick && tick < base))
+          if (tick === values[i]) expect(lines[row]![col]).toBe(tick > base ? '▄' : '▀')
+        })
+      }
+    })
+  }
+})
+
+describe('xychart ASCII – lines with bars', () => {
+  it('draws a line at 0 along the x-axis line', () => {
+    const lines = render(`xychart-beta
+      x-axis [A, B, C]
+      y-axis 0 --> 100
+      line [0, 60, 100]`).split('\n')
+    const axis = lines.findIndex(l => /^\s*0┼/.test(l))
+    expect(lines[axis]).toMatch(/^\s*0┼─+╯/)
+  })
+
+  for (const useAscii of [false, true]) {
+    it(`draws a line behind the bars, leaving every bar cell as it was${useAscii ? ' (ASCII)' : ''}`, () => {
+      const bars = `xychart-beta
+        x-axis [A, B, C, D]
+        y-axis 0 --> 100
+        bar [20, 50, 80, 40]`
+      const cells = (text: string) => {
+        const lines = render(text, useAscii).split('\n')
+        const top = lines.findIndex(l => /^\s*\d+[┤+]/.test(l))
+        const axis = lines.findIndex(l => /^\s*0[┼+]/.test(l))
+        return lines.slice(top, axis + 1).flatMap((l, r) => [...l].flatMap((c, col) => (isBar(c) ? [`${axis - top - r}:${col}`] : [])))
+      }
+      for (const line of ['line [20, 50, 80, 40]', 'line [0, 50, 100, 25]']) {
+        expect(cells(`${bars}\n        ${line}`)).toEqual(cells(bars))
+      }
+    })
+  }
 })

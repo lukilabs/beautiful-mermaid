@@ -5,8 +5,11 @@
 // Uses the parsed XYChart type directly (not PositionedXYChart) since
 // pixel coordinates don't map to character grids.
 //
-// Bar charts: █ (Unicode) or # (ASCII) block characters.
-// Line charts: continuous staircase routing with rounded corners (╭╮╰╯│─).
+// Bar charts: █ (Unicode) or # (ASCII) block characters. Unicode bars are
+// drawn to the half row with ▀ and ▄, so they meet the axis line and stop on
+// the tick they reach, both of which run through the middle of a cell.
+// Line charts: continuous staircase routing with rounded corners (╭╮╰╯│─),
+// drawn behind bars.
 //
 // Multi-series support: each series gets a distinct color from a palette.
 // ============================================================================
@@ -32,6 +35,8 @@ const UNI = {
   yTick: '┤',
   xTick: '┬',
   bar: '█',
+  barUpper: '▀',  // upper half of a cell
+  barLower: '▄',  // lower half of a cell
   grid: '·',
   cornerTL: '╭',  // top-left: down+right
   cornerTR: '╮',  // top-right: down+left
@@ -47,6 +52,8 @@ const ASC = {
   yTick: '+',
   xTick: '+',
   bar: '#',
+  barUpper: '',  // no half-height glyphs in ASCII
+  barLower: '',
   grid: '.',
   cornerTL: '+',
   cornerTR: '+',
@@ -114,13 +121,21 @@ function renderVertical(
   const dataCount = getDataCount(chart)
   if (dataCount === 0) return ''
 
+  // Y ticks: the axis extends outward to whole tick steps, so it starts and
+  // ends on a tick, and every tick interval gets the same whole number of rows.
   const yRange = chart.yAxis.range!
-  const yTicks = niceTickValues(yRange.min, yRange.max)
+  const niceTicks = niceTickValues(yRange.min, yRange.max)
+  const step = niceTicks.length > 1 ? niceTicks[1]! - niceTicks[0]! : Math.abs(yRange.max - yRange.min) || 1
+  const yMin = Math.floor(yRange.min / step + 1e-9) * step
+  const yMax = Math.max(yMin + step, Math.ceil(yRange.max / step - 1e-9) * step)
+  const intervals = Math.round((yMax - yMin) / step)
+  const yTicks = Array.from({ length: intervals + 1 }, (_, i) => Math.round((yMin + i * step) * 1e10) / 1e10)
   const yLabels = yTicks.map(v => formatTickValue(v))
   const yGutter = Math.max(...yLabels.map(l => l.length)) + 1
 
   const plotW = Math.max(PLOT_WIDTH, dataCount * 6)
-  const plotH = PLOT_HEIGHT
+  const rowsPerTick = Math.max(1, Math.round(PLOT_HEIGHT / intervals))
+  const plotH = intervals * rowsPerTick
   const bandW = Math.floor(plotW / dataCount)
   const catLabels = getCategoryLabels(chart, dataCount)
 
@@ -145,11 +160,15 @@ function renderVertical(
   // Series colors
   const seriesColors = getSeriesColors(chart.series.length, theme)
 
-  // Scales
-  const valueToRow = (v: number): number => {
-    const t = (v - yRange.min) / (yRange.max - yRange.min || 1)
-    return Math.round(t * (plotH - 1))
-  }
+  // Scales. A level counts rows up from the x-axis line: level 0 is the
+  // middle of the axis line and level n is the middle of plot row n - 1, so
+  // ticks land on row middles, where grid dots and line segments are drawn.
+  const level = (v: number): number => (v - yMin) / (step / rowsPerTick)
+  // Bars grow from 0, or from the end of the axis nearest 0 when 0 is off it.
+  // baseRow is -1 when that is the x-axis line itself.
+  const base = level(Math.min(Math.max(0, yMin), yMax))
+  const baseRow = Math.round(base) - 1
+  const valueToRow = (v: number): number => Math.min(plotH - 1, Math.max(-1, Math.round(level(v)) - 1))
   const bandCenter = (i: number): number => plotLeft + Math.floor(bandW * (i + 0.5))
 
   // 1. Title
@@ -172,12 +191,12 @@ function renderVertical(
   set(canvas, roles, xAxisRow, plotLeft - 1, ch.origin, 'border')
 
   for (const tick of yTicks) {
-    const row = valueToRow(tick)
-    if (row < 0 || row >= plotH) continue
+    const row = Math.round(level(tick)) - 1
+    if (row < -1 || row >= plotH) continue
     const displayRow = plotTop + (plotH - 1 - row)
     const label = formatTickValue(tick)
-    // Tick mark on axis
-    set(canvas, roles, displayRow, plotLeft - 1, row === 0 ? ch.origin : ch.yTick, 'border')
+    // Tick mark on axis; the x-axis line and a solid base line cross it
+    set(canvas, roles, displayRow, plotLeft - 1, row === -1 || row === baseRow ? ch.origin : ch.yTick, 'border')
     // Label
     const labelStart = yGutter - label.length
     writeText(canvas, roles, displayRow, Math.max(0, labelStart), label, 'text')
@@ -202,14 +221,17 @@ function renderVertical(
     writeText(canvas, roles, xTitleRow, Math.floor(totalW / 2 - title.length / 2), title, 'text')
   }
 
-  // 6. Grid lines (subtle horizontal dots at y-tick positions)
+  // 6. Grid lines (subtle horizontal dots at y-tick positions). When bars grow
+  // from a tick inside the plot (0 with negative values, or the top tick when
+  // every value is negative), that tick gets a solid line like the x-axis.
   for (const tick of yTicks) {
-    const row = valueToRow(tick)
+    const row = Math.round(level(tick)) - 1
     if (row < 0 || row >= plotH) continue
     const displayRow = plotTop + (plotH - 1 - row)
+    const solid = row === baseRow
     for (let c = plotLeft; c < plotLeft + bandW * dataCount; c++) {
       if (get(canvas, displayRow, c) === ' ') {
-        set(canvas, roles, displayRow, c, ch.grid, 'line')
+        set(canvas, roles, displayRow, c, solid ? ch.hLine : ch.grid, solid ? 'border' : 'line')
       }
     }
   }
@@ -225,7 +247,6 @@ function renderVertical(
     const usable = Math.max(1, bandW - 2)
     const singleBarW = Math.max(1, Math.min(Math.floor(usable / barCount), 8))
     const groupW = singleBarW * barCount + (barCount - 1)
-    const baseRow = valueToRow(Math.max(0, yRange.min))
 
     for (let bIdx = 0; bIdx < barEntries.length; bIdx++) {
       const entry = barEntries[bIdx]!
@@ -234,14 +255,22 @@ function renderVertical(
         const cx = bandCenter(i)
         const groupLeft = cx - Math.floor(groupW / 2)
         const bx = groupLeft + bIdx * (singleBarW + 1)
-        const valRow = valueToRow(entry.data[i]!)
-        const fromRow = Math.min(baseRow, valRow)
-        const toRow = Math.max(baseRow, valRow)
+        // Round toward the base to the nearest half row, so a bar never passes
+        // its value but still reaches every tick at or below it.
+        const exact = level(entry.data[i]!)
+        const value = exact < base ? Math.ceil(exact * 2 - 1e-9) / 2 : Math.floor(exact * 2 + 1e-9) / 2
+        const from = Math.max(0, Math.min(base, value))
+        const to = Math.min(plotH, Math.max(base, value))
 
-        for (let row = fromRow; row <= toRow; row++) {
+        // Row -1 is the x-axis line, whose upper half a bar standing on it covers
+        for (let row = -1; row < plotH; row++) {
+          const lower = from <= row + 0.5 + 1e-9 && to >= row + 1 - 1e-9
+          const upper = from <= row + 1 + 1e-9 && to >= row + 1.5 - 1e-9
+          const glyph = barGlyph(lower, upper, value >= base, ch)
+          if (!glyph) continue
           const displayRow = plotTop + (plotH - 1 - row)
           for (let c = bx; c < bx + singleBarW; c++) {
-            set(canvas, roles, displayRow, c, ch.bar, 'arrow', hexColors, hexColor)
+            set(canvas, roles, displayRow, c, glyph, 'arrow', hexColors, hexColor)
           }
         }
       }
@@ -438,10 +467,12 @@ function drawStaircaseLine(
     row: valueToRow(v),
   }))
 
-  // Helper to draw on the canvas (row 0 = bottom, displayed inverted)
+  // Helper to draw on the canvas (row 0 = bottom, displayed inverted). The
+  // line passes behind bars: a cell that already holds a bar keeps it.
+  const isBar = (c: string) => c === ch.bar || c === ch.barUpper || c === ch.barLower
   const drawAt = (col: number, row: number, char: string) => {
     const displayRow = plotTop + (plotH - 1 - row)
-    if (displayRow >= 0 && col >= plotLeft && col < plotLeft + plotTotalW) {
+    if (displayRow >= 0 && col >= plotLeft && col < plotLeft + plotTotalW && !isBar(get(canvas, displayRow, col))) {
       set(canvas, roles, displayRow, col, char, 'arrow', hexCanvas, hexColor)
     }
   }
@@ -816,6 +847,20 @@ function colorizeRow(
 // ============================================================================
 // Helpers (chart-level)
 // ============================================================================
+
+/**
+ * Glyph for one cell of a bar, given which halves of the cell the bar covers.
+ * Unicode draws each half with ▀ or ▄. ASCII has no half-height glyph, so it
+ * fills the cell when the bar covers the half nearer its base, which is the
+ * same as filling every row whose middle the bar reaches.
+ */
+function barGlyph(lower: boolean, upper: boolean, growsUp: boolean, ch: typeof UNI | typeof ASC): string {
+  if (!ch.barLower) return (growsUp ? lower : upper) ? ch.bar : ''
+  if (lower && upper) return ch.bar
+  if (lower) return ch.barLower
+  if (upper) return ch.barUpper
+  return ''
+}
 
 function getDataCount(chart: XYChart): number {
   if (chart.xAxis.categories) return chart.xAxis.categories.length

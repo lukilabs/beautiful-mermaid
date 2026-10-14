@@ -481,8 +481,8 @@ renderMermaidASCII(diagram, {
 
 XY charts render to ASCII with dedicated chart-drawing characters:
 
-- **Bar charts** — `█` blocks (Unicode) or `#` (ASCII mode)
-- **Line charts** — Staircase routing with rounded corners: `╭╮╰╯│─` (Unicode) or `+|-` (ASCII)
+- **Bar charts** — `█` blocks (Unicode) or `#` (ASCII mode). Unicode bars are drawn to the half row with `▀` and `▄`, so each bar stands on the axis line and stops exactly on a tick it reaches; negative values grow down from a solid `0` line
+- **Line charts** — Staircase routing with rounded corners: `╭╮╰╯│─` (Unicode) or `+|-` (ASCII); in a chart with bars, lines pass behind the bars
 - **Multi-series** — Each series gets a distinct ANSI color from the theme's accent palette
 - **Legends** — Automatically shown when multiple series are present
 - **Horizontal charts** — Fully supported with categories on the y-axis
