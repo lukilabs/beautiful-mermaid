@@ -745,3 +745,75 @@ describe('sequence layout – note positioning', () => {
     }
   })
 })
+
+describe('sequence layout – horizontal spacing and block boundaries', () => {
+  it('widens inter-actor gaps for self-messages and multi-column labels and expands block right boundary', () => {
+    const result = layout(`sequenceDiagram
+      autonumber
+      actor User
+      participant UI as Web UI
+      participant Backend as Main Server
+      participant Hub as Shared Runtime
+      participant Sub as Tool Process
+      User->>UI: Open tool
+      UI->>Backend: Send session ID and tool name
+      Backend->>Hub: Get saved result
+      alt Saved result found
+        Hub-->>Backend: Return saved result
+        Backend-->>UI: Return result
+      else No saved result
+        Backend->>Backend: Load tool in a new process
+        Backend->>Sub: Start main program from its package, in a temp folder
+        Sub-->>Backend: Return result or web address
+        Backend->>Backend: Save result to shared folder
+        Backend-->>UI: Show report in a safe frame
+      end`)
+
+    expect(result.messages).toHaveLength(10)
+    expect(result.messages[0]!.stepNumber).toBe(1)
+    expect(result.messages[9]!.stepNumber).toBe(10)
+
+    // Self-message on Backend (index 2) must not cross Hub's (index 3) lifeline
+    const backendX = result.actors[2]!.x
+    const hubX = result.actors[3]!.x
+    expect(hubX - backendX).toBeGreaterThan(200)
+
+    // Multi-column message Backend (2) -> Sub (4) must have wide span
+    const subX = result.actors[4]!.x
+    expect(subX - backendX).toBeGreaterThan(320)
+  })
+
+  it('accounts for stick-figure actor label height below icon before first message and lifeline top', () => {
+    const withActor = layout(`sequenceDiagram
+      actor A as Alice
+      participant B as Bob
+      A->>B: First Method Call`)
+    const withParticipant = layout(`sequenceDiagram
+      participant A as Alice
+      participant B as Bob
+      A->>B: First Method Call`)
+
+    expect(withActor.messages[0]!.y).toBeGreaterThan(withParticipant.messages[0]!.y)
+    expect(withActor.lifelines[0]!.topY).toBeGreaterThan(withActor.lifelines[1]!.topY)
+  })
+
+  it('extends block bottom below the return loop when a block ends with a self-message', () => {
+    const result = layout(`sequenceDiagram
+      participant A
+      participant B
+      loop Health check
+        A->>B: Ping
+        B->>B: Record metric
+      end
+      B-->>A: Pong`)
+
+    const block = result.blocks[0]!
+    const endSelfMsg = result.messages[1]!
+    const nextMsg = result.messages[2]!
+    const selfLoopBottom = endSelfMsg.y + 20
+
+    // Block bottom must clear the self-message return line by 20px and stay above the next message
+    expect(block.y + block.height).toBe(selfLoopBottom + 20)
+    expect(block.y + block.height).toBeLessThan(nextMsg.y - 10)
+  })
+})

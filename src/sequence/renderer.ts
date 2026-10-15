@@ -2,6 +2,7 @@ import type { PositionedSequenceDiagram, PositionedActor, Lifeline, PositionedMe
 import type { DiagramColors } from '../theme.ts'
 import { svgOpenTag, buildStyleBlock } from '../theme.ts'
 import { FONT_SIZES, FONT_WEIGHTS, STROKE_WIDTHS, ARROW_HEAD, estimateTextWidth, TEXT_BASELINE_SHIFT } from '../styles.ts'
+import { measureMultilineText } from '../text-metrics.ts'
 import { renderMultilineText, escapeXml as escapeXmlUtil } from '../multiline-utils.ts'
 
 // ============================================================================
@@ -42,14 +43,14 @@ export function renderSequenceSvg(
   parts.push(arrowMarkerDefs())
   parts.push('</defs>')
 
-  // 1. Block backgrounds (loop/alt/opt rectangles)
-  for (const block of diagram.blocks) {
-    parts.push(renderBlock(block))
-  }
-
-  // 2. Lifelines (dashed vertical lines from actor to bottom)
+  // 1. Lifelines (dashed vertical lines from actor to bottom, rendered behind block tabs/labels)
   for (const lifeline of diagram.lifelines) {
     parts.push(renderLifeline(lifeline))
+  }
+
+  // 2. Block backgrounds (loop/alt/opt rectangles)
+  for (const block of diagram.blocks) {
+    parts.push(renderBlock(block))
   }
 
   // 3. Activation boxes
@@ -188,10 +189,12 @@ function renderMessage(msg: PositionedMessage): string {
   const markerId = msg.arrowHead === 'filled' ? 'seq-arrow' : 'seq-arrow-open'
 
   // Semantic wrapper with message metadata
+  const arrowStartAttr = msg.arrowStart ? ` data-arrow-start="${msg.arrowStart}"` : ''
+  const stepAttr = msg.stepNumber !== undefined ? ` data-step="${msg.stepNumber}"` : ''
   parts.push(
     `<g class="message" data-from="${escapeAttr(msg.from)}" data-to="${escapeAttr(msg.to)}" ` +
     `data-label="${escapeAttr(msg.label)}" data-line-style="${msg.lineStyle}" ` +
-    `data-arrow-head="${msg.arrowHead}" data-self="${msg.isSelf}">`
+    `data-arrow-head="${msg.arrowHead}"${arrowStartAttr} data-self="${msg.isSelf}"${stepAttr}>`
   )
 
   if (msg.isSelf) {
@@ -204,6 +207,13 @@ function renderMessage(msg: PositionedMessage): string {
       `  <polyline points="${msg.x1},${msg.y} ${msg.x1 + loopW},${msg.y} ${msg.x1 + loopW},${msg.y + loopH} ${msg.x2},${msg.y + loopH}" ` +
       `fill="none" stroke="var(--_line)" stroke-width="${STROKE_WIDTHS.connector}"${dashArray} marker-end="url(#${markerId})" />`
     )
+    if (msg.label) {
+      const m = measureMultilineText(msg.label, FONT_SIZES.edgeLabel, FONT_WEIGHTS.edgeLabel)
+      parts.push(
+        `  <rect x="${msg.x1 + loopW + labelPadding - 3}" y="${msg.y + loopH / 2 - m.height / 2 - 1}" ` +
+        `width="${Math.ceil(m.width * 1.1) + 6}" height="${m.height + 2}" rx="2" ry="2" fill="var(--bg)" />`
+      )
+    }
     // Label to the right of the loop (supports multi-line)
     parts.push(
       '  ' + renderMultilineText(msg.label, msg.x1 + loopW + labelPadding, msg.y + loopH / 2, FONT_SIZES.edgeLabel,
@@ -211,15 +221,44 @@ function renderMessage(msg: PositionedMessage): string {
     )
   } else {
     // Normal message: horizontal arrow
+    const startMarker = msg.arrowStart
+      ? ` marker-start="url(#${msg.arrowStart === 'filled' ? 'seq-arrow' : 'seq-arrow-open'})"`
+      : ''
     parts.push(
       `  <line x1="${msg.x1}" y1="${msg.y}" x2="${msg.x2}" y2="${msg.y}" ` +
-      `stroke="var(--_line)" stroke-width="${STROKE_WIDTHS.connector}"${dashArray} marker-end="url(#${markerId})" />`
+      `stroke="var(--_line)" stroke-width="${STROKE_WIDTHS.connector}"${dashArray}${startMarker} marker-end="url(#${markerId})" />`
     )
     // Label above the arrow, centered (supports multi-line)
     const midX = (msg.x1 + msg.x2) / 2
+    if (msg.label) {
+      const m = measureMultilineText(msg.label, FONT_SIZES.edgeLabel, FONT_WEIGHTS.edgeLabel)
+      const haloW = Math.ceil(m.width * 1.1) + 6
+      parts.push(
+        `  <rect x="${midX - haloW / 2}" y="${msg.y - 10 - m.height / 2 - 1}" ` +
+        `width="${haloW}" height="${m.height + 2}" rx="2" ry="2" fill="var(--bg)" />`
+      )
+    }
     parts.push(
       '  ' + renderMultilineText(msg.label, midX, msg.y - 10, FONT_SIZES.edgeLabel,
         `font-size="${FONT_SIZES.edgeLabel}" text-anchor="middle" font-weight="${FONT_WEIGHTS.edgeLabel}" fill="var(--_text-muted)"`)
+    )
+  }
+
+  // Render step number badge at message origin when autonumber is enabled
+  if (msg.stepNumber !== undefined) {
+    const numStr = String(msg.stepNumber)
+    const r = numStr.length <= 2 ? 9 : 11
+    const dirSign = msg.isSelf || msg.x2 >= msg.x1 ? 1 : -1
+    const badgeCx = msg.x1 + (msg.arrowStart ? dirSign * (ARROW_HEAD.width + r + 2) : 0)
+    parts.push(
+      `  <circle class="sequence-number" cx="${badgeCx}" cy="${msg.y}" r="${r}" ` +
+      `fill="var(--_arrow)" stroke="var(--bg)" stroke-width="1" />`
+    )
+    parts.push(
+      '  ' + renderMultilineText(
+        numStr, badgeCx, msg.y, 10,
+        `class="sequence-number-label" font-size="10" text-anchor="middle" font-weight="${FONT_WEIGHTS.groupHeader}" fill="var(--bg)"`
+      )
     )
   }
 
@@ -250,8 +289,8 @@ function renderBlock(block: PositionedBlock): string {
   // For multi-line block labels, we use the first line for the tab but show full label
   const labelText = `${block.type}${block.label ? ` [${block.label}]` : ''}`
   const firstLine = labelText.split('\n')[0]!
-  const tabWidth = estimateTextWidth(firstLine, FONT_SIZES.edgeLabel, FONT_WEIGHTS.groupHeader) + 16
-  const tabHeight = 18
+  const tabWidth = Math.ceil(estimateTextWidth(firstLine, FONT_SIZES.edgeLabel, FONT_WEIGHTS.groupHeader) * 1.12) + 22
+  const tabHeight = 20
 
   parts.push(
     `  <rect x="${block.x}" y="${block.y}" width="${tabWidth}" height="${tabHeight}" ` +
@@ -261,7 +300,7 @@ function renderBlock(block: PositionedBlock): string {
   parts.push(
     '  ' + renderMultilineText(
       labelText,
-      block.x + 6,
+      block.x + 8,
       block.y + tabHeight / 2,
       FONT_SIZES.edgeLabel,
       `font-size="${FONT_SIZES.edgeLabel}" font-weight="${FONT_WEIGHTS.groupHeader}" fill="var(--_text-sec)"`
@@ -275,6 +314,11 @@ function renderBlock(block: PositionedBlock): string {
       `stroke="var(--_line)" stroke-width="0.75" stroke-dasharray="6 4" />`
     )
     if (divider.label) {
+      const m = measureMultilineText(`[${divider.label}]`, FONT_SIZES.edgeLabel, FONT_WEIGHTS.edgeLabel)
+      parts.push(
+        `  <rect x="${block.x + 5}" y="${divider.y + 14 - m.height / 2 - 1}" ` +
+        `width="${Math.ceil(m.width * 1.1) + 6}" height="${m.height + 2}" rx="2" ry="2" fill="var(--bg)" />`
+      )
       // Divider label supports multi-line
       parts.push(
         '  ' + renderMultilineText(`[${divider.label}]`, block.x + 8, divider.y + 14, FONT_SIZES.edgeLabel,

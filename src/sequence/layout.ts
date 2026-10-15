@@ -1,6 +1,7 @@
 import type { SequenceDiagram, PositionedSequenceDiagram, PositionedActor, Lifeline, PositionedMessage, Activation, PositionedBlock, PositionedNote } from './types.ts'
 import type { RenderOptions } from '../types.ts'
 import { estimateTextWidth, FONT_SIZES, FONT_WEIGHTS } from '../styles.ts'
+import { measureMultilineText } from '../text-metrics.ts'
 
 // ============================================================================
 // Sequence diagram layout engine
@@ -66,21 +67,72 @@ export function layoutSequenceDiagram(
     return Math.max(textW + SEQ.actorPadX * 2, 80)
   })
 
-  // Build actor center X positions with minimum gap
-  const actorCenterX: number[] = []
-  let currentX = SEQ.padding + actorWidths[0]! / 2
-  for (let i = 0; i < diagram.actors.length; i++) {
-    if (i > 0) {
-      const minGap = Math.max(SEQ.actorGap, (actorWidths[i - 1]! + actorWidths[i]!) / 2 + 40)
-      currentX += minGap
+  // Calculate actor heights to account for 'actor' type labels that render below the icon
+  const actorHeights = diagram.actors.map(a => {
+    if (a.type === 'actor') {
+      const metrics = measureMultilineText(a.label, FONT_SIZES.nodeLabel, FONT_WEIGHTS.nodeLabel)
+      // 14px is the gap between icon and label. Label is vertically centered,
+      // so it extends metrics.height / 2 below its center Y.
+      return SEQ.actorHeight + 14 + metrics.height / 2
     }
-    actorCenterX.push(currentX)
-  }
+    return SEQ.actorHeight
+  })
+
+  const maxActorHeight = Math.max(...actorHeights)
 
   // Build actor ID → index lookup
   const actorIndex = new Map<string, number>()
   for (let i = 0; i < diagram.actors.length; i++) {
     actorIndex.set(diagram.actors[i]!.id, i)
+  }
+
+  // Compute pairwise minimum gaps between adjacent actors (i - 1 and i)
+  const pairwiseGaps = actorWidths.slice(1).map((w, i) =>
+    Math.max(SEQ.actorGap, (actorWidths[i]! + w) / 2 + 40)
+  )
+  const selfLoopOffset = 38 // loopW (30) + labelPadding (8)
+  const labelWidth = (text: string) =>
+    measureMultilineText(text, FONT_SIZES.edgeLabel, FONT_WEIGHTS.edgeLabel).width
+
+  // 1a. Enforce single-column message label and self-message clearances
+  for (const msg of diagram.messages) {
+    const fromIdx = actorIndex.get(msg.from)
+    const toIdx = actorIndex.get(msg.to)
+    if (!msg.label || fromIdx === undefined || toIdx === undefined) continue
+    const labelW = labelWidth(msg.label)
+    const padX = msg.stepNumber !== undefined ? 44 : 28
+    if (fromIdx === toIdx && fromIdx < pairwiseGaps.length) {
+      pairwiseGaps[fromIdx] = Math.max(pairwiseGaps[fromIdx]!, selfLoopOffset + labelW + 36)
+    } else if (Math.abs(fromIdx - toIdx) === 1) {
+      const gapIdx = Math.min(fromIdx, toIdx)
+      pairwiseGaps[gapIdx] = Math.max(pairwiseGaps[gapIdx]!, labelW + padX)
+    }
+  }
+
+  // 1b. Enforce multi-column message label spans across intermediate gaps
+  for (const msg of diagram.messages) {
+    const fromIdx = actorIndex.get(msg.from)
+    const toIdx = actorIndex.get(msg.to)
+    if (!msg.label || fromIdx === undefined || toIdx === undefined) continue
+    const leftIdx = Math.min(fromIdx, toIdx)
+    const rightIdx = Math.max(fromIdx, toIdx)
+    if (rightIdx - leftIdx <= 1) continue
+    const padX = msg.stepNumber !== undefined ? 44 : 28
+    const requiredSpan = labelWidth(msg.label) + padX
+    let currentSpan = 0
+    for (let k = leftIdx; k < rightIdx; k++) currentSpan += pairwiseGaps[k]!
+    if (currentSpan < requiredSpan) {
+      const extra = (requiredSpan - currentSpan) / (rightIdx - leftIdx)
+      for (let k = leftIdx; k < rightIdx; k++) pairwiseGaps[k]! += extra
+    }
+  }
+
+  // Build actor center X positions with computed gaps
+  const actorCenterX: number[] = []
+  let currentX = SEQ.padding + actorWidths[0]! / 2
+  for (let i = 0; i < diagram.actors.length; i++) {
+    if (i > 0) currentX += pairwiseGaps[i - 1]!
+    actorCenterX.push(currentX)
   }
 
   // 2. Position actors at the top
@@ -92,11 +144,11 @@ export function layoutSequenceDiagram(
     x: actorCenterX[i]!,
     y: actorY,
     width: actorWidths[i]!,
-    height: SEQ.actorHeight,
+    height: SEQ.actorHeight, // Keep base height for icon rendering scaling
   }))
 
   // 3. Stack messages vertically
-  let messageY = actorY + SEQ.actorHeight + SEQ.headerGap
+  let messageY = actorY + maxActorHeight + SEQ.headerGap
   const messages: PositionedMessage[] = []
 
   // Pre-scan blocks to determine which message indices need extra vertical
@@ -151,9 +203,11 @@ export function layoutSequenceDiagram(
       label: msg.label,
       lineStyle: msg.lineStyle,
       arrowHead: msg.arrowHead,
+      arrowStart: msg.arrowStart,
       x1, x2,
       y: messageY,
       isSelf,
+      stepNumber: msg.stepNumber,
     })
 
     // Handle activation - track nesting depth for visual offset
@@ -263,7 +317,7 @@ export function layoutSequenceDiagram(
     const startMsg = messages[block.startIndex]
     const endMsg = messages[block.endIndex]
     const blockTop = (startMsg?.y ?? messageY) - SEQ.blockPadTop
-    const blockBottom = (endMsg?.y ?? messageY) + SEQ.blockPadBottom + 12
+    const blockBottom = (endMsg?.y ?? messageY) + (endMsg?.isSelf ? 20 : 0) + SEQ.blockPadBottom + 12
 
     // Block width spans all actors involved in its messages
     const involvedActors = new Set<number>()
@@ -281,7 +335,21 @@ export function layoutSequenceDiagram(
     const minIdx = Math.min(...involvedActors)
     const maxIdx = Math.max(...involvedActors)
     const blockLeft = actorCenterX[minIdx]! - actorWidths[minIdx]! / 2 - SEQ.blockPadX
-    const blockRight = actorCenterX[maxIdx]! + actorWidths[maxIdx]! / 2 + SEQ.blockPadX
+    let blockRight = actorCenterX[maxIdx]! + actorWidths[maxIdx]! / 2 + SEQ.blockPadX
+    const headerText = `${block.type}${block.label ? ` [${block.label}]` : ''}`
+    const headerTabW = Math.ceil(measureMultilineText(headerText, FONT_SIZES.edgeLabel, FONT_WEIGHTS.groupHeader).width * 1.12) + 22
+    blockRight = Math.max(blockRight, blockLeft + headerTabW + SEQ.blockPadX)
+    for (let mi = block.startIndex; mi <= block.endIndex; mi++) {
+      const m = messages[mi]
+      if (m?.isSelf && m.label) {
+        blockRight = Math.max(blockRight, m.x1 + selfLoopOffset + labelWidth(m.label) + SEQ.blockPadX)
+      }
+    }
+    for (const d of block.dividers) {
+      if (d.label) {
+        blockRight = Math.max(blockRight, blockLeft + labelWidth(`[${d.label}]`) + 16 + SEQ.blockPadX)
+      }
+    }
 
     // Position dividers — offset from message Y so the divider label text
     // (rendered at divider.y + 14 in the renderer) clears the message label
@@ -346,7 +414,7 @@ export function layoutSequenceDiagram(
   // extends left of the desired padding margin and expand the width to fit.
   const diagramBottom = messageY + SEQ.padding
 
-  // Find global X extents across actors, blocks, notes, and message labels
+  // Find global X extents across actors, blocks, notes, and labels
   let globalMinX: number = SEQ.padding // actors already start at SEQ.padding
   let globalMaxX = 0
   for (const a of actors) {
@@ -356,6 +424,19 @@ export function layoutSequenceDiagram(
   for (const b of blocks) {
     globalMinX = Math.min(globalMinX, b.x)
     globalMaxX = Math.max(globalMaxX, b.x + b.width)
+
+    // Include block divider labels in the bounding box
+    for (const d of b.dividers) {
+      if (d.label) {
+        const divLabelText = `[${d.label}]`
+        const divLabelW = estimateTextWidth(
+            divLabelText, FONT_SIZES.edgeLabel, FONT_WEIGHTS.edgeLabel)
+        const divLabelLeft = b.x + 8
+        const divLabelRight = divLabelLeft + divLabelW
+        globalMinX = Math.min(globalMinX, divLabelLeft)
+        globalMaxX = Math.max(globalMaxX, divLabelRight)
+      }
+    }
   }
   for (const n of notes) {
     globalMinX = Math.min(globalMinX, n.x)
@@ -370,6 +451,26 @@ export function layoutSequenceDiagram(
       const labelLeft = m.x1 + loopW + labelPadding
       const labelWidth = estimateTextWidth(m.label, FONT_SIZES.edgeLabel, FONT_WEIGHTS.edgeLabel)
       globalMaxX = Math.max(globalMaxX, labelLeft + labelWidth + 8) // +8 for safety margin
+    }
+  }
+
+  // Include message labels in the bounding box
+  for (const m of messages) {
+    if (m.label) {
+      const labelW = estimateTextWidth(
+          m.label, FONT_SIZES.edgeLabel, FONT_WEIGHTS.edgeLabel)
+      let labelLeft: number
+      if (m.isSelf) {
+        // Self-messages render labels at x1 + 36 (left-aligned)
+        labelLeft = m.x1 + 36
+      }
+      else {
+        // Normal messages center the label between the two actor lifelines
+        labelLeft = (m.x1 + m.x2) / 2 - labelW / 2
+      }
+      const labelRight = labelLeft + labelW
+      globalMinX = Math.min(globalMinX, labelLeft)
+      globalMaxX = Math.max(globalMaxX, labelRight)
     }
   }
 
@@ -389,7 +490,7 @@ export function layoutSequenceDiagram(
   const lifelines: Lifeline[] = diagram.actors.map((a, i) => ({
     actorId: a.id,
     x: actorCenterX[i]!,
-    topY: actorY + SEQ.actorHeight,
+    topY: actorY + actorHeights[i]!,
     bottomY: diagramBottom - SEQ.padding,
   }))
 

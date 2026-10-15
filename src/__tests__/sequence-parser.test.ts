@@ -117,6 +117,40 @@ describe('parseSequenceDiagram – messages', () => {
       B-->>-A: Deactivate`)
     expect(d.messages[0]!.deactivate).toBe(true)
   })
+
+  it('parses autonumber directive including start, step, and off', () => {
+    const d = parse(`sequenceDiagram
+      autonumber
+      A->>B: First step
+      B-->>A: Second step
+      autonumber off
+      A->>B: Unnumbered step
+      autonumber 10 5
+      A->>B: Step 10
+      B-->>A: Step 15`)
+    expect(d.messages.map(m => m.stepNumber)).toEqual([1, 2, undefined, 10, 15])
+  })
+
+  it('parses bidirectional arrows <<->> and <<-->>', () => {
+    const d = parse(`sequenceDiagram
+      A<<->>B: Sync call
+      A<<-->>B: Async bidirectional`)
+    expect(d.messages).toHaveLength(2)
+    expect(d.messages[0]!).toMatchObject({
+      from: 'A',
+      to: 'B',
+      lineStyle: 'solid',
+      arrowHead: 'filled',
+      arrowStart: 'filled',
+    })
+    expect(d.messages[1]!).toMatchObject({
+      from: 'A',
+      to: 'B',
+      lineStyle: 'dashed',
+      arrowHead: 'filled',
+      arrowStart: 'filled',
+    })
+  })
 })
 
 // ============================================================================

@@ -115,4 +115,56 @@ describe('renderMermaidSVG – sequence diagrams', () => {
     expect(svg).toContain('Database')
     expect(svg).toContain('POST /login')
   })
+
+  it('renders 1-based step badges when autonumber is enabled', () => {
+    const svg = renderMermaidSVG(`sequenceDiagram
+      autonumber
+      A->>B: First call
+      B->>B: Self check
+      B-->>A: Done`)
+    expect(svg).toContain('data-step="1"')
+    expect(svg).toContain('data-step="2"')
+    expect(svg).toContain('data-step="3"')
+    expect(svg).toContain('class="sequence-number"')
+    expect(svg).toContain('class="sequence-number-label"')
+  })
+
+  it('widens inter-actor gaps for self-messages and long message labels and renders blocks above lifelines', () => {
+    const svg = renderMermaidSVG(`sequenceDiagram
+      autonumber
+      actor User
+      participant UI as Web UI
+      participant Backend as Main Server
+      participant Hub as Shared Runtime
+      participant Sub as Tool Process
+      User->>UI: Open tool
+      UI->>Backend: Send session ID and tool name
+      Backend->>Hub: Get saved result
+      alt Saved result found
+        Hub-->>Backend: Return saved result
+        Backend-->>UI: Return result
+      else No saved result
+        Backend->>Backend: Load tool in a new process
+        Backend->>Sub: Start main program from its package, in a temp folder
+        Sub-->>Backend: Return result or web address
+        Backend->>Backend: Save result to shared folder
+        Backend-->>UI: Show report in a safe frame
+      end`)
+    expect(svg).toContain('data-step="10"')
+    const lifelinePos = svg.indexOf('class="lifeline"')
+    const blockPos = svg.indexOf('class="block"')
+    expect(lifelinePos).toBeGreaterThan(0)
+    expect(blockPos).toBeGreaterThan(lifelinePos)
+  })
+
+  it('renders bidirectional arrows and offsets autonumber badge from start arrowhead', () => {
+    const svg = renderMermaidSVG(`sequenceDiagram
+      autonumber
+      A<<->>B: Bidirectional sync
+      B<<-->>A: Bidirectional reply`)
+    expect(svg).toContain('data-arrow-start="filled"')
+    expect(svg).toContain('marker-start="url(#seq-arrow)"')
+    expect(svg).toContain('data-step="1"')
+    expect(svg).toContain('data-step="2"')
+  })
 })

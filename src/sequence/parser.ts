@@ -40,9 +40,22 @@ export function parseSequenceDiagram(lines: string[]): SequenceDiagram {
   const actorIds = new Set<string>()
   // Track block nesting with a stack
   const blockStack: Array<{ type: Block['type']; label: string; startIndex: number; dividers: Block['dividers'] }> = []
+  let autoNum: { next: number; step: number } | undefined
 
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i]!
+
+    // --- Autonumber directive (autonumber [start [step] | off]) ---
+    const autoMatch = line.match(/^autonumber(?:\s+(off|\d+)(?:\s+(\d+))?)?$/i)
+    if (autoMatch) {
+      autoNum = autoMatch[1]?.toLowerCase() === 'off'
+        ? undefined
+        : {
+            next: autoMatch[1] ? Number(autoMatch[1]) : (autoNum?.next ?? 1),
+            step: autoMatch[2] ? Number(autoMatch[2]) : (autoNum?.step ?? 1),
+          }
+      continue
+    }
 
     // --- Participant / Actor declaration ---
     // "participant A as Alice" or "participant Alice"
@@ -128,10 +141,11 @@ export function parseSequenceDiagram(lines: string[]): SequenceDiagram {
     }
 
     // --- Message ---
-    // Patterns: A->>B, A-->>B, A-)B, A--)B, with optional +/- activation
+    // Patterns: A->>B, A-->>B, A-)B, A--)B, A<<->>B, A<<-->>B, etc.
+    // with optional +/- activation
     // Format: FROM ARROW TO: LABEL
     const msgMatch = line.match(
-      /^(\S+?)\s*(--?>?>|--?[)x]|--?>>|--?>)\s*([+-]?)(\S+?)\s*:\s*(.+)$/
+      /^(\S+?)\s*(<<--?>>|--?>?>|--?[)x]|--?>>|--?>)\s*([+-]?)(\S+?)\s*:\s*(.+)$/
     )
     if (msgMatch) {
       const from = msgMatch[1]!
@@ -145,9 +159,10 @@ export function parseSequenceDiagram(lines: string[]): SequenceDiagram {
       ensureActor(diagram, actorIds, to)
 
       // Determine line style and arrow head from the arrow operator
-      const lineStyle = arrow.startsWith('--') ? 'dashed' : 'solid'
+      const lineStyle = arrow.includes('--') ? 'dashed' : 'solid'
       // ">>" = filled arrow, ")" or ">" alone = open arrow, "x" = cross (treat as filled)
-      const arrowHead = arrow.includes('>>') || arrow.includes('x') ? 'filled' : 'open'
+      const arrowHead = arrow.endsWith('>>') || arrow.includes('x') ? 'filled' : 'open'
+      const arrowStart = arrow.startsWith('<<') ? 'filled' : undefined
 
       const msg: Message = {
         from,
@@ -156,10 +171,15 @@ export function parseSequenceDiagram(lines: string[]): SequenceDiagram {
         lineStyle,
         arrowHead,
       }
+      if (arrowStart) msg.arrowStart = arrowStart
 
       // Activation/deactivation via +/- prefix on target
       if (activationMark === '+') msg.activate = true
       if (activationMark === '-') msg.deactivate = true
+      if (autoNum) {
+        msg.stepNumber = autoNum.next
+        autoNum.next += autoNum.step
+      }
 
       diagram.messages.push(msg)
       continue
@@ -167,7 +187,7 @@ export function parseSequenceDiagram(lines: string[]): SequenceDiagram {
 
     // --- Simplified message format: A->>B: Label (fallback with more relaxed regex) ---
     const simpleMsgMatch = line.match(
-      /^(\S+?)\s*(->>|-->>|-\)|--\)|-x|--x|->|-->)\s*([+-]?)(\S+?)\s*:\s*(.+)$/
+      /^(\S+?)\s*(<<--?>>|->>|-->>|-\)|--\)|-x|--x|->|-->)\s*([+-]?)(\S+?)\s*:\s*(.+)$/
     )
     if (simpleMsgMatch) {
       const from = simpleMsgMatch[1]!
@@ -179,12 +199,18 @@ export function parseSequenceDiagram(lines: string[]): SequenceDiagram {
       ensureActor(diagram, actorIds, from)
       ensureActor(diagram, actorIds, to)
 
-      const lineStyle = arrow.startsWith('--') ? 'dashed' : 'solid'
-      const arrowHead = arrow.includes('>>') || arrow.includes('x') ? 'filled' : 'open'
+      const lineStyle = arrow.includes('--') ? 'dashed' : 'solid'
+      const arrowHead = arrow.endsWith('>>') || arrow.includes('x') ? 'filled' : 'open'
+      const arrowStart = arrow.startsWith('<<') ? 'filled' : undefined
 
       const msg: Message = { from, to, label, lineStyle, arrowHead }
+      if (arrowStart) msg.arrowStart = arrowStart
       if (activationMark === '+') msg.activate = true
       if (activationMark === '-') msg.deactivate = true
+      if (autoNum) {
+        msg.stepNumber = autoNum.next
+        autoNum.next += autoNum.step
+      }
 
       diagram.messages.push(msg)
       continue

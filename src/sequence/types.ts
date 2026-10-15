@@ -32,10 +32,14 @@ export interface Message {
   lineStyle: 'solid' | 'dashed'
   /** Arrow head: filled (closed) or open */
   arrowHead: 'filled' | 'open'
+  /** Arrow start head for bidirectional arrows: filled (closed) or open */
+  arrowStart?: 'filled' | 'open'
   /** Activate the target lifeline (+) */
   activate?: boolean
   /** Deactivate the source lifeline (-) */
   deactivate?: boolean
+  /** Step number when autonumber is enabled */
+  stepNumber?: number
 }
 
 export interface Block {
@@ -103,6 +107,8 @@ export interface PositionedMessage {
   label: string
   lineStyle: 'solid' | 'dashed'
   arrowHead: 'filled' | 'open'
+  /** Arrow start head for bidirectional arrows: filled (closed) or open */
+  arrowStart?: 'filled' | 'open'
   /** Start point (from actor's lifeline) */
   x1: number
   /** End point (to actor's lifeline) */
@@ -111,6 +117,8 @@ export interface PositionedMessage {
   y: number
   /** Whether this is a self-message (same actor) */
   isSelf: boolean
+  /** Step number when autonumber is enabled */
+  stepNumber?: number
 }
 
 /** Narrow rectangle on a lifeline showing active processing */
