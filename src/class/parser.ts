@@ -208,13 +208,18 @@ function parseMember(line: string): { member: ClassMember; isMethod: boolean } |
     }
   }
 
-  // It's an attribute: [Type] name or name Type
-  // Common patterns: "String name", "+int age", "name"
+  // It's an attribute: "Type name", "name: Type" or "name"
+  // Common patterns: "String name", "+int age", "+id: UUID", "name"
   const parts = rest.split(/\s+/)
   let name: string
   let type: string | undefined
 
-  if (parts.length >= 2) {
+  // "name: Type" pattern (UML and TypeScript style), which Mermaid prints as written
+  const typed = rest.match(/^([^\s:]+)\s*:\s*(.+)$/)
+  if (typed) {
+    name = typed[1]!
+    type = typed[2]!.trim()
+  } else if (parts.length >= 2) {
     // "Type name" pattern
     type = parts[0]
     name = parts.slice(1).join(' ')

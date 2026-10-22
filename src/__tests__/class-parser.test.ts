@@ -32,6 +32,23 @@ describe('parseClassDiagram – class definitions', () => {
     expect(d.classes[0]!.methods).toHaveLength(2)
   })
 
+  it('parses "name: Type" attributes, as UML and TypeScript write them', () => {
+    const d = parse(`classDiagram
+      class BaseEntity {
+        +id: UUID
+        +createdAt : Date
+        -tags: List~string~
+        +String name
+      }`)
+    const attributes = d.classes[0]!.attributes
+    expect(attributes.map(a => [a.visibility, a.name, a.type])).toEqual([
+      ['+', 'id', 'UUID'],
+      ['+', 'createdAt', 'Date'],
+      ['-', 'tags', 'List~string~'],
+      ['+', 'name', 'String'],
+    ])
+  })
+
   it('parses attribute visibility (+ - # ~)', () => {
     const d = parse(`classDiagram
       class MyClass {
