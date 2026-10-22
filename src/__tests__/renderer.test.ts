@@ -80,6 +80,13 @@ describe('renderSvg – SVG structure', () => {
     expect(svg).toContain('Inter')
   })
 
+  it('leaves the font import out when fonts are not embedded, keeping the font family', () => {
+    const svg = renderSvg(makeGraph(), lightColors, 'Inter', false, false)
+    expect(svg).not.toContain('fonts.googleapis.com')
+    expect(svg).not.toContain('@import')
+    expect(svg).toContain("font-family: 'Inter'")
+  })
+
   it('uses custom font name when specified', () => {
     const svg = renderSvg(makeGraph(), lightColors, 'Roboto Mono')
     // encodeURIComponent turns spaces into %20

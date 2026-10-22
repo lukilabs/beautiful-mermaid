@@ -119,6 +119,7 @@ export function renderMermaidSVG(
   const colors = buildColors(options)
   const font = options.font ?? 'Inter'
   const transparent = options.transparent ?? false
+  const embedFonts = options.embedFonts ?? true
   const diagramType = detectDiagramType(text)
 
   const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0 && !l.startsWith('%%'))
@@ -127,28 +128,28 @@ export function renderMermaidSVG(
     case 'sequence': {
       const diagram = parseSequenceDiagram(lines)
       const positioned = layoutSequenceDiagram(diagram, options)
-      return renderSequenceSvg(positioned, colors, font, transparent)
+      return renderSequenceSvg(positioned, colors, font, transparent, embedFonts)
     }
     case 'class': {
       const diagram = parseClassDiagram(lines)
       const positioned = layoutClassDiagramSync(diagram, options)
-      return renderClassSvg(positioned, colors, font, transparent)
+      return renderClassSvg(positioned, colors, font, transparent, embedFonts)
     }
     case 'er': {
       const diagram = parseErDiagram(lines)
       const positioned = layoutErDiagramSync(diagram, options)
-      return renderErSvg(positioned, colors, font, transparent)
+      return renderErSvg(positioned, colors, font, transparent, embedFonts)
     }
     case 'xychart': {
       const chart = parseXYChart(lines)
       const positioned = layoutXYChart(chart, options)
-      return renderXYChartSvg(positioned, colors, font, transparent, options.interactive ?? false)
+      return renderXYChartSvg(positioned, colors, font, transparent, options.interactive ?? false, embedFonts)
     }
     case 'flowchart':
     default: {
       const graph = parseMermaid(text)
       const positioned = layoutGraphSync(graph, options)
-      return renderSvg(positioned, colors, font, transparent)
+      return renderSvg(positioned, colors, font, transparent, embedFonts)
     }
   }
 }

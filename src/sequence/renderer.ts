@@ -29,13 +29,14 @@ export function renderSequenceSvg(
   diagram: PositionedSequenceDiagram,
   colors: DiagramColors,
   font: string = 'Inter',
-  transparent: boolean = false
+  transparent: boolean = false,
+  embedFonts: boolean = true
 ): string {
   const parts: string[] = []
 
   // SVG root with CSS variables + style block + defs
   parts.push(svgOpenTag(diagram.width, diagram.height, colors, transparent))
-  parts.push(buildStyleBlock(font, false))
+  parts.push(buildStyleBlock(font, false, embedFonts))
   parts.push('<defs>')
 
   // Arrow marker definitions

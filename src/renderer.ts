@@ -36,13 +36,14 @@ export function renderSvg(
   graph: PositionedGraph,
   colors: DiagramColors,
   font: string = 'Inter',
-  transparent: boolean = false
+  transparent: boolean = false,
+  embedFonts: boolean = true
 ): string {
   const parts: string[] = []
 
   // SVG root with CSS variables + style block + defs
   parts.push(svgOpenTag(graph.width, graph.height, colors, transparent))
-  parts.push(buildStyleBlock(font, false))
+  parts.push(buildStyleBlock(font, false, embedFonts))
   parts.push('<defs>')
   parts.push(arrowMarkerDefs())
   // Per-color arrow markers for edges with custom stroke via linkStyle

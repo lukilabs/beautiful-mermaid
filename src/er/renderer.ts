@@ -36,13 +36,14 @@ export function renderErSvg(
   diagram: PositionedErDiagram,
   colors: DiagramColors,
   font: string = 'Inter',
-  transparent: boolean = false
+  transparent: boolean = false,
+  embedFonts: boolean = true
 ): string {
   const parts: string[] = []
 
   // SVG root with CSS variables + style block (with mono font) + defs
   parts.push(svgOpenTag(diagram.width, diagram.height, colors, transparent))
-  parts.push(buildStyleBlock(font, true))
+  parts.push(buildStyleBlock(font, true, embedFonts))
   parts.push('<defs>')
   parts.push('</defs>') // No marker defs — we draw crow's foot inline
 

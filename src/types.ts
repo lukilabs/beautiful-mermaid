@@ -149,6 +149,8 @@ export interface RenderOptions {
 
   /** Font family for all text. Default: 'Inter' */
   font?: string
+  /** Import the font from Google Fonts in the SVG's style. Default: true */
+  embedFonts?: boolean
   /** Canvas padding in px. Default: 40 */
   padding?: number
   /** Horizontal spacing between sibling nodes. Default: 24 */

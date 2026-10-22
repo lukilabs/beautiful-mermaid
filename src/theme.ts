@@ -235,13 +235,14 @@ export function fromShikiTheme(theme: ShikiThemeLike): DiagramColors {
  * a parent element, it's used directly. When unset, the fallback computes
  * a blended value from --fg and --bg using color-mix().
  */
-export function buildStyleBlock(font: string, hasMonoFont: boolean): string {
-  const fontImports = [
+export function buildStyleBlock(font: string, hasMonoFont: boolean, embedFonts: boolean = true): string {
+  // A host that serves its own fonts, or allows no third-party requests, leaves the imports out.
+  const fontImports = embedFonts ? [
     `@import url('https://fonts.googleapis.com/css2?family=${encodeURIComponent(font)}:wght@400;500;600;700&amp;display=swap');`,
     ...(hasMonoFont
       ? [`@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&amp;display=swap');`]
       : []),
-  ]
+  ] : []
 
   // Derived CSS variables: use override if set, else mix from bg+fg.
   // The --_ prefix signals "private/derived" — not meant for external override.

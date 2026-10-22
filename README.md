@@ -511,6 +511,7 @@ Render a Mermaid diagram to SVG. Synchronous. Auto-detects diagram type.
 | `surface` | `string?` | — | Node fill tint |
 | `border` | `string?` | — | Node stroke color |
 | `font` | `string` | `Inter` | Font family |
+| `embedFonts` | `boolean` | `true` | Import the font from Google Fonts; `false` leaves it to the host, for pages that serve their own fonts or allow no third-party requests |
 | `transparent` | `boolean` | `false` | Render with transparent background |
 | `padding` | `number` | `40` | Canvas padding in px |
 | `nodeSpacing` | `number` | `24` | Horizontal spacing between sibling nodes |

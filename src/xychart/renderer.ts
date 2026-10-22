@@ -61,6 +61,7 @@ export function renderXYChartSvg(
   font: string = 'Inter',
   transparent: boolean = false,
   interactive: boolean = false,
+  embedFonts: boolean = true,
 ): string {
   const parts: string[] = []
 
@@ -70,7 +71,7 @@ export function renderXYChartSvg(
   const svgTag = svgOpenTag(chart.width, chart.height, colors, transparent)
     .replace('<svg ', `<svg data-xychart-colors="${maxColorIdx}" `)
   parts.push(svgTag)
-  parts.push(buildStyleBlock(font, false))
+  parts.push(buildStyleBlock(font, false, embedFonts))
 
   // Sparse lines (≤12 points) show dots by default
   const maxLinePoints = Math.max(...chart.lines.map(l => l.points.length), 0)
