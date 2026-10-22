@@ -49,6 +49,10 @@ export interface Block {
   endIndex: number
   /** For alt/par blocks: indices where "else"/"and" dividers appear (message indices) */
   dividers: Array<{ index: number; label: string }>
+  /** Index of the first note inside this block */
+  noteStartIndex: number
+  /** Index one past the last note inside this block */
+  noteEndIndex: number
 }
 
 export interface Note {

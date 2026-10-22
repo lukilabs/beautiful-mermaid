@@ -8,6 +8,7 @@
 import { describe, it, expect } from 'bun:test'
 import { parseSequenceDiagram } from '../sequence/parser.ts'
 import { layoutSequenceDiagram } from '../sequence/layout.ts'
+import { estimateTextWidth, FONT_SIZES, FONT_WEIGHTS } from '../styles.ts'
 
 /** Helper: parse and layout a sequence diagram from source lines */
 function layout(source: string) {
@@ -436,14 +437,18 @@ describe('sequence layout – render clearance', () => {
     const divider = block.dividers[0]!
     const msgAfter = result.messages[2]! // "403 Forbidden"
 
-    // With the overlap-aware offset (36 instead of default 28), the divider
-    // label baseline (divider.y + 14) should be further from the message
-    // label baseline (msg.y - 6), giving at least 14px baseline clearance.
-    const divLabelBaseline = divider.y + 14
-    const msgLabelBaseline = msgAfter.y - 6
-    const baselineClearance = msgLabelBaseline - divLabelBaseline
+    // The labels must not collide: either the actor gap is wide enough that they
+    // do not overlap horizontally, or the overlap-aware offset (36 instead of the
+    // default 28) leaves at least 14px between the divider label baseline
+    // (divider.y + 14) and the message label baseline (msg.y - 6).
+    const divLabelRight =
+      block.x + 8 + estimateTextWidth(`[${divider.label}]`, FONT_SIZES.edgeLabel, FONT_WEIGHTS.edgeLabel)
+    const msgLabelLeft =
+      (msgAfter.x1 + msgAfter.x2) / 2 -
+      estimateTextWidth(msgAfter.label, FONT_SIZES.edgeLabel, FONT_WEIGHTS.edgeLabel) / 2
+    const baselineClearance = msgAfter.y - 6 - (divider.y + 14)
 
-    expect(baselineClearance).toBeGreaterThanOrEqual(14)
+    expect(divLabelRight <= msgLabelLeft || baselineClearance >= 14).toBe(true)
   })
 
   it('short divider labels keep the default offset (no unnecessary extra space)', () => {
@@ -745,3 +750,163 @@ describe('sequence layout – note positioning', () => {
     }
   })
 })
+
+describe('sequence layout – label fitting', () => {
+  const longLabel = 'POST /api/widgets/batch?includeArchived=true&pageSize=250'
+
+  function lifelineGap(result: ReturnType<typeof layout>) {
+    return result.lifelines[1]!.x - result.lifelines[0]!.x
+  }
+
+  it('keeps the default gap when labels are short', () => {
+    const result = layout(`sequenceDiagram
+      A->>B: Hi`)
+    expect(lifelineGap(result)).toBe(140)
+  })
+
+  it('widens the gap so a long message label fits between lifelines', () => {
+    const result = layout(`sequenceDiagram
+      A->>B: ${longLabel}`)
+    expect(lifelineGap(result)).toBeGreaterThan(longLabel.length * 5)
+  })
+
+  it('widens the gap so a self-message label stops before the next lifeline', () => {
+    const result = layout(`sequenceDiagram
+      participant A
+      participant B
+      A->>A: ${longLabel}`)
+    expect(lifelineGap(result)).toBeGreaterThan(38 + longLabel.length * 5)
+  })
+
+  it('widens the gap so a block header tab fits', () => {
+    const short = layout(`sequenceDiagram
+      A->>B: x`)
+    const withBlock = layout(`sequenceDiagram
+      loop Until every worker has drained its queue and reported back
+        A->>B: x
+      end`)
+    expect(lifelineGap(withBlock)).toBeGreaterThan(lifelineGap(short))
+  })
+
+  it('spreads a label spanning several actors over the gaps it crosses', () => {
+    const result = layout(`sequenceDiagram
+      participant A
+      participant B
+      participant C
+      A->>C: ${longLabel}`)
+    const left = result.lifelines[1]!.x - result.lifelines[0]!.x
+    const right = result.lifelines[2]!.x - result.lifelines[1]!.x
+    expect(left).toBeCloseTo(right)
+    expect(left + right).toBeGreaterThan(longLabel.length * 5)
+  })
+})
+
+describe('sequence layout – block contents', () => {
+  const longLabel = 'POST /api/widgets/batch?includeArchived=true&pageSize=250'
+
+  function right(b: { x: number; width: number }) {
+    return b.x + b.width
+  }
+
+  it('widens a block to hold a self-message label', () => {
+    const result = layout(`sequenceDiagram
+      participant A
+      participant B
+      loop Poll
+        B->>B: ${longLabel}
+      end`)
+    const msg = result.messages[0]!
+    const labelRight =
+      msg.x1 + 38 + estimateTextWidth(longLabel, FONT_SIZES.edgeLabel, FONT_WEIGHTS.edgeLabel)
+    expect(right(result.blocks[0]!)).toBeGreaterThan(labelRight)
+  })
+
+  it('widens a block to hold its header tab', () => {
+    const result = layout(`sequenceDiagram
+      participant A
+      participant B
+      opt ${longLabel}
+        B->>B: x
+      end`)
+    const block = result.blocks[0]!
+    const tabW = estimateTextWidth(`opt [${longLabel}]`, FONT_SIZES.edgeLabel, FONT_WEIGHTS.groupHeader) + 16
+    expect(block.width).toBeGreaterThan(tabW)
+    expect(result.width).toBeGreaterThanOrEqual(right(block))
+  })
+
+  it('widens a block and the gap after its first actor to hold divider labels', () => {
+    const result = layout(`sequenceDiagram
+      alt ok
+        A->>B: Save
+      else ${longLabel}
+        B-->>A: 409
+      end`)
+    const block = result.blocks[0]!
+    const divRight =
+      block.x + 8 + estimateTextWidth(`[${longLabel}]`, FONT_SIZES.edgeLabel, FONT_WEIGHTS.edgeLabel)
+    expect(right(block)).toBeGreaterThan(divRight)
+    expect(result.lifelines[1]!.x).toBeGreaterThan(divRight)
+  })
+
+  it('encloses notes written inside the block', () => {
+    const result = layout(`sequenceDiagram
+      loop Every minute
+        A->>B: Poll
+        Note right of B: Backs off exponentially after failures
+      end`)
+    const block = result.blocks[0]!
+    const note = result.notes[0]!
+    expect(block.x).toBeLessThan(note.x)
+    expect(right(block)).toBeGreaterThan(right(note))
+    expect(block.y + block.height).toBeGreaterThan(note.y + note.height)
+  })
+
+  it('leaves out notes written after the block', () => {
+    const result = layout(`sequenceDiagram
+      loop Every minute
+        A->>B: Poll
+      end
+      Note right of B: Backs off exponentially after failures`)
+    expect(right(result.blocks[0]!)).toBeLessThan(right(result.notes[0]!))
+  })
+
+  it('nests blocks inside each other with stacked header tabs', () => {
+    const result = layout(`sequenceDiagram
+      A->>B: Before
+      loop Retry
+        alt success
+          A->>B: Request
+        else failure
+          B-->>A: Error
+        end
+      end
+      A->>B: After`)
+    const [inner, outer] = result.blocks as [PositionedBlockLike, PositionedBlockLike]
+    expect(inner.type).toBe('alt')
+    expect(outer.x).toBeLessThan(inner.x)
+    expect(right(outer)).toBeGreaterThan(right(inner))
+    // The outer tab (18px tall) ends above the inner block's top edge
+    expect(outer.y + 18).toBeLessThan(inner.y)
+    expect(outer.y + outer.height).toBeGreaterThan(inner.y + inner.height)
+    // The next message's label stays below the outer block
+    expect(result.messages[3]!.y - 16).toBeGreaterThan(outer.y + outer.height)
+  })
+
+  it('puts a divider above the header of a block opening right after it', () => {
+    const result = layout(`sequenceDiagram
+      alt ok
+        A->>B: Save
+      else retry
+        loop Backoff
+          A->>B: Save again
+        end
+      end`)
+    const [inner, outer] = result.blocks as [PositionedBlockLike, PositionedBlockLike]
+    const divider = outer.dividers[0]!
+    expect(divider.y).toBeGreaterThan(result.messages[0]!.y)
+    // The divider label (centred 14px below the divider) clears the inner block
+    expect(divider.y + 20).toBeLessThan(inner.y)
+  })
+})
+
+type PositionedBlockLike = ReturnType<typeof layout>['blocks'][number]

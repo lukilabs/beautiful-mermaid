@@ -39,7 +39,7 @@ export function parseSequenceDiagram(lines: string[]): SequenceDiagram {
   // Track actor IDs to auto-create actors referenced in messages
   const actorIds = new Set<string>()
   // Track block nesting with a stack
-  const blockStack: Array<{ type: Block['type']; label: string; startIndex: number; dividers: Block['dividers'] }> = []
+  const blockStack: Array<{ type: Block['type']; label: string; startIndex: number; noteStartIndex: number; dividers: Block['dividers'] }> = []
 
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i]!
@@ -97,6 +97,7 @@ export function parseSequenceDiagram(lines: string[]): SequenceDiagram {
         type: blockType,
         label,
         startIndex: diagram.messages.length,
+        noteStartIndex: diagram.notes.length,
         dividers: [],
       })
       continue
@@ -123,6 +124,8 @@ export function parseSequenceDiagram(lines: string[]): SequenceDiagram {
         startIndex: completed.startIndex,
         endIndex: Math.max(diagram.messages.length - 1, completed.startIndex),
         dividers: completed.dividers,
+        noteStartIndex: completed.noteStartIndex,
+        noteEndIndex: diagram.notes.length,
       })
       continue
     }

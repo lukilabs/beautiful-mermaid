@@ -3,6 +3,7 @@ import type { DiagramColors } from '../theme.ts'
 import { svgOpenTag, buildStyleBlock } from '../theme.ts'
 import { FONT_SIZES, FONT_WEIGHTS, STROKE_WIDTHS, ARROW_HEAD, estimateTextWidth, TEXT_BASELINE_SHIFT } from '../styles.ts'
 import { renderMultilineText, escapeXml as escapeXmlUtil } from '../multiline-utils.ts'
+import { LINE_HEIGHT_RATIO } from '../text-metrics.ts'
 
 // ============================================================================
 // Sequence diagram SVG renderer
@@ -42,14 +43,14 @@ export function renderSequenceSvg(
   parts.push(arrowMarkerDefs())
   parts.push('</defs>')
 
-  // 1. Block backgrounds (loop/alt/opt rectangles)
-  for (const block of diagram.blocks) {
-    parts.push(renderBlock(block))
-  }
-
-  // 2. Lifelines (dashed vertical lines from actor to bottom)
+  // 1. Lifelines (dashed vertical lines from actor to bottom)
   for (const lifeline of diagram.lifelines) {
     parts.push(renderLifeline(lifeline))
+  }
+
+  // 2. Block backgrounds (loop/alt/opt rectangles), drawn over the lifelines so header tabs stay legible
+  for (const block of diagram.blocks) {
+    parts.push(renderBlock(block))
   }
 
   // 3. Activation boxes
@@ -275,6 +276,14 @@ function renderBlock(block: PositionedBlock): string {
       `stroke="var(--_line)" stroke-width="0.75" stroke-dasharray="6 4" />`
     )
     if (divider.label) {
+      // Backdrop so the lifeline the label sits on does not cross it
+      const text = `[${divider.label}]`
+      const lines = text.split('\n')
+      const w = Math.max(...lines.map(l => estimateTextWidth(l, FONT_SIZES.edgeLabel, FONT_WEIGHTS.edgeLabel)))
+      const h = FONT_SIZES.edgeLabel * LINE_HEIGHT_RATIO * lines.length
+      parts.push(
+        `  <rect x="${block.x + 6}" y="${divider.y + 14 - h / 2}" width="${w + 4}" height="${h}" fill="var(--bg)" />`
+      )
       // Divider label supports multi-line
       parts.push(
         '  ' + renderMultilineText(`[${divider.label}]`, block.x + 8, divider.y + 14, FONT_SIZES.edgeLabel,
