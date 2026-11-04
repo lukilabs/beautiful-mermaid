@@ -14,7 +14,7 @@ import {
   Up, Down, Left, Right, UpperLeft, UpperRight, LowerLeft, LowerRight, Middle,
   drawingCoordEquals,
 } from './types.ts'
-import { mkCanvas, copyCanvas, getCanvasSize, mergeCanvases, drawText, mkRoleCanvas, setRole, mergeRoleCanvases } from './canvas.ts'
+import { mkCanvas, copyCanvas, getCanvasSize, mergeCanvases, clearLabelGaps, drawText, mkRoleCanvas, setRole, mergeRoleCanvases } from './canvas.ts'
 import type { RoleCanvas, CharRole } from './types.ts'
 import { determineDirection, dirEquals } from './edge-routing.ts'
 import { gridToDrawingCoord, lineToDrawing } from './grid.ts'
@@ -1359,6 +1359,7 @@ export function drawGraph(graph: AsciiGraph): Canvas {
   fillRolesFromCanvases(graph.roleCanvas, arrowHeadStartCanvases, zero, 'arrow')
 
   graph.canvas = mergeCanvases(graph.canvas, zero, useAscii, ...labelCanvases)
+  for (const label of labelCanvases) clearLabelGaps(graph.canvas, label)
   fillRolesFromCanvases(graph.roleCanvas, labelCanvases, zero, 'text')
 
   // Draw subgraph labels last (on top)

@@ -174,6 +174,16 @@ const JUNCTION_CHARS = new Set([
   '─', '│', '┌', '┐', '└', '┘', '├', '┤', '┬', '┴', '┼', '╴', '╵', '╶', '╷',
 ])
 
+export function clearLabelGaps(canvas: Canvas, label: Canvas): void {
+  for (let y = 0; y < (label[0]?.length ?? 0); y++) {
+    const xs = label.map((col, x) => (col[y] !== ' ' ? x : -1)).filter(x => x >= 0)
+    if (xs.length === 0) continue
+    for (let x = xs[0]!; x <= xs[xs.length - 1]!; x++) {
+      if (label[x]![y] === ' ' && !isAlphanumeric(canvas[x]![y]!)) canvas[x]![y] = ' '
+    }
+  }
+}
+
 export function isJunctionChar(c: string): boolean {
   return JUNCTION_CHARS.has(c)
 }

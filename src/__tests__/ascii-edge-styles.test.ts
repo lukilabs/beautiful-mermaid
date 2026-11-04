@@ -131,4 +131,11 @@ describe('ASCII edge styles', () => {
       expect(result).toContain('D')
     })
   })
+
+  describe('edge labels', () => {
+    it('keeps the line out of spaces inside a label', () => {
+      const result = renderMermaidAscii('graph TD\n  A -->|push = build| B', { colorMode: 'none' })
+      expect(result).toContain('push = build')
+    })
+  })
 })
