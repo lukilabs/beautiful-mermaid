@@ -242,6 +242,32 @@ describe('Edge Approach Direction', () => {
     })
   })
 
+  describe('Layer alignment keeps the final segment', () => {
+    // The edge label keeps these branches from being bundled, and ELK staggers
+    // A, B and C, so alignment moves B and C toward the last bend of their edges.
+    for (const direction of ['TD', 'BT', 'LR', 'RL'] as const) {
+      it(`${direction}: every edge ends with a straight run into its target`, () => {
+        const parsed = parseMermaid(`graph ${direction}
+          D --> A
+          D --> B
+          D --> C
+          D -- x --> E`)
+        const positioned = layoutGraphSync(parsed, {})
+        const horizontal = direction === 'LR' || direction === 'RL'
+        const forward = direction === 'TD' || direction === 'LR' ? 1 : -1
+
+        expect(positioned.edges).toHaveLength(4)
+        for (const edge of positioned.edges) {
+          const { p1, p2 } = getFinalSegment(edge.points)!
+          const along = (horizontal ? p2.x - p1.x : p2.y - p1.y) * forward
+          const across = horizontal ? p2.y - p1.y : p2.x - p1.x
+          expect(along).toBeGreaterThanOrEqual(8)
+          expect(Math.abs(across)).toBeLessThan(0.01)
+        }
+      })
+    }
+  })
+
   describe('Diamond shapes - approach direction preserved', () => {
     it('edges to diamond should approach with correct direction', () => {
       const parsed = parseMermaid(`graph TD
