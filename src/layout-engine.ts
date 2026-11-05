@@ -1024,9 +1024,8 @@ function resolveEdgeStyle(
  * Directly connected nodes (sharing an edge) are never merged into the same
  * layer group as an additional safety check.
  *
- * Edge endpoints connected to shifted nodes are adjusted proportionally.
- * Intermediate bend points are left unchanged — edge bundling or clipping
- * will recalculate them afterwards.
+ * Edges touching a shifted node are stretched along the flow axis between
+ * their moved endpoints, so bend points and labels keep their relative place.
  */
 function alignLayerNodes(
   nodes: PositionedNode[],
@@ -1118,6 +1117,22 @@ function alignLayerNodes(
 
     const srcDelta = deltas.get(edge.source)
     const tgtDelta = deltas.get(edge.target)
+    if (srcDelta == null && tgtDelta == null) continue
+
+    // Moving only the endpoints can leave a bend on the target's new border,
+    // collapsing the final segment under the arrowhead.
+    const axis = isHorizontal ? 'x' : 'y'
+    const start = edge.points[0]![axis]
+    const span = edge.points[edge.points.length - 1]![axis] - start
+    const startShift = srcDelta ?? 0
+    const endShift = tgtDelta ?? 0
+    if (Math.abs(span) > 0.5 || startShift === endShift) {
+      const scale = Math.abs(span) > 0.5 ? (span + endShift - startShift) / span : 1
+      const move = (value: number) => start + startShift + (value - start) * scale
+      for (const point of edge.points) point[axis] = move(point[axis])
+      if (edge.labelPosition) edge.labelPosition[axis] = move(edge.labelPosition[axis])
+      continue
+    }
 
     if (srcDelta != null) {
       // Shift first point and any subsequent points in the initial vertical/horizontal run
